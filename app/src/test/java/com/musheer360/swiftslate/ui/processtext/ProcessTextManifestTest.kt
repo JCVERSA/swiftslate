@@ -80,7 +80,10 @@ class ProcessTextManifestTest {
     }
 
     private fun locateManifest(): File {
-        var dir: File? = File(System.getProperty("user.dir")).absoluteFile
+        // Elvis over !!: explicit failure with context if the property is ever absent.
+        val userDir = System.getProperty("user.dir")
+            ?: throw AssertionError("user.dir system property is not set")
+        var dir: File? = File(userDir).absoluteFile
         while (dir != null) {
             val direct = File(dir, "src/main/AndroidManifest.xml")
             if (direct.isFile) return direct

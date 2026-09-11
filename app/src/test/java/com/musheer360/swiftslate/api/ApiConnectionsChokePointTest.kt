@@ -59,7 +59,10 @@ class ApiConnectionsChokePointTest {
      * (`app/`), but probing upward also covers a repo-root working directory and IDE runs.
      */
     private fun locateMainSourceRoot(): File {
-        var dir: File? = File(System.getProperty("user.dir")).absoluteFile
+        // Elvis over !!: explicit failure with context if the property is ever absent.
+        val userDir = System.getProperty("user.dir")
+            ?: throw AssertionError("user.dir system property is not set")
+        var dir: File? = File(userDir).absoluteFile
         while (dir != null) {
             val direct = File(dir, "src/main/java")
             if (direct.isDirectory) return direct
