@@ -42,6 +42,17 @@ class UpdateCheckWorker(
          * constructing a Worker: a wrong answer here either spams an update notification on
          * every run or silently never notifies.
          */
+        /**
+         * Whether [version] is a non-release build name. Dev builds use "1.0-dev" and PR
+         * previews "prNNN-<sha>", so anything after a "-" marks one. [isNewer] drops
+         * non-numeric segments, which would make every release tag compare newer than such a
+         * name and spam an unactionable notification — callers skip the check instead.
+         *
+         * Internal (rather than a private instance method) so it can be unit tested without
+         * constructing a Worker, like [isNewer].
+         */
+        internal fun isDevVersion(version: String): Boolean = "-" in version
+
         internal fun isNewer(latest: String, current: String): Boolean {
             val latestParts = latest.split(".").mapNotNull { it.toIntOrNull() }
             val currentParts = current.split(".").mapNotNull { it.toIntOrNull() }
@@ -62,7 +73,9 @@ class UpdateCheckWorker(
             val latestTag = release.optString("tag_name", "").removePrefix("v")
             val currentVersion = BuildConfig.VERSION_NAME.removePrefix("v")
 
-            if (latestTag.isBlank() || currentVersion.isBlank()) return@withContext Result.success()
+            if (latestTag.isBlank() || currentVersion.isBlank() || isDevVersion(currentVersion)) {
+                return@withContext Result.success()
+            }
 
             if (isNewer(latestTag, currentVersion) && !alreadyNotified(latestTag)) {
                 showNotification()

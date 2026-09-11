@@ -46,4 +46,13 @@ class UpdateCheckWorkerTest {
         assertFalse(UpdateCheckWorker.isNewer("abc", "1.0.49"))
         assertTrue(UpdateCheckWorker.isNewer("1.0.49", "1.0-dev"))
     }
+
+    @Test
+    fun isDevVersion_flagsDevAndPreviewBuildsOnly() {
+        assertTrue(UpdateCheckWorker.isDevVersion("1.0-dev"))
+        assertTrue(UpdateCheckWorker.isDevVersion("pr12-abc1234"))
+        assertFalse(UpdateCheckWorker.isDevVersion("1.0.49"))
+        assertFalse(UpdateCheckWorker.isDevVersion("1.0"))
+        assertFalse(UpdateCheckWorker.isDevVersion(""))
+    }
 }

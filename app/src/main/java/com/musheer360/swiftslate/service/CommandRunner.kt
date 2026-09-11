@@ -38,6 +38,24 @@ internal const val MAX_INPUT_CHARS = 1_000_000
 internal fun isInputTooLarge(text: String): Boolean = text.length > MAX_INPUT_CHARS
 
 /**
+ * Sampling-temperature bounds, matching the Settings slider (`valueRange = 0f..2f`) and the
+ * range Gemini/Groq/OpenAI-compatible providers accept.
+ */
+internal const val MIN_TEMPERATURE = 0.0
+internal const val MAX_TEMPERATURE = 2.0
+
+/**
+ * Pure policy behind the temperature guard, so it is unit-testable. Prefs are a trust
+ * boundary (corruption, backup/restore, hand edits): NaN falls back to the default and
+ * anything else is clamped, so a bad float can never reach the provider as a 400-class
+ * failure. coerceIn alone would not suffice — NaN comparisons are false, so NaN passes
+ * straight through it.
+ */
+internal fun sanitizeTemperature(stored: Float): Double =
+    if (stored.isNaN()) DEFAULT_TEMPERATURE.toDouble()
+    else stored.toDouble().coerceIn(MIN_TEMPERATURE, MAX_TEMPERATURE)
+
+/**
  * Everything a trigger command does between "user asked" and "text came back": provider
  * resolution, key rotation, rate-limit benching and error mapping. Both entry points call this
  * — the accessibility service for a typed `?trigger`, the text-selection sheet for a tapped
@@ -79,7 +97,7 @@ suspend fun runTextCommand(
     if (!provider.isConfigured(model, endpoint)) {
         return CommandOutcome.Unavailable(context.getString(R.string.toast_custom_not_configured))
     }
-    val temperature = prefs.getFloat(PrefKeys.TEMPERATURE, DEFAULT_TEMPERATURE).toDouble()
+    val temperature = sanitizeTemperature(prefs.getFloat(PrefKeys.TEMPERATURE, DEFAULT_TEMPERATURE))
     val useStructuredOutput = System.currentTimeMillis() -
         prefs.getLong(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT, 0L) > STRUCTURED_OUTPUT_RETRY_MS
 

@@ -21,6 +21,10 @@
 - [ ] Password fields are still ignored
 - [ ] If touching `service/CommandRunner.kt` or `ui/processtext/`, tested the text-selection
   popup too (with accessibility enabled and disabled)
+- [ ] If touching networking/endpoints, all connections still go through `api/ApiConnections.kt`
+  (no direct `openConnection()` — the choke-point test enforces this)
+- [ ] If touching `AndroidManifest.xml`, the ProcessTextActivity VIEW filter still has no
+  DEFAULT category (must not become an https link handler — the manifest test enforces this)
 - [ ] No new external dependencies added
 
 ## Checklist
