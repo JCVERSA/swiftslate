@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Cleartext is permitted at the platform layer because the NSC cannot
+         express IP ranges. The app-level guard (EndpointValidator) restricts
+         http:// to private-LAN endpoints; all other traffic is https://. -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

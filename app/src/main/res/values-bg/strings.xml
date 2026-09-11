@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SwiftSlate</string>
+    <string name="accessibility_service_label">Асистент SwiftSlate</string>
+    <string name="accessibility_service_desc">Предоставя системни замествания на текст с изкуствен интелект, когато се въвеждат тригерни команди.</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Табло</string>
+    <string name="service_status_active">Активен</string>
+    <string name="service_status_inactive">Неактивен</string>
+    <string name="service_enable">Включи</string>
+    <string name="dashboard_api_keys_title">API ключове</string>
+    <string name="dashboard_keys_configured">%1$d конфигурирани ключа</string>
+    <string name="dashboard_add_key_hint">Добавете API ключ, за да започнете.</string>
+    <string name="dashboard_monthly_requests">Този месец</string>
+    <string name="dashboard_favorite_command">Най-използвана команда</string>
+    <string name="dashboard_no_data">—</string>
+    <string name="dashboard_last_7_days">Последните 7 дни</string>
+
+    <!-- Keys -->
+    <string name="keys_title">API ключове</string>
+    <string name="keys_api_key_label">API ключ</string>
+    <string name="keys_testing">Тестване…</string>
+    <string name="keys_add_key">Добави ключ</string>
+    <string name="keys_valid_added">Валиден ключ е добавен!</string>
+    <string name="keys_already_added">Този ключ вече е добавен</string>
+    <string name="keys_validation_failed">Неуспешно валидиране</string>
+    <string name="keys_keystore_error">Сигурното съхранение на ключове не е налично на това устройство. Ключовете не могат да бъдат запазени.</string>
+    <string name="keys_custom_endpoint_required">Set the endpoint URL in Settings before adding a key for the Custom provider</string>
+    <string name="keys_get_api_key">Вземете своя API ключ за %1$s ↗</string>
+    <string name="keys_empty">Няма добавени API ключове</string>
+
+    <!-- Commands -->
+    <string name="commands_title">Команди</string>
+    <string name="commands_add_custom_title">Добавяне на потребителска команда</string>
+    <string name="commands_trigger_label">Тригер (напр. %1$scode)</string>
+    <string name="commands_prompt_label">Заявка (напр. Препиши като стихотворение)</string>
+    <string name="commands_add_command">Добави команда</string>
+    <string name="commands_delete_command">Изтрий</string>
+    <string name="commands_edit_command">Редактирай</string>
+    <string name="commands_save_command">Запази команда</string>
+    <string name="commands_cancel">Отказ</string>
+    <string name="commands_type_ai">ИИ</string>
+    <string name="commands_type_replacer">Локален</string>
+    <string name="commands_replacement_label">Текст за заместване (напр. myemail@example.com)</string>
+    <string name="commands_built_in">Вграден</string>
+    <string name="commands_error_prefix">Тригерът трябва да започва с \'%1$s\'</string>
+    <string name="commands_error_duplicate">Вече съществува команда с този тригер</string>
+    <string name="commands_error_conflict">Конфликт със съществуваща команда \'%1$s\' — единият тригер е префикс на другия</string>
+    <string name="commands_error_empty_trigger">Тригерът трябва да има име след префикса</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Настройки</string>
+    <string name="settings_provider_title">Доставчик на модел</string>
+    <string name="settings_provider_gemini">Google Gemini</string>
+    <string name="settings_provider_groq">Groq</string>
+    <string name="settings_provider_custom">Потребителски (съвместим с OpenAI)</string>
+    <string name="settings_model_title">Модел</string>
+    <string name="settings_temperature_title">Температура</string>
+    <string name="settings_endpoint_title">Крайна точка</string>
+    <string name="settings_endpoint_placeholder">https://api.example.com/v1</string>
+    <string name="settings_model_placeholder">gpt-4o, claude-3-haiku и др.</string>
+    <string name="settings_trigger_prefix_desc">Символ, използван преди имената на командите (напр. %1$sfix).</string>
+    <string name="settings_prefix_error_length">Трябва да е точно 1 знак</string>
+    <string name="settings_prefix_error_whitespace">Не може да бъде интервал</string>
+    <string name="settings_prefix_error_alphanumeric">Не може да бъде буква или цифра</string>
+    <string name="settings_endpoint_error_scheme">Трябва да започва с https://</string>
+    <string name="settings_endpoint_error_spaces">URL адресът не може да съдържа интервали</string>
+
+    <!-- Backup -->
+    <string name="backup_desc">Експортирайте или импортирайте вашите команди като JSON файл.</string>
+    <string name="backup_export">Експорт</string>
+    <string name="backup_import">Импорт</string>
+    <string name="backup_export_success">Командите са експортирани успешно</string>
+    <string name="backup_export_error">Неуспешен експорт</string>
+    <string name="backup_import_success">Командите са импортирани успешно</string>
+    <string name="backup_import_error">Невалиден файл за възстановяване</string>
+    <string name="backup_import_confirm">Това ще замени всичките ви съществуващи потребителски команди. Продължавате ли?</string>
+    <string name="backup_import_cancel">Отказ</string>
+    <string name="settings_check_updates">Проверка за актуализации</string>
+    <string name="settings_made_by">Направено с любов от Musheer Alam</string>
+    <string name="settings_sponsor">Спонсорирайте в GitHub</string>
+    <string name="commands_collapse">Свий</string>
+    <string name="commands_expand">Разгъни</string>
+    <string name="commands_search_hint">Търсене на команди…</string>
+    <string name="commands_search_close">Затваряне на търсенето</string>
+    <string name="commands_search_empty">Няма намерени команди</string>
+
+    <!-- Delete confirmation -->
+    <string name="delete_confirm_command_title">Да изтрия ли тази команда?</string>
+    <string name="delete_confirm_key_title">Да изтрия ли този API ключ?</string>
+    <string name="delete_confirm_message">Това действие не може да бъде отменено.</string>
+    <string name="delete_confirm_button">Изтрий</string>
+
+    <!-- Toasts and errors -->
+    <string name="toast_replace_failed">Текстът не можа да бъде заменен</string>
+    <string name="toast_custom_not_configured">Потребителският доставчик не е конфигуриран. Задайте крайна точка и модел в Настройки.</string>
+    <string name="toast_key_rate_limited">API ключът е с ограничена честота. Опитайте отново след %1$d сек</string>
+    <string name="toast_no_keys">Няма конфигурирани API ключове</string>
+    <string name="toast_all_keys_invalid">Всички API ключове са невалидни. Моля, проверете ключовете си</string>
+    <string name="toast_request_timed_out">Времето за заявката изтече</string>
+    <string name="process_text_title">Прилагане на команда</string>
+    <string name="process_text_replace">Замяна</string>
+    <string name="process_text_copy">Копиране</string>
+    <string name="process_text_back">Назад</string>
+    <string name="process_text_retry">Повторен опит</string>
+    <string name="process_text_copied">Копирано</string>
+    <string name="process_text_no_selection">Няма избран текст</string>
+    <string name="process_text_no_commands">Няма налични команди. Добавете команда в SwiftSlate.</string>
+    <string name="toast_restore_failed">Оригиналният текст не можа да бъде възстановен</string>
+    <string name="toast_nothing_to_undo">Няма нищо за отмяна</string>
+    <string name="toast_undo_failed">Отмяната беше неуспешна</string>
+    <string name="toast_nothing_to_copy">Няма нищо за копиране</string>
+    <string name="toast_copied">Копирано в клипборда</string>
+    <string name="toast_nothing_to_cut">Няма нищо за изрязване</string>
+    <string name="toast_cut">Изрязано в клипборда</string>
+    <string name="toast_clipboard_empty">Клипбордът е празен</string>
+    <string name="toast_clipboard_failed">Операцията с клипборда беше неуспешна</string>
+    <string name="error_no_model_access">Вашият API ключ няма достъп до този модел.</string>
+    <string name="error_invalid_key">Невалиден API ключ. Моля, проверете ключа си в Настройки.</string>
+    <string name="error_invalid_key_with_hint">Invalid API key (%1$s). Please check your keys in Settings.</string>
+    <string name="error_rate_limited">Ограничена честота. Опитайте отново скоро.</string>
+    <string name="error_model_not_found">Моделът не е намерен. Проверете избора на модел в Настройки.</string>
+    <string name="error_safety_blocked">Отговорът е блокиран от филтрите за безопасност. Опитайте да префразирате.</string>
+    <string name="error_empty_response">Моделът върна празен отговор. Опитайте отново.</string>
+    <string name="error_timeout_connection">Времето за заявката изтече. Проверете връзката си.</string>
+    <string name="error_no_internet">Няма интернет връзка.</string>
+    <string name="error_endpoint_unreachable">API не можа да бъде достигнат. Проверете URL адреса на крайната точка.</string>
+    <string name="error_bad_request">Заявката е неуспешна. Проверете настройките си.</string>
+
+    <!-- Updates -->
+    <string name="update_channel_name">Актуализации на приложението</string>
+    <string name="update_channel_desc">Известява, когато е налична нова версия на SwiftSlate</string>
+    <string name="update_available_title">Налична е актуализация на SwiftSlate</string>
+    <string name="update_available_text">Докоснете, за да видите последната версия</string>
+
+    <!-- Command descriptions -->
+    <string name="error_input_too_long">Текстът е твърде дълъг за лимита на токени в минута на този модел. Опитайте отново с по-кратък текст.</string>
+    <string name="note_response_truncated">[Бележка: отговорът може да е отрязан]</string>
+    <string name="error_provider_auth_required">Крайната точка отхвърли заявката. Ако е облачен сървър, влезте на самия сървър (напр. „ollama signin“).</string>
+    <string name="keys_endpoint_needs_v1">Крайната точка е достъпна, но адресът трябва да завършва на /v1 (напр. http://host:11434/v1).</string>
+    <string name="settings_fetch_models">Зареждане на модели</string>
+    <string name="settings_fetch_models_loading">Зареждане…</string>
+    <string name="settings_fetch_models_success">Заредени са %1$d модела</string>
+    <string name="settings_fetch_models_empty">Не са намерени модели. Все пак можете да въведете модел ръчно.</string>
+    <string name="settings_fetch_models_failed">Моделите не можаха да бъдат заредени. Проверете адреса и API ключа.</string>
+    <string name="settings_models_refresh">Обнови</string>
+    <string name="settings_models_need_key">Добавете API ключ по-горе, за да заредите списъка с модели.</string>
+    <string name="settings_models_load_failed">Моделите не успяха да се заредят. Проверете връзката и API ключа.</string>
+    <string name="settings_models_empty_provider">Няма налични модели за този API ключ.</string>
+    <string name="dashboard_service_killed_title">SwiftSlate беше прекъснат</string>
+    <string name="dashboard_service_killed_message">Фоновата услуга спря неочаквано. Активирайте я отново в настройките за достъпност, за да продължите да използвате командите.</string>
+    <string name="dashboard_service_killed_dismiss">Отхвърли</string>
+</resources>

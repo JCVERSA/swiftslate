@@ -1,0 +1,554 @@
+name: Build & Release
+
+on:
+  # Manual trigger: lets a maintainer re-run the release pipeline on demand.
+  # The version job auto-bumps from the existing tags, so this also serves as
+  # the recovery path when a run was cancelled mid-release and left a tag
+  # behind (delete the orphan tag first, then dispatch).
+  workflow_dispatch:
+  push:
+    branches: [master]
+    # Deliberately excludes '.github/workflows/**': the pipeline cuts a release
+    # on every matching push, and a CI-only commit must not burn a version
+    # number for zero app changes. Workflow changes made via PR still get
+    # lint/test through the pull_request trigger below.
+    paths:
+      - 'app/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle/**'
+      - 'gradle.properties'
+    tags: ['v*']
+  # Contributor pull requests previously ran no CI at all: the workflow only
+  # triggered on pushes to master, so #104 (50 locale files) was merged without
+  # lint or tests ever seeing it. Only lint and test run here — build and release
+  # need signing secrets, which are not exposed to pull requests.
+  pull_request:
+    branches: [master]
+    paths:
+      - 'app/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - '.github/workflows/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx3g -Dfile.encoding=UTF-8 -XX:+UseG1GC"
+
+jobs:
+  version:
+    name: Determine Version
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      # Orphan-tag self-healing below deletes a stale tag from origin.
+      contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version_name: ${{ steps.version.outputs.version_name }}
+      version_code: ${{ steps.version.outputs.version_code }}
+      create_tag: ${{ steps.version.outputs.create_tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Determine version
+        id: version
+        shell: bash
+        env:
+          # Passed via env rather than interpolated into the script: ${{ }} is substituted
+          # before bash sees it, so a tag containing shell metacharacters would be executed.
+          GIT_REF: ${{ github.ref }}
+          GIT_REF_NAME: ${{ github.ref_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          BASE_VERSION=$(grep 'val baseVersion' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
+
+          if [[ "$GIT_REF" == refs/tags/v* ]]; then
+            TAG="$GIT_REF_NAME"
+            CREATE_TAG=false
+          else
+            PATCH=$(git tag -l "v${BASE_VERSION}.*" | grep -v beta | sed "s/v${BASE_VERSION}\.//" | sort -n | tail -1)
+            NEXT=$((${PATCH:--1} + 1))
+            TAG="v${BASE_VERSION}.${NEXT}"
+            CREATE_TAG=true
+          fi
+
+          # Self-healing for cancelled release runs: a previous run on this branch can be
+          # cancelled (concurrency) AFTER its tag job created a tag but BEFORE build/release
+          # ran, leaving a tag with no release. That orphan would silently push every later
+          # release one version ahead — e.g. a cancelled v1.0.76 run made the next release
+          # skip to v1.0.77. When the orphan tag is part of this branch's history (it always
+          # is for the cancelled-run case) and has no GitHub release, delete it and take its
+          # version instead of skipping past it. Tags that DID get a release, or that sit on
+          # unrelated history, are left alone.
+          if [[ "$CREATE_TAG" == "true" && -n "$PATCH" ]]; then
+            PATCH_TAG="v${BASE_VERSION}.${PATCH}"
+            if git rev-parse -q --verify "refs/tags/$PATCH_TAG" >/dev/null; then
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                -H "Authorization: Bearer $GITHUB_TOKEN" \
+                "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$PATCH_TAG")
+              if [[ "$HTTP_CODE" == "404" ]] && git merge-base --is-ancestor "$PATCH_TAG" HEAD; then
+                echo "::notice::Tag $PATCH_TAG has no release and is part of this branch — removing the orphan and reusing the version."
+                git push origin --delete "refs/tags/$PATCH_TAG"
+                PATCH=$(git tag -l "v${BASE_VERSION}.*" | grep -v beta | sed "s/v${BASE_VERSION}\.//" | sort -n | tail -1)
+                NEXT=$((${PATCH:--1} + 1))
+                TAG="v${BASE_VERSION}.${NEXT}"
+              fi
+            fi
+          fi
+
+          VERSION_NAME="${TAG#v}"
+          VERSION_CODE=$(git rev-list --count HEAD)
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "create_tag=${CREATE_TAG}" >> "$GITHUB_OUTPUT"
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          gradle-home-cache-cleanup: true
+          # Pull requests consume the cache but never write it, so a PR cannot
+          # influence what a later release build compiles against.
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Run lint
+        id: lint
+        shell: bash
+        run: |
+          result=1
+          for i in 1 2 3; do
+            ./gradlew lint --parallel --build-cache --no-daemon --configuration-cache-problems=warn && { result=0; break; }
+            echo "::warning::Lint attempt $i failed, retrying..."
+            sleep 10
+          done
+          exit $result
+
+      - name: Upload lint results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lint-results
+          path: app/build/reports/lint-results-*.html
+          retention-days: 14
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          gradle-home-cache-cleanup: true
+          # Pull requests consume the cache but never write it, so a PR cannot
+          # influence what a later release build compiles against.
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Run unit tests
+        shell: bash
+        run: |
+          result=1
+          for i in 1 2 3; do
+            ./gradlew test --parallel --build-cache --no-daemon --configuration-cache-problems=warn && { result=0; break; }
+            echo "::warning::Test attempt $i failed, retrying..."
+            sleep 10
+          done
+          exit $result
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-results
+          path: app/build/reports/tests/
+          retention-days: 14
+
+  build:
+    name: Build Signed APK
+    needs: [version, lint, test, tag]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Check out the tag itself, not the branch tip. F-Droid (and anyone else verifying
+      # reproducibility) builds from the tagged commit and compares the result — including
+      # the vcsInfo AGP embeds in META-INF/version-control-info.textproto — against this
+      # release's APK. The `tag` job above creates the tag on the changelog commit, so
+      # checking out the branch here would build one commit behind what the tag names,
+      # and the two builds' vcsInfo would never agree. See #128.
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          gradle-home-cache-cleanup: true
+          # Pull requests consume the cache but never write it, so a PR cannot
+          # influence what a later release build compiles against.
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Decode signing keystore
+        shell: bash
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > ${{ github.workspace }}/release.keystore
+          chmod 600 ${{ github.workspace }}/release.keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+
+      - name: Build Release APK
+        shell: bash
+        run: |
+          result=1
+          for i in 1 2 3; do
+            ./gradlew assembleRelease --parallel --build-cache --no-daemon --configuration-cache-problems=warn --stacktrace \
+              -PversionCode="$VERSION_CODE" \
+              -PversionName="$VERSION_NAME" && { result=0; break; }
+            echo "::warning::Build attempt $i failed, retrying..."
+            sleep 15
+          done
+          exit $result
+        env:
+          # Passed via env rather than interpolated into the script: ${{ }} is substituted
+          # before bash sees it, so a value containing shell metacharacters would be executed.
+          VERSION_CODE: ${{ needs.version.outputs.version_code }}
+          VERSION_NAME: ${{ needs.version.outputs.version_name }}
+          KEYSTORE_FILE: ${{ github.workspace }}/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Cleanup keystore
+        if: always()
+        shell: bash
+        run: rm -f ${{ github.workspace }}/release.keystore
+
+      - name: Verify APK and log size
+        shell: bash
+        run: |
+          APK_PATH="app/build/outputs/apk/release/app-release.apk"
+          if [ ! -f "$APK_PATH" ]; then
+            echo "::error::APK not found at $APK_PATH"
+            exit 1
+          fi
+          SIZE=$(stat -c%s "$APK_PATH")
+          SIZE_MB=$(awk "BEGIN {printf \"%.2f\", $SIZE / 1048576}")
+          echo "## APK Size: ${SIZE_MB}MB ($SIZE bytes)" >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice::APK size: ${SIZE_MB}MB ($SIZE bytes)"
+          if [ "$SIZE" -lt 100000 ]; then
+            echo "::error::APK suspiciously small ($SIZE bytes)"
+            exit 1
+          fi
+
+      - name: Verify APK signature
+        shell: bash
+        run: |
+          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/*/ | sort -V | tail -1)
+          ${BUILD_TOOLS}apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk
+
+      - name: Rename APK
+        shell: bash
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+        run: mv app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/SwiftSlate-${TAG}.apk"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: SwiftSlate-${{ needs.version.outputs.tag }}
+          path: app/build/outputs/apk/release/SwiftSlate-*.apk
+          retention-days: 90
+
+  tag:
+    name: Tag Release
+    needs: [version, lint, test]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      # Defence in depth. The job-level `if` already restricts this to push/manual events, but
+      # this job creates tags and pushes to master — if someone later loosens that condition, a
+      # pull request must fail loudly here rather than cut a release.
+      - name: Guard — releases only from a master push
+        shell: bash
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "push" ] && [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
+            echo "::error::Refusing to release: event is '$GITHUB_EVENT_NAME', expected 'push' or 'workflow_dispatch'."
+            exit 1
+          fi
+          case "$GITHUB_REF" in
+            refs/heads/master|refs/tags/v*) ;;
+            *) echo "::error::Refusing to release from ref '$GITHUB_REF'."; exit 1 ;;
+          esac
+          echo "Releasing from $GITHUB_REF"
+
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Generate changelog
+        shell: bash
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          # Find previous tag
+          PREV_TAG=$(git tag -l 'v*' --sort=-version:refname | grep -v "^${TAG}$" | head -1)
+          if [ -z "$PREV_TAG" ]; then
+            RANGE="HEAD"
+          else
+            RANGE="${PREV_TAG}..HEAD"
+          fi
+          # Generate changelog from commit messages, skip merge commits and CI noise
+          CHANGELOG=$(git log "$RANGE" --pretty=format:"- %s" --no-merges \
+            | grep -iv "^- \(ci:\|merge\|changelog\|bump\|docs(fastlane)\)" \
+            | head -20)
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="- Maintenance and bug fixes"
+          fi
+          # Write to file to avoid escaping issues
+          echo "$CHANGELOG" > /tmp/changelog.md
+
+      # Must run BEFORE the tag is created: F-Droid reads changelogs from the repo at the
+      # tag it builds, so a changelog committed afterwards is never seen for that version.
+      # That is why fastlane/metadata/.../changelogs/ had stalled at versionCode 102 while
+      # releases carried on to 170+ — F-Droid users saw no release notes at all.
+      # This commit touches only fastlane/, which is outside this workflow's `paths`
+      # filter, so it cannot retrigger the pipeline.
+      - name: Record changelog for F-Droid
+        if: needs.version.outputs.create_tag == 'true'
+        shell: bash
+        env:
+          VERSION_CODE: ${{ needs.version.outputs.version_code }}
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          DIR="fastlane/metadata/android/en-US/changelogs"
+          mkdir -p "$DIR"
+          # F-Droid renders these as plain text and truncates around 500 chars.
+          head -c 480 /tmp/changelog.md > "$DIR/${VERSION_CODE}.txt"
+          # Stage first: `git diff` does not report untracked files, so checking the working
+          # tree before staging always reported "no changes" for a brand new changelog and
+          # skipped the commit entirely.
+          git add "$DIR/${VERSION_CODE}.txt"
+          if git diff --cached --quiet -- "$DIR"; then
+            echo "::notice::F-Droid changelog already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "docs(fastlane): changelog for ${TAG} [skip ci]"
+          # Fail loudly rather than tagging a commit that never reached origin. The next
+          # push to master retries cleanly because no tag was created.
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      # Tag the commit we are actually about to build, whichever one that is (the changelog
+      # commit above, or plain HEAD if that step was a no-op / this ref is already a tag).
+      # `build` and `release` check out this exact tag afterwards, so the APK they produce
+      # and the tree the tag names are always identical — the two must never diverge. See
+      # #128: they previously did, because the tag used to land on a commit created after
+      # the build had already run against the branch tip.
+      - name: Create tag
+        if: needs.version.outputs.create_tag == 'true'
+        shell: bash
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Upload changelog
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: changelog-${{ needs.version.outputs.tag }}
+          path: /tmp/changelog.md
+          retention-days: 1
+
+  release:
+    name: Release
+    needs: [version, tag, build]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download APK
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: SwiftSlate-${{ needs.version.outputs.tag }}
+          path: artifacts/
+
+      - name: Download changelog
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: changelog-${{ needs.version.outputs.tag }}
+          path: /tmp/
+
+      - name: Write versionCode file for F-Droid auto-update
+        shell: bash
+        env:
+          VERSION_CODE: ${{ needs.version.outputs.version_code }}
+        run: echo "$VERSION_CODE" > artifacts/versionCode.txt
+
+      - name: Release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          files: |
+            artifacts/SwiftSlate-*.apk
+            artifacts/versionCode.txt
+          name: SwiftSlate ${{ needs.version.outputs.tag }}
+          body_path: /tmp/changelog.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Produces an APK reviewers and testers can install *alongside* a stable install.
+  # Pull requests previously produced no artifact at all, so trying a change meant
+  # building it yourself or overwriting your working install.
+  preview-apk:
+    name: Preview APK
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          gradle-home-cache-cleanup: true
+          cache-read-only: true
+
+      - name: Build preview APK
+        shell: bash
+        env:
+          # Monotonic so a later preview build upgrades an earlier one in place instead of
+          # forcing an uninstall. No signing secrets needed: the preview build type is signed
+          # with the local debug key, so this works for fork pull requests too.
+          VERSION_CODE: ${{ github.run_number }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          ./gradlew assemblePreview --parallel --build-cache --no-daemon \
+            --configuration-cache-problems=warn \
+            -PversionCode="$VERSION_CODE" \
+            -PversionName="pr${PR_NUMBER}-${GITHUB_SHA:0:7}"
+
+      - name: Rename APK
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          mv app/build/outputs/apk/preview/app-preview.apk \
+             "app/build/outputs/apk/preview/SwiftSlate-preview-pr${PR_NUMBER}-${GITHUB_SHA:0:7}.apk"
+
+      - name: Upload preview APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: SwiftSlate-preview-pr${{ github.event.pull_request.number }}
+          path: app/build/outputs/apk/preview/SwiftSlate-preview-*.apk
+          retention-days: 14
+
+      - name: Explain how to use it
+        shell: bash
+        run: |
+          {
+            echo "### Preview APK ready"
+            echo
+            echo "Installs as a **separate app** (\`com.musheer360.swiftslate.preview\`, shown as"
+            echo "**SwiftSlate Preview**), so it will not touch your stable install, its API keys,"
+            echo "its commands or its accessibility setting."
+            echo
+            echo "Download it from the **Artifacts** section of this run, then enable it under"
+            echo "Settings > Accessibility as a second entry. Uninstall it when you are done."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  notify-failure:
+    name: Notify on Failure
+    needs: [version, lint, test, tag, build, release]
+    if: failure() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Create failure issue
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "CI failure on ${GITHUB_REF_NAME} ($(date +%Y-%m-%d))" \
+            --body "Pipeline failed for commit [\`${GITHUB_SHA::7}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}).
+
+          **Run:** [${GITHUB_RUN_ID}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})
+          **Branch:** \`${GITHUB_REF_NAME}\`" \
+            --label "bug"

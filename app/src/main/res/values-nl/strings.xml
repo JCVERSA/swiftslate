@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SwiftSlate</string>
+    <string name="accessibility_service_label">SwiftSlate-assistent</string>
+    <string name="accessibility_service_desc">Biedt systeembrede AI-tekstvervangingen wanneer triggeropdrachten worden getypt.</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Dashboard</string>
+    <string name="service_status_active">Actief</string>
+    <string name="service_status_inactive">Inactief</string>
+    <string name="service_enable">Inschakelen</string>
+    <string name="dashboard_api_keys_title">API-sleutels</string>
+    <string name="dashboard_keys_configured">%1$d sleutels geconfigureerd</string>
+    <string name="dashboard_add_key_hint">Voeg een API-sleutel toe om te beginnen.</string>
+    <string name="dashboard_monthly_requests">Deze maand</string>
+    <string name="dashboard_favorite_command">Topopdracht</string>
+    <string name="dashboard_no_data">—</string>
+    <string name="dashboard_last_7_days">Laatste 7 dagen</string>
+
+    <!-- Keys -->
+    <string name="keys_title">API-sleutels</string>
+    <string name="keys_api_key_label">API-sleutel</string>
+    <string name="keys_testing">Testen…</string>
+    <string name="keys_add_key">Sleutel toevoegen</string>
+    <string name="keys_valid_added">Geldige sleutel toegevoegd!</string>
+    <string name="keys_already_added">Deze sleutel is al toegevoegd</string>
+    <string name="keys_validation_failed">Validatie mislukt</string>
+    <string name="keys_keystore_error">Veilige sleutelopslag is niet beschikbaar op dit apparaat. Sleutels kunnen niet worden opgeslagen.</string>
+    <string name="keys_custom_endpoint_required">Set the endpoint URL in Settings before adding a key for the Custom provider</string>
+    <string name="keys_get_api_key">Haal uw %1$s API-sleutel op ↗</string>
+    <string name="keys_empty">Geen API-sleutels toegevoegd</string>
+
+    <!-- Commands -->
+    <string name="commands_title">Opdrachten</string>
+    <string name="commands_add_custom_title">Aangepaste opdracht toevoegen</string>
+    <string name="commands_trigger_label">Trigger (bijv. %1$scode)</string>
+    <string name="commands_prompt_label">Prompt (bijv. Herschrijf als gedicht)</string>
+    <string name="commands_add_command">Opdracht toevoegen</string>
+    <string name="commands_delete_command">Verwijderen</string>
+    <string name="commands_edit_command">Bewerken</string>
+    <string name="commands_save_command">Opdracht opslaan</string>
+    <string name="commands_cancel">Annuleren</string>
+    <string name="commands_type_ai">AI</string>
+    <string name="commands_type_replacer">Lokaal</string>
+    <string name="commands_replacement_label">Vervangende tekst (bijv. myemail@example.com)</string>
+    <string name="commands_built_in">Ingebouwd</string>
+    <string name="commands_error_prefix">Trigger moet beginnen met \'%1$s\'</string>
+    <string name="commands_error_duplicate">Er bestaat al een opdracht met deze trigger</string>
+    <string name="commands_error_conflict">Conflict met bestaande opdracht \'%1$s\' — de ene trigger is een voorvoegsel van de andere</string>
+    <string name="commands_error_empty_trigger">Trigger moet een naam hebben na het voorvoegsel</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Instellingen</string>
+    <string name="settings_provider_title">Modelaanbieder</string>
+    <string name="settings_provider_gemini">Google Gemini</string>
+    <string name="settings_provider_groq">Groq</string>
+    <string name="settings_provider_custom">Aangepast (OpenAI-compatibel)</string>
+    <string name="settings_model_title">Model</string>
+    <string name="settings_temperature_title">Temperatuur</string>
+    <string name="settings_endpoint_title">Endpoint</string>
+    <string name="settings_endpoint_placeholder">https://api.example.com/v1</string>
+    <string name="settings_model_placeholder">gpt-4o, claude-3-haiku, enz.</string>
+    <string name="settings_trigger_prefix_desc">Symbool gebruikt vóór opdrachtnamen (bijv. %1$sfix).</string>
+    <string name="settings_prefix_error_length">Moet exact 1 teken zijn</string>
+    <string name="settings_prefix_error_whitespace">Kan geen spatie zijn</string>
+    <string name="settings_prefix_error_alphanumeric">Kan geen letter of cijfer zijn</string>
+    <string name="settings_endpoint_error_scheme">Moet beginnen met https://</string>
+    <string name="settings_endpoint_error_spaces">URL mag geen spaties bevatten</string>
+
+    <!-- Backup -->
+    <string name="backup_desc">Exporteer of importeer uw opdrachten als een JSON-bestand.</string>
+    <string name="backup_export">Exporteren</string>
+    <string name="backup_import">Importeren</string>
+    <string name="backup_export_success">Opdrachten succesvol geëxporteerd</string>
+    <string name="backup_export_error">Exporteren mislukt</string>
+    <string name="backup_import_success">Opdrachten succesvol geïmporteerd</string>
+    <string name="backup_import_error">Ongeldig back-upbestand</string>
+    <string name="backup_import_confirm">Dit zal al uw bestaande aangepaste opdrachten vervangen. Doorgaan?</string>
+    <string name="backup_import_cancel">Annuleren</string>
+    <string name="settings_check_updates">Controleren op updates</string>
+    <string name="settings_made_by">Met liefde gemaakt door Musheer Alam</string>
+    <string name="settings_sponsor">Sponsor op GitHub</string>
+    <string name="commands_collapse">Inklappen</string>
+    <string name="commands_expand">Uitklappen</string>
+    <string name="commands_search_hint">Zoek opdrachten…</string>
+    <string name="commands_search_close">Zoeken sluiten</string>
+    <string name="commands_search_empty">Geen opdrachten gevonden</string>
+
+    <!-- Delete confirmation -->
+    <string name="delete_confirm_command_title">Deze opdracht verwijderen?</string>
+    <string name="delete_confirm_key_title">Deze API-sleutel verwijderen?</string>
+    <string name="delete_confirm_message">Deze actie kan niet ongedaan worden gemaakt.</string>
+    <string name="delete_confirm_button">Verwijderen</string>
+
+    <!-- Toast & error messages -->
+    <string name="toast_replace_failed">Kon tekst niet vervangen</string>
+    <string name="toast_custom_not_configured">Aangepaste aanbieder niet geconfigureerd. Stel endpoint en model in bij Instellingen.</string>
+    <string name="toast_key_rate_limited">API-sleutel snelheidsbeperkt. Probeer het over %1$d s opnieuw</string>
+    <string name="toast_no_keys">Geen API-sleutels geconfigureerd</string>
+    <string name="toast_all_keys_invalid">Alle API-sleutels zijn ongeldig. Controleer uw sleutels</string>
+    <string name="toast_request_timed_out">Aanvraag verlopen</string>
+    <string name="process_text_title">Opdracht toepassen</string>
+    <string name="process_text_replace">Vervangen</string>
+    <string name="process_text_copy">Kopiëren</string>
+    <string name="process_text_back">Terug</string>
+    <string name="process_text_retry">Opnieuw proberen</string>
+    <string name="process_text_copied">Gekopieerd</string>
+    <string name="process_text_no_selection">Geen tekst geselecteerd</string>
+    <string name="process_text_no_commands">Geen opdrachten beschikbaar. Voeg er een toe in SwiftSlate.</string>
+    <string name="toast_restore_failed">Kon oorspronkelijke tekst niet herstellen</string>
+    <string name="toast_nothing_to_undo">Niets om ongedaan te maken</string>
+    <string name="toast_undo_failed">Kon niet ongedaan maken</string>
+    <string name="toast_nothing_to_copy">Niets om te kopiëren</string>
+    <string name="toast_copied">Gekopieerd naar klembord</string>
+    <string name="toast_nothing_to_cut">Niets om te knippen</string>
+    <string name="toast_cut">Geknipt naar klembord</string>
+    <string name="toast_clipboard_empty">Klembord is leeg</string>
+    <string name="toast_clipboard_failed">Klembordbewerking mislukt</string>
+    <string name="error_no_model_access">Uw API-sleutel heeft geen toegang tot dit model.</string>
+    <string name="error_invalid_key">Ongeldige API-sleutel. Controleer uw sleutel bij Instellingen.</string>
+    <string name="error_invalid_key_with_hint">Invalid API key (%1$s). Please check your keys in Settings.</string>
+    <string name="error_rate_limited">Snelheidsbeperkt. Probeer het zo opnieuw.</string>
+    <string name="error_model_not_found">Model niet gevonden. Controleer uw modelselectie bij Instellingen.</string>
+    <string name="error_safety_blocked">Reactie geblokkeerd door veiligheidsfilters. Probeer het te herformuleren.</string>
+    <string name="error_empty_response">Model gaf een lege reactie terug. Probeer het opnieuw.</string>
+    <string name="error_timeout_connection">Aanvraag verlopen. Controleer uw verbinding.</string>
+    <string name="error_no_internet">Geen internetverbinding.</string>
+    <string name="error_endpoint_unreachable">Kon de API niet bereiken. Controleer uw endpoint-URL.</string>
+    <string name="error_bad_request">Aanvraag mislukt. Controleer uw instellingen.</string>
+
+    <!-- Update notifications -->
+    <string name="update_channel_name">App-updates</string>
+    <string name="update_channel_desc">Geeft een melding wanneer een nieuwe versie van SwiftSlate beschikbaar is</string>
+    <string name="update_available_title">SwiftSlate-update beschikbaar</string>
+    <string name="update_available_text">Tik om de nieuwste release te bekijken</string>
+    <string name="error_input_too_long">De tekst is te lang voor de tokenlimiet per minuut van dit model. Probeer het opnieuw met kortere tekst.</string>
+    <string name="note_response_truncated">[Let op: antwoord is mogelijk afgekapt]</string>
+    <string name="error_provider_auth_required">De server heeft de aanvraag geweigerd. Bij een cloudserver moet je je aanmelden op de server zelf (bijv. „ollama signin“).</string>
+    <string name="keys_endpoint_needs_v1">De server is bereikbaar, maar de URL moet eindigen op /v1 (bijv. http://host:11434/v1).</string>
+    <string name="settings_fetch_models">Modellen ophalen</string>
+    <string name="settings_fetch_models_loading">Ophalen…</string>
+    <string name="settings_fetch_models_success">%1$d modellen geladen</string>
+    <string name="settings_fetch_models_empty">Geen modellen gevonden. Je kunt nog steeds handmatig een model invoeren.</string>
+    <string name="settings_fetch_models_failed">Modellen konden niet worden opgehaald. Controleer het adres en de API-sleutel.</string>
+    <string name="settings_models_refresh">Vernieuwen</string>
+    <string name="settings_models_need_key">Voeg hierboven een API-sleutel toe om de modellenlijst te laden.</string>
+    <string name="settings_models_load_failed">Kon modellen niet laden. Controleer je verbinding en API-sleutel.</string>
+    <string name="settings_models_empty_provider">Geen modellen beschikbaar voor deze API-sleutel.</string>
+    <string name="dashboard_service_killed_title">SwiftSlate is onderbroken</string>
+    <string name="dashboard_service_killed_message">De achtergrondservice is onverwacht gestopt. Schakel deze opnieuw in bij de toegankelijkheidsinstellingen om opdrachten te blijven gebruiken.</string>
+    <string name="dashboard_service_killed_dismiss">Sluiten</string>
+</resources>

@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SwiftSlate</string>
+    <string name="accessibility_service_label">Βοηθός SwiftSlate</string>
+    <string name="accessibility_service_desc">Παρέχει αντικαταστάσεις κειμένου με AI σε όλο το σύστημα όταν πληκτρολογούνται εντολές ενεργοποίησης.</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Πίνακας ελέγχου</string>
+    <string name="service_status_active">Ενεργό</string>
+    <string name="service_status_inactive">Ανενεργό</string>
+    <string name="service_enable">Ενεργοποίηση</string>
+    <string name="dashboard_api_keys_title">Κλειδιά API</string>
+    <string name="dashboard_keys_configured">%1$d διαμορφωμένα κλειδιά</string>
+    <string name="dashboard_add_key_hint">Προσθέστε ένα κλειδί API για να ξεκινήσετε.</string>
+    <string name="dashboard_monthly_requests">Αυτόν τον μήνα</string>
+    <string name="dashboard_favorite_command">Κορυφαία εντολή</string>
+    <string name="dashboard_no_data">—</string>
+    <string name="dashboard_last_7_days">Τελευταίες 7 ημέρες</string>
+
+    <!-- Keys -->
+    <string name="keys_title">Κλειδιά API</string>
+    <string name="keys_api_key_label">Κλειδί API</string>
+    <string name="keys_testing">Δοκιμή…</string>
+    <string name="keys_add_key">Προσθήκη κλειδιού</string>
+    <string name="keys_valid_added">Προστέθηκε έγκυρο κλειδί!</string>
+    <string name="keys_already_added">Αυτό το κλειδί έχει ήδη προστεθεί</string>
+    <string name="keys_validation_failed">Η επικύρωση απέτυχε</string>
+    <string name="keys_keystore_error">Η ασφαλής αποθήκευση κλειδιών δεν είναι διαθέσιμη σε αυτήν τη συσκευή. Τα κλειδιά δεν μπορούν να αποθηκευτούν.</string>
+    <string name="keys_custom_endpoint_required">Set the endpoint URL in Settings before adding a key for the Custom provider</string>
+    <string name="keys_get_api_key">Αποκτήστε το κλειδί API σας για %1$s ↗</string>
+    <string name="keys_empty">Δεν προστέθηκαν κλειδιά API</string>
+
+    <!-- Commands -->
+    <string name="commands_title">Εντολές</string>
+    <string name="commands_add_custom_title">Προσθήκη προσαρμοσμένης εντολής</string>
+    <string name="commands_trigger_label">Ενεργοποιητής (π.χ. %1$scode)</string>
+    <string name="commands_prompt_label">Προτροπή (π.χ. Ξαναγράψε το ως ποίημα)</string>
+    <string name="commands_add_command">Προσθήκη εντολής</string>
+    <string name="commands_delete_command">Διαγραφή</string>
+    <string name="commands_edit_command">Επεξεργασία</string>
+    <string name="commands_save_command">Αποθήκευση εντολής</string>
+    <string name="commands_cancel">Ακύρωση</string>
+    <string name="commands_type_ai">AI</string>
+    <string name="commands_type_replacer">Τοπικό</string>
+    <string name="commands_replacement_label">Κείμενο αντικατάστασης (π.χ. myemail@example.com)</string>
+    <string name="commands_built_in">Ενσωματωμένο</string>
+    <string name="commands_error_prefix">Ο ενεργοποιητής πρέπει να ξεκινά με \'%1$s\'</string>
+    <string name="commands_error_duplicate">Υπάρχει ήδη εντολή με αυτόν τον ενεργοποιητή</string>
+    <string name="commands_error_conflict">Σύγκρουση με υπάρχουσα εντολή \'%1$s\' — ο ένας ενεργοποιητής είναι πρόθεμα του άλλου</string>
+    <string name="commands_error_empty_trigger">Ο ενεργοποιητής πρέπει να έχει όνομα μετά το πρόθεμα</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Ρυθμίσεις</string>
+    <string name="settings_provider_title">Πάροχος μοντέλου</string>
+    <string name="settings_provider_gemini">Google Gemini</string>
+    <string name="settings_provider_groq">Groq</string>
+    <string name="settings_provider_custom">Προσαρμοσμένο (συμβατό με OpenAI)</string>
+    <string name="settings_model_title">Μοντέλο</string>
+    <string name="settings_temperature_title">Θερμοκρασία</string>
+    <string name="settings_endpoint_title">Τελικό σημείο</string>
+    <string name="settings_endpoint_placeholder">https://api.example.com/v1</string>
+    <string name="settings_model_placeholder">gpt-4o, claude-3-haiku, κ.λπ.</string>
+    <string name="settings_trigger_prefix_desc">Σύμβολο που χρησιμοποιείται πριν από τα ονόματα εντολών (π.χ. %1$sfix).</string>
+    <string name="settings_prefix_error_length">Πρέπει να είναι ακριβώς 1 χαρακτήρας</string>
+    <string name="settings_prefix_error_whitespace">Δεν μπορεί να είναι κενός χαρακτήρας</string>
+    <string name="settings_prefix_error_alphanumeric">Δεν μπορεί να είναι γράμμα ή ψηφίο</string>
+    <string name="settings_endpoint_error_scheme">Πρέπει να ξεκινά με https://</string>
+    <string name="settings_endpoint_error_spaces">Η διεύθυνση URL δεν μπορεί να περιέχει κενά</string>
+
+    <!-- Backup -->
+    <string name="backup_desc">Εξαγωγή ή εισαγωγή των εντολών σας ως αρχείο JSON.</string>
+    <string name="backup_export">Εξαγωγή</string>
+    <string name="backup_import">Εισαγωγή</string>
+    <string name="backup_export_success">Οι εντολές εξήχθησαν με επιτυχία</string>
+    <string name="backup_export_error">Η εξαγωγή απέτυχε</string>
+    <string name="backup_import_success">Οι εντολές εισήχθησαν με επιτυχία</string>
+    <string name="backup_import_error">Μη έγκυρο αρχείο αντιγράφου ασφαλείας</string>
+    <string name="backup_import_confirm">Αυτό θα αντικαταστήσει όλες τις υπάρχουσες προσαρμοσμένες εντολές σας. Θέλετε να συνεχίσετε;</string>
+    <string name="backup_import_cancel">Ακύρωση</string>
+    <string name="settings_check_updates">Έλεγχος για ενημερώσεις</string>
+    <string name="settings_made_by">Φτιαγμένο με αγάπη από τον Musheer Alam</string>
+    <string name="settings_sponsor">Υποστήριξη στο GitHub</string>
+    <string name="commands_collapse">Σύμπτυξη</string>
+    <string name="commands_expand">Επέκταση</string>
+    <string name="commands_search_hint">Αναζήτηση εντολών…</string>
+    <string name="commands_search_close">Κλείσιμο αναζήτησης</string>
+    <string name="commands_search_empty">Δεν βρέθηκαν εντολές</string>
+
+    <!-- Delete confirmation -->
+    <string name="delete_confirm_command_title">Να διαγραφεί αυτή η εντολή;</string>
+    <string name="delete_confirm_key_title">Να διαγραφεί αυτό το κλειδί API;</string>
+    <string name="delete_confirm_message">Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.</string>
+    <string name="delete_confirm_button">Διαγραφή</string>
+
+    <!-- Toasts and errors -->
+    <string name="toast_replace_failed">Δεν ήταν δυνατή η αντικατάσταση του κειμένου</string>
+    <string name="toast_custom_not_configured">Ο προσαρμοσμένος πάροχος δεν έχει διαμορφωθεί. Ορίστε το τελικό σημείο και το μοντέλο στις Ρυθμίσεις.</string>
+    <string name="toast_key_rate_limited">Το κλειδί API έχει περιορισμό ρυθμού. Δοκιμάστε ξανά σε %1$d δευτ</string>
+    <string name="toast_no_keys">Δεν έχουν διαμορφωθεί κλειδιά API</string>
+    <string name="toast_all_keys_invalid">Όλα τα κλειδιά API είναι μη έγκυρα. Παρακαλούμε ελέγξτε τα κλειδιά σας</string>
+    <string name="toast_request_timed_out">Το αίτημα έληξε</string>
+    <string name="process_text_title">Εφαρμογή εντολής</string>
+    <string name="process_text_replace">Αντικατάσταση</string>
+    <string name="process_text_copy">Αντιγραφή</string>
+    <string name="process_text_back">Πίσω</string>
+    <string name="process_text_retry">Δοκιμάστε ξανά</string>
+    <string name="process_text_copied">Αντιγράφηκε</string>
+    <string name="process_text_no_selection">Δεν έχει επιλεγεί κείμενο</string>
+    <string name="process_text_no_commands">Δεν υπάρχουν διαθέσιμες εντολές. Προσθέστε μία στο SwiftSlate.</string>
+    <string name="toast_restore_failed">Δεν ήταν δυνατή η επαναφορά του αρχικού κειμένου</string>
+    <string name="toast_nothing_to_undo">Δεν υπάρχει τίποτα για αναίρεση</string>
+    <string name="toast_undo_failed">Δεν ήταν δυνατή η αναίρεση</string>
+    <string name="toast_nothing_to_copy">Δεν υπάρχει τίποτα για αντιγραφή</string>
+    <string name="toast_copied">Αντιγράφηκε στο πρόχειρο</string>
+    <string name="toast_nothing_to_cut">Δεν υπάρχει τίποτα για αποκοπή</string>
+    <string name="toast_cut">Αποκόπηκε στο πρόχειρο</string>
+    <string name="toast_clipboard_empty">Το πρόχειρο είναι κενό</string>
+    <string name="toast_clipboard_failed">Η λειτουργία προχείρου απέτυχε</string>
+    <string name="error_no_model_access">Το κλειδί API σας δεν έχει πρόσβαση σε αυτό το μοντέλο.</string>
+    <string name="error_invalid_key">Μη έγκυρο κλειδί API. Παρακαλούμε ελέγξτε το κλειδί σας στις Ρυθμίσεις.</string>
+    <string name="error_invalid_key_with_hint">Invalid API key (%1$s). Please check your keys in Settings.</string>
+    <string name="error_rate_limited">Περιορισμός ρυθμού. Δοκιμάστε ξανά σύντομα.</string>
+    <string name="error_model_not_found">Το μοντέλο δεν βρέθηκε. Ελέγξτε την επιλογή μοντέλου στις Ρυθμίσεις.</string>
+    <string name="error_safety_blocked">Η απάντηση αποκλείστηκε από τα φίλτρα ασφαλείας. Δοκιμάστε να την αναδιατυπώσετε.</string>
+    <string name="error_empty_response">Το μοντέλο επέστρεψε κενή απάντηση. Δοκιμάστε ξανά.</string>
+    <string name="error_timeout_connection">Το αίτημα έληξε. Ελέγξτε τη σύνδεσή σας.</string>
+    <string name="error_no_internet">Δεν υπάρχει σύνδεση στο διαδίκτυο.</string>
+    <string name="error_endpoint_unreachable">Δεν ήταν δυνατή η προσέγγιση του API. Ελέγξτε τη διεύθυνση URL του τελικού σημείου.</string>
+    <string name="error_bad_request">Το αίτημα απέτυχε. Ελέγξτε τις ρυθμίσεις σας.</string>
+
+    <!-- Updates -->
+    <string name="update_channel_name">Ενημερώσεις εφαρμογής</string>
+    <string name="update_channel_desc">Ειδοποιεί όταν είναι διαθέσιμη μια νέα έκδοση του SwiftSlate</string>
+    <string name="update_available_title">Διαθέσιμη ενημέρωση SwiftSlate</string>
+    <string name="update_available_text">Πατήστε για να δείτε την τελευταία έκδοση</string>
+
+    <!-- Command descriptions -->
+    <string name="error_input_too_long">Το κείμενο είναι πολύ μεγάλο για το όριο διακριτικών ανά λεπτό αυτού του μοντέλου. Δοκιμάστε ξανά με μικρότερο κείμενο.</string>
+    <string name="note_response_truncated">[Σημείωση: η απάντηση μπορεί να έχει αποκοπεί]</string>
+    <string name="error_provider_auth_required">Το endpoint απέρριψε το αίτημα. Αν πρόκειται για διακομιστή cloud, συνδεθείτε στον ίδιο τον διακομιστή (π.χ. «ollama signin»).</string>
+    <string name="keys_endpoint_needs_v1">Το endpoint είναι προσβάσιμο, αλλά η διεύθυνση πρέπει να τελειώνει σε /v1 (π.χ. http://host:11434/v1).</string>
+    <string name="settings_fetch_models">Λήψη μοντέλων</string>
+    <string name="settings_fetch_models_loading">Λήψη…</string>
+    <string name="settings_fetch_models_success">Φορτώθηκαν %1$d μοντέλα</string>
+    <string name="settings_fetch_models_empty">Δεν βρέθηκαν μοντέλα. Μπορείτε να εισαγάγετε ένα μοντέλο χειροκίνητα.</string>
+    <string name="settings_fetch_models_failed">Δεν ήταν δυνατή η λήψη των μοντέλων. Ελέγξτε τη διεύθυνση και το κλειδί API.</string>
+    <string name="settings_models_refresh">Ανανέωση</string>
+    <string name="settings_models_need_key">Προσθέστε ένα κλειδί API παραπάνω για να φορτώσει η λίστα μοντέλων.</string>
+    <string name="settings_models_load_failed">Δεν ήταν δυνατή η φόρτωση των μοντέλων. Ελέγξτε τη σύνδεση και το κλειδί API.</string>
+    <string name="settings_models_empty_provider">Δεν υπάρχουν διαθέσιμα μοντέλα για αυτό το κλειδί API.</string>
+    <string name="dashboard_service_killed_title">Το SwiftSlate διακόπηκε</string>
+    <string name="dashboard_service_killed_message">Η υπηρεσία παρασκηνίου σταμάτησε απροσδόκητα. Ενεργοποιήστε την ξανά στις ρυθμίσεις προσβασιμότητας για να συνεχίσετε να χρησιμοποιείτε εντολές.</string>
+    <string name="dashboard_service_killed_dismiss">Απόρριψη</string>
+</resources>

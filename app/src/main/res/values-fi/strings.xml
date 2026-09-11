@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SwiftSlate</string>
+    <string name="accessibility_service_label">SwiftSlate-avustin</string>
+    <string name="accessibility_service_desc">Tarjoaa järjestelmänlaajuisia AI-pohjaisia tekstinkorvauksia, kun käynnistyskomennot kirjoitetaan.</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Kojelauta</string>
+    <string name="service_status_active">Aktiivinen</string>
+    <string name="service_status_inactive">Epäaktiivinen</string>
+    <string name="service_enable">Ota käyttöön</string>
+    <string name="dashboard_api_keys_title">API-avaimet</string>
+    <string name="dashboard_keys_configured">%1$d avainta määritetty</string>
+    <string name="dashboard_add_key_hint">Lisää API-avain aloittaaksesi.</string>
+    <string name="dashboard_monthly_requests">Tämä kuukausi</string>
+    <string name="dashboard_favorite_command">Suosituin komento</string>
+    <string name="dashboard_no_data">—</string>
+    <string name="dashboard_last_7_days">Viimeiset 7 päivää</string>
+
+    <!-- Keys -->
+    <string name="keys_title">API-avaimet</string>
+    <string name="keys_api_key_label">API-avain</string>
+    <string name="keys_testing">Testataan…</string>
+    <string name="keys_add_key">Lisää avain</string>
+    <string name="keys_valid_added">Kelvollinen avain lisätty!</string>
+    <string name="keys_already_added">Tämä avain on jo lisätty</string>
+    <string name="keys_validation_failed">Vahvistus epäonnistui</string>
+    <string name="keys_keystore_error">Turvallinen avainten tallennus ei ole käytettävissä tällä laitteella. Avaimia ei voida tallentaa.</string>
+    <string name="keys_custom_endpoint_required">Set the endpoint URL in Settings before adding a key for the Custom provider</string>
+    <string name="keys_get_api_key">Hanki %1$s API-avaimesi ↗</string>
+    <string name="keys_empty">API-avaimia ei ole lisätty</string>
+
+    <!-- Commands -->
+    <string name="commands_title">Komennot</string>
+    <string name="commands_add_custom_title">Lisää mukautettu komento</string>
+    <string name="commands_trigger_label">Käynnistin (esim. %1$scode)</string>
+    <string name="commands_prompt_label">Kehote (esim. Kirjoita uudelleen runoksi)</string>
+    <string name="commands_add_command">Lisää komento</string>
+    <string name="commands_delete_command">Poista</string>
+    <string name="commands_edit_command">Muokkaa</string>
+    <string name="commands_save_command">Tallenna komento</string>
+    <string name="commands_cancel">Peruuta</string>
+    <string name="commands_type_ai">AI</string>
+    <string name="commands_type_replacer">Paikallinen</string>
+    <string name="commands_replacement_label">Korvaava teksti (esim. myemail@example.com)</string>
+    <string name="commands_built_in">Sisäänrakennettu</string>
+    <string name="commands_error_prefix">Käynnistimen on alettava merkillä \'%1$s\'</string>
+    <string name="commands_error_duplicate">Tällä käynnistimellä oleva komento on jo olemassa</string>
+    <string name="commands_error_conflict">Ristiriita olemassa olevan komennon \'%1$s\' kanssa — toinen käynnistin on toisen etuliite</string>
+    <string name="commands_error_empty_trigger">Käynnistimellä on oltava nimi etuliitteen jälkeen</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Asetukset</string>
+    <string name="settings_provider_title">Mallin tarjoaja</string>
+    <string name="settings_provider_gemini">Google Gemini</string>
+    <string name="settings_provider_groq">Groq</string>
+    <string name="settings_provider_custom">Mukautettu (OpenAI-yhteensopiva)</string>
+    <string name="settings_model_title">Malli</string>
+    <string name="settings_temperature_title">Lämpötila</string>
+    <string name="settings_endpoint_title">Päätepiste</string>
+    <string name="settings_endpoint_placeholder">https://api.example.com/v1</string>
+    <string name="settings_model_placeholder">gpt-4o, claude-3-haiku jne.</string>
+    <string name="settings_trigger_prefix_desc">Symboli, jota käytetään komentojen nimien edessä (esim. %1$sfix).</string>
+    <string name="settings_prefix_error_length">On oltava tarkalleen 1 merkki</string>
+    <string name="settings_prefix_error_whitespace">Ei voi olla välilyönti</string>
+    <string name="settings_prefix_error_alphanumeric">Ei voi olla kirjain tai numero</string>
+    <string name="settings_endpoint_error_scheme">On alettava https://</string>
+    <string name="settings_endpoint_error_spaces">URL-osoite ei voi sisältää välilyöntejä</string>
+
+    <!-- Backup -->
+    <string name="backup_desc">Vie tai tuo komentosi JSON-tiedostona.</string>
+    <string name="backup_export">Vie</string>
+    <string name="backup_import">Tuo</string>
+    <string name="backup_export_success">Komennot viety onnistuneesti</string>
+    <string name="backup_export_error">Vienti epäonnistui</string>
+    <string name="backup_import_success">Komennot tuotu onnistuneesti</string>
+    <string name="backup_import_error">Virheellinen varmuuskopiotiedosto</string>
+    <string name="backup_import_confirm">Tämä korvaa kaikki olemassa olevat mukautetut komentosi. Jatketaanko?</string>
+    <string name="backup_import_cancel">Peruuta</string>
+    <string name="settings_check_updates">Tarkista päivitykset</string>
+    <string name="settings_made_by">Tehty rakkaudella Musheer Alamin toimesta</string>
+    <string name="settings_sponsor">Sponsoroi GitHubissa</string>
+    <string name="commands_collapse">Sulje</string>
+    <string name="commands_expand">Laajenna</string>
+    <string name="commands_search_hint">Hae komentoja…</string>
+    <string name="commands_search_close">Sulje haku</string>
+    <string name="commands_search_empty">Komentoja ei löytynyt</string>
+
+    <!-- Delete confirmation -->
+    <string name="delete_confirm_command_title">Poistetaanko tämä komento?</string>
+    <string name="delete_confirm_key_title">Poistetaanko tämä API-avain?</string>
+    <string name="delete_confirm_message">Tätä toimintoa ei voi peruuttaa.</string>
+    <string name="delete_confirm_button">Poista</string>
+
+    <!-- Toasts and errors -->
+    <string name="toast_replace_failed">Tekstin korvaaminen epäonnistui</string>
+    <string name="toast_custom_not_configured">Mukautettua tarjoajaa ei ole määritetty. Määritä päätepiste ja malli Asetuksissa.</string>
+    <string name="toast_key_rate_limited">API-avaimen käyttöraja saavutettu. Yritä uudelleen %1$d s kuluttua</string>
+    <string name="toast_no_keys">API-avaimia ei ole määritetty</string>
+    <string name="toast_all_keys_invalid">Kaikki API-avaimet ovat virheellisiä. Tarkista avaimesi</string>
+    <string name="toast_request_timed_out">Pyyntö aikakatkaistiin</string>
+    <string name="process_text_title">Käytä komentoa</string>
+    <string name="process_text_replace">Korvaa</string>
+    <string name="process_text_copy">Kopioi</string>
+    <string name="process_text_back">Takaisin</string>
+    <string name="process_text_retry">Yritä uudelleen</string>
+    <string name="process_text_copied">Kopioitu</string>
+    <string name="process_text_no_selection">Tekstiä ei ole valittu</string>
+    <string name="process_text_no_commands">Komentoja ei ole käytettävissä. Lisää komento SwiftSlatessa.</string>
+    <string name="toast_restore_failed">Alkuperäisen tekstin palauttaminen epäonnistui</string>
+    <string name="toast_nothing_to_undo">Ei mitään kumottavaa</string>
+    <string name="toast_undo_failed">Kumoaminen epäonnistui</string>
+    <string name="toast_nothing_to_copy">Ei mitään kopioitavaa</string>
+    <string name="toast_copied">Kopioitu leikepöydälle</string>
+    <string name="toast_nothing_to_cut">Ei mitään leikattavaa</string>
+    <string name="toast_cut">Leikattu leikepöydälle</string>
+    <string name="toast_clipboard_empty">Leikepöytä on tyhjä</string>
+    <string name="toast_clipboard_failed">Leikepöytätoiminto epäonnistui</string>
+    <string name="error_no_model_access">API-avaimellasi ei ole pääsyä tähän malliin.</string>
+    <string name="error_invalid_key">Virheellinen API-avain. Tarkista avaimesi Asetuksissa.</string>
+    <string name="error_invalid_key_with_hint">Invalid API key (%1$s). Please check your keys in Settings.</string>
+    <string name="error_rate_limited">Käyttöraja saavutettu. Yritä pian uudelleen.</string>
+    <string name="error_model_not_found">Mallia ei löytynyt. Tarkista mallin valinta Asetuksissa.</string>
+    <string name="error_safety_blocked">Vastaus estettiin turvasuodattimilla. Yritä muotoilla uudelleen.</string>
+    <string name="error_empty_response">Malli palautti tyhjän vastauksen. Yritä uudelleen.</string>
+    <string name="error_timeout_connection">Pyyntö aikakatkaistiin. Tarkista yhteytesi.</string>
+    <string name="error_no_internet">Ei internetyhteyttä.</string>
+    <string name="error_endpoint_unreachable">API:in ei saatu yhteyttä. Tarkista päätepisteen URL-osoite.</string>
+    <string name="error_bad_request">Pyyntö epäonnistui. Tarkista asetuksesi.</string>
+
+    <!-- Updates and command descriptions -->
+    <string name="update_channel_name">Sovelluspäivitykset</string>
+    <string name="update_channel_desc">Ilmoittaa, kun uusi SwiftSlate-versio on saatavilla</string>
+    <string name="update_available_title">SwiftSlate-päivitys saatavilla</string>
+    <string name="update_available_text">Napauta nähdäksesi uusimman version</string>
+    <string name="error_input_too_long">Teksti on liian pitkä tämän mallin minuuttikohtaiselle token-rajalle. Yritä uudelleen lyhyemmällä tekstillä.</string>
+    <string name="note_response_truncated">[Huomio: vastaus voi olla katkaistu]</string>
+    <string name="error_provider_auth_required">Päätepiste hylkäsi pyynnön. Pilvipalvelimella kirjaudu sisään itse palvelimelle (esim. „ollama signin“).</string>
+    <string name="keys_endpoint_needs_v1">Päätepiste on käytettävissä, mutta osoitteen tulee päättyä /v1 (esim. http://host:11434/v1).</string>
+    <string name="settings_fetch_models">Hae mallit</string>
+    <string name="settings_fetch_models_loading">Haetaan…</string>
+    <string name="settings_fetch_models_success">%1$d mallia ladattu</string>
+    <string name="settings_fetch_models_empty">Malleja ei löytynyt. Voit silti syöttää mallin käsin.</string>
+    <string name="settings_fetch_models_failed">Malleja ei voitu hakea. Tarkista osoite ja API-avain.</string>
+    <string name="settings_models_refresh">Päivitä</string>
+    <string name="settings_models_need_key">Lisää yläpuolelle API-avain ladataksesi mallilistan.</string>
+    <string name="settings_models_load_failed">Malleja ei voitu ladata. Tarkista yhteys ja API-avain.</string>
+    <string name="settings_models_empty_provider">Tälle API-avaimelle ei ole saatavilla malleja.</string>
+    <string name="dashboard_service_killed_title">SwiftSlate keskeytyi</string>
+    <string name="dashboard_service_killed_message">Taustapalvelu pysähtyi odottamatta. Ota se uudelleen käyttöön esteettömyysasetuksista, jotta voit jatkaa komentojen käyttöä.</string>
+    <string name="dashboard_service_killed_dismiss">Sulje</string>
+</resources>
