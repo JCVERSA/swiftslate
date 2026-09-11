@@ -1,0 +1,101 @@
+name: Verify
+
+on:
+  push:
+    branches: [arena/01a092c0-swiftslate]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx3g -Dfile.encoding=UTF-8 -XX:+UseG1GC"
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          gradle-home-cache-cleanup: true
+          cache-read-only: true
+
+      - name: Run lint
+        shell: bash
+        run: |
+          result=1
+          for i in 1 2 3; do
+            ./gradlew lint --parallel --build-cache --no-daemon --configuration-cache-problems=warn && { result=0; break; }
+            echo "::warning::Lint attempt $i failed, retrying..."
+            sleep 10
+          done
+          exit $result
+
+      - name: Upload lint results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lint-results
+          path: app/build/reports/lint-results-*.html
+          retention-days: 14
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
+          gradle-home-cache-cleanup: true
+          cache-read-only: true
+
+      - name: Run unit tests
+        shell: bash
+        run: |
+          result=1
+          for i in 1 2 3; do
+            ./gradlew test --parallel --build-cache --no-daemon --configuration-cache-problems=warn && { result=0; break; }
+            echo "::warning::Test attempt $i failed, retrying..."
+            sleep 10
+          done
+          exit $result
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-results
+          path: app/build/reports/tests/
+          retention-days: 14
