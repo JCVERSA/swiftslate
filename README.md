@@ -219,6 +219,9 @@ Beyond AI, you can create **text replacer commands** that run **entirely offline
 |:---------|:-------|:------|
 | **Google Gemini** (default) | `gemini-3.5-flash-lite` (default), `gemini-3.6-flash` | Free tier available at [aistudio.google.com](https://aistudio.google.com) |
 | **Groq** | `openai/gpt-oss-120b` (default), `qwen/qwen3.6-27b` | Free tier at [console.groq.com](https://console.groq.com/keys) |
+| **NVIDIA NIM** | `nvidia/nemotron-3-super-120b-a12b` (default), plus the live NIM catalog | User supplies a key from [build.nvidia.com](https://build.nvidia.com/settings/api-keys); OpenAI-compatible |
+| **OpenRouter** | `openrouter/free` (default), plus the live model catalog | User supplies a key from [openrouter.ai](https://openrouter.ai/settings/keys); free availability can change |
+| **DeepSeek** | `deepseek-flash` (default), plus the live DeepSeek catalog | User supplies a key from [platform.deepseek.com](https://platform.deepseek.com/api_keys); OpenAI-compatible |
 | **Custom (OpenAI-compatible)** | Any model your endpoint supports | Works with Ollama, LM Studio, vLLM, any `/v1/chat/completions` endpoint |
 
 > [!TIP]
@@ -512,7 +515,7 @@ Adding a translation is a single directory: drop `values-<locale>/strings.xml` i
 | | Concern | How SwiftSlate Handles It |
 |:--|:--------|:------------------------|
 | 👁️ | **Text Monitoring** | Only processes text when a trigger command is detected at the end. All other typing is completely ignored. Password fields are always skipped. |
-| 📡 | **Data Transmission** | Text is sent **only** to the configured AI provider (Google Gemini, Groq, or your custom endpoint). The only other network contact is a daily GitHub Releases check for update notifications — your text is never part of it. Text replacer commands never leave your device. |
+| 📡 | **Data Transmission** | Text is sent **only** to the configured AI provider (Google Gemini, Groq, NVIDIA NIM, OpenRouter, DeepSeek, or your custom endpoint). The only other network contact is a daily GitHub Releases check for update notifications — your text is never part of it. Text replacer commands never leave your device. |
 | 🌐 | **Local HTTP** | HTTPS is preferred. HTTP is accepted only for private-LAN endpoints and the app warns that this traffic is unencrypted. |
 | 🔐 | **Key Storage** | API keys are encrypted with AES-256-GCM using the Android Keystore system and isolated per provider. Encryption failures throw rather than falling back to plaintext. |
 | 📊 | **Analytics** | **None.** Zero telemetry, zero tracking, zero crash reporting. |
@@ -576,7 +579,7 @@ com.jcversa.swiftslate/
 │   ├── GeminiModels.kt          # Gemini model catalog + per-model thinking level
 │   ├── GroqModels.kt            # Groq model catalog + per-model reasoning params
 │   ├── PrefKeys.kt              # SharedPreferences key constants
-│   └── ProviderType.kt          # Provider constants (gemini, groq, custom)
+│   └── ProviderType.kt          # Provider constants (gemini, groq, nvidia, openrouter, deepseek, custom)
 ├── ui/
 │   ├── DashboardScreen.kt       # Service status, key count, usage stats, 7-day chart
 │   ├── KeysScreen.kt            # API key management with live validation

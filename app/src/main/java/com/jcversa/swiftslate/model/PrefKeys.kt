@@ -10,7 +10,7 @@ package com.jcversa.swiftslate.model
  * stored preferences continue to resolve identically.
  */
 object PrefKeys {
-    /** Active provider ("gemini" | "groq" | "custom") — see [ProviderType]. */
+    /** Active provider (see [ProviderType]); each provider has its own key namespace. */
     const val PROVIDER_TYPE = "provider_type"
 
     /** Selected Gemini model id. */
@@ -18,6 +18,15 @@ object PrefKeys {
 
     /** Selected Groq model id. */
     const val GROQ_MODEL = "groq_model"
+
+    /** Selected NVIDIA NIM model id. */
+    const val NVIDIA_MODEL = "nvidia_model"
+
+    /** Selected OpenRouter model id. */
+    const val OPENROUTER_MODEL = "openrouter_model"
+
+    /** Selected DeepSeek model id. */
+    const val DEEPSEEK_MODEL = "deepseek_model"
 
     /** Custom (OpenAI-compatible) model id. */
     const val CUSTOM_MODEL = "custom_model"

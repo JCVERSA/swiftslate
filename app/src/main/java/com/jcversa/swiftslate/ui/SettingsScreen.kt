@@ -38,12 +38,12 @@ import kotlinx.coroutines.withContext
 import com.jcversa.swiftslate.manager.CommandManager
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.manager.ProviderModelsCache
-import com.jcversa.swiftslate.model.GeminiModels
 import com.jcversa.swiftslate.model.GroqModels
+import com.jcversa.swiftslate.model.OpenAIModels
 import com.jcversa.swiftslate.model.PrefKeys
 import com.jcversa.swiftslate.model.ProviderType
 import com.jcversa.swiftslate.provider.EndpointValidator
-import com.jcversa.swiftslate.provider.GroqConfig
+import com.jcversa.swiftslate.provider.Providers
 import com.jcversa.swiftslate.ui.components.LocalSlateRhythm
 import com.jcversa.swiftslate.ui.components.SlateCard
 import com.jcversa.swiftslate.ui.components.SlateDivider
@@ -61,7 +61,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     var saveEndpointJob by remember { mutableStateOf<Job?>(null) }
     var saveModelJob by remember { mutableStateOf<Job?>(null) }
 
-    var providerType by remember { mutableStateOf(prefs.getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI) ?: ProviderType.GEMINI) }
+    var providerType by remember { mutableStateOf(ProviderType.sanitize(prefs.getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI))) }
     var providerExpanded by remember { mutableStateOf(false) }
 
     var selectedModel by remember { mutableStateOf(prefs.getString(PrefKeys.GEMINI_MODEL, "") ?: "") }
@@ -71,6 +71,12 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     var groqModel by remember { mutableStateOf(prefs.getString(PrefKeys.GROQ_MODEL, "") ?: "") }
     var groqModelExpanded by remember { mutableStateOf(false) }
     var groqModelList by remember { mutableStateOf(ProviderModelsCache.get(ProviderType.GROQ)?.models ?: emptyList()) }
+    // The three fixed OpenAI-compatible providers share one dropdown state; the
+    // selected value is restored from that provider's own preference on switch.
+    var managedModel by remember { mutableStateOf("") }
+    var managedModelExpanded by remember { mutableStateOf(false) }
+    var managedModelList by remember { mutableStateOf<List<String>>(emptyList()) }
+    var isFetchingManagedModels by remember { mutableStateOf(false) }
 
     var customEndpoint by rememberSaveable { mutableStateOf(prefs.getString(PrefKeys.CUSTOM_ENDPOINT, "") ?: "") }
     var customModel by rememberSaveable { mutableStateOf(prefs.getString(PrefKeys.CUSTOM_MODEL, "") ?: "") }
@@ -118,63 +124,113 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     // dropdown renders without refetching on every visit.
     fun startModelFetch(type: String) {
         val isGemini = type == ProviderType.GEMINI
-        if (!isGemini && type != ProviderType.GROQ) return
+        val isGroq = type == ProviderType.GROQ
+        val isManaged = type == ProviderType.NVIDIA ||
+            type == ProviderType.OPENROUTER || type == ProviderType.DEEPSEEK
+        if (!isGemini && !isGroq && !isManaged) return
         if (isGemini && isFetchingGeminiModels) return
-        if (!isGemini && isFetchingGroqModels) return
+        if (isGroq && isFetchingGroqModels) return
+        if (isManaged && isFetchingManagedModels) return
 
         val key = apiKeys.firstOrNull() ?: return
+        val config = Providers.forType(type)
+        if (isGemini) isFetchingGeminiModels = true
+        else if (isGroq) isFetchingGroqModels = true
+        else isFetchingManagedModels = true
 
-        if (isGemini) isFetchingGeminiModels = true else isFetchingGroqModels = true
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                if (isGemini) {
-                    geminiClient.fetchModels(key)
-                } else {
-                    openAIClient.fetchModels(key, GroqConfig.ENDPOINT).map { ids ->
-                        ids.filter { GroqModels.isChatCandidate(it) }
+                when {
+                    isGemini -> geminiClient.fetchModels(key)
+                    else -> openAIClient.fetchModels(key, config.resolveEndpoint("")).map { ids ->
+                        val chatIds = ids.filter { id ->
+                            if (isGroq) GroqModels.isChatCandidate(id)
+                            else OpenAIModels.isChatCandidate(id)
+                        }
+                        // openrouter/free is a router target, not a regular catalog
+                        // entry, so keep it selectable even when /models omits it.
+                        if (type == ProviderType.OPENROUTER && config.defaultModel !in chatIds) {
+                            listOf(config.defaultModel) + chatIds
+                        } else {
+                            chatIds
+                        }
                     }
                 }
             }
             val models = result.getOrNull().orEmpty()
             val success = result.isSuccess && models.isNotEmpty()
-            val currentModels = if (isGemini) geminiModelList else groqModelList
+            val currentModels = when {
+                isGemini -> geminiModelList
+                isGroq -> groqModelList
+                else -> managedModelList
+            }
             val toCache = if (success) models else (ProviderModelsCache.get(type)?.models ?: currentModels)
             ProviderModelsCache.put(type, ProviderModelsCache.Entry(toCache, attempted = true))
-            if (isGemini) {
-                isFetchingGeminiModels = false
-                if (success) {
-                    geminiModelList = models
-                    if (selectedModel.isBlank() && models.isNotEmpty()) {
-                        val pick = preferredModel(models, GeminiModels.DEFAULT)
-                        selectedModel = pick
-                        prefs.edit().putString(PrefKeys.GEMINI_MODEL, pick).apply()
+
+            when {
+                isGemini -> {
+                    isFetchingGeminiModels = false
+                    if (success) {
+                        geminiModelList = models
+                        if (selectedModel.isBlank()) {
+                            val pick = preferredModel(models, config.defaultModel)
+                            selectedModel = pick
+                            prefs.edit().putString(config.modelPrefKey, pick).apply()
+                        }
                     }
                 }
-            } else {
-                isFetchingGroqModels = false
-                if (success) {
-                    groqModelList = models
-                    if (groqModel.isBlank() && models.isNotEmpty()) {
-                        val pick = preferredModel(models, GroqModels.DEFAULT)
-                        groqModel = pick
-                        prefs.edit().putString(PrefKeys.GROQ_MODEL, pick).apply()
+                isGroq -> {
+                    isFetchingGroqModels = false
+                    if (success) {
+                        groqModelList = models
+                        if (groqModel.isBlank()) {
+                            val pick = preferredModel(models, config.defaultModel)
+                            groqModel = pick
+                            prefs.edit().putString(config.modelPrefKey, pick).apply()
+                        }
+                    }
+                }
+                else -> {
+                    isFetchingManagedModels = false
+                    if (success) {
+                        managedModelList = models
+                        if (managedModel.isBlank()) {
+                            val pick = preferredModel(models, config.defaultModel)
+                            managedModel = pick
+                            prefs.edit().putString(config.modelPrefKey, pick).apply()
+                        }
                     }
                 }
             }
         }
     }
 
-    // Auto-fetch once per session per provider (issue #148): fires when Settings shows
-    // a Gemini/Groq provider whose list has never been fetched this process — including
-    // the no-key case, so it runs automatically once a first key is added.
+    // Auto-fetch once per session per provider when a user-owned key exists.
     LaunchedEffect(providerType, apiKeys) {
-        if (providerType == ProviderType.GEMINI || providerType == ProviderType.GROQ) {
+        val managed = providerType == ProviderType.GEMINI || providerType == ProviderType.GROQ ||
+            providerType == ProviderType.NVIDIA || providerType == ProviderType.OPENROUTER ||
+            providerType == ProviderType.DEEPSEEK
+        if (managed) {
             val cached = ProviderModelsCache.get(providerType)
             if (apiKeys.isNotEmpty() && (cached == null || !cached.attempted)) {
                 startModelFetch(providerType)
             }
         }
     }
+
+    // Restore the independent model choice when moving between NVIDIA, OpenRouter
+    // and DeepSeek. Their lists remain session-only and are kept in the cache above.
+    LaunchedEffect(providerType) {
+        val managed = providerType == ProviderType.NVIDIA ||
+            providerType == ProviderType.OPENROUTER || providerType == ProviderType.DEEPSEEK
+        if (managed) {
+            val config = Providers.forType(providerType)
+            managedModel = prefs.getString(config.modelPrefKey, "").orEmpty()
+            managedModelList = ProviderModelsCache.get(providerType)?.models ?: emptyList()
+            managedModelExpanded = false
+        }
+    }
+
 
     var backupMessage by remember { mutableStateOf<String?>(null) }
     var backupSuccess by remember { mutableStateOf(false) }
@@ -324,6 +380,9 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                         value = when (providerType) {
                             ProviderType.GEMINI -> stringResource(R.string.settings_provider_gemini)
                             ProviderType.GROQ -> stringResource(R.string.settings_provider_groq)
+                            ProviderType.NVIDIA -> stringResource(R.string.settings_provider_nvidia)
+                            ProviderType.OPENROUTER -> stringResource(R.string.settings_provider_openrouter)
+                            ProviderType.DEEPSEEK -> stringResource(R.string.settings_provider_deepseek)
                             else -> stringResource(R.string.settings_provider_custom)
                         },
                         onValueChange = {},
@@ -351,6 +410,33 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 providerType = ProviderType.GROQ
                                 prefs.edit().putString(PrefKeys.PROVIDER_TYPE, ProviderType.GROQ).remove(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT).apply()
+                                providerExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.settings_provider_nvidia)) },
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                providerType = ProviderType.NVIDIA
+                                prefs.edit().putString(PrefKeys.PROVIDER_TYPE, ProviderType.NVIDIA).remove(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT).apply()
+                                providerExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.settings_provider_openrouter)) },
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                providerType = ProviderType.OPENROUTER
+                                prefs.edit().putString(PrefKeys.PROVIDER_TYPE, ProviderType.OPENROUTER).remove(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT).apply()
+                                providerExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.settings_provider_deepseek)) },
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                providerType = ProviderType.DEEPSEEK
+                                prefs.edit().putString(PrefKeys.PROVIDER_TYPE, ProviderType.DEEPSEEK).remove(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT).apply()
                                 providerExpanded = false
                             }
                         )
@@ -428,7 +514,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                         isFetching = isFetchingGroqModels,
                         fetchingText = fetchingModelsMsg
                     )
-                } else {
+                } else if (providerType == ProviderType.CUSTOM) {
                     Text(
                         text = stringResource(R.string.settings_endpoint_title),
                         fontSize = 11.sp,
@@ -589,6 +675,38 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                             modifier = Modifier.padding(top = 4.dp)
                         )
                     }
+                } else {
+                    val managedConfig = Providers.forType(providerType)
+                    Text(
+                        text = stringResource(R.string.settings_model_title),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    DynamicModelDropdown(
+                        selectedModel = if (apiKeys.isEmpty() || managedModel.isBlank()) "" else managedModel,
+                        enabled = apiKeys.isNotEmpty(),
+                        expanded = managedModelExpanded,
+                        onExpandedChange = { isOpening ->
+                            managedModelExpanded = isOpening
+                            if (isOpening && apiKeys.isNotEmpty() && !isFetchingManagedModels) {
+                                startModelFetch(providerType)
+                            }
+                        },
+                        models = managedModelList,
+                        onSelect = { id ->
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            managedModel = id
+                            prefs.edit().putString(managedConfig.modelPrefKey, id)
+                                .remove(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT).apply()
+                            managedModelExpanded = false
+                        },
+                        onDismiss = { managedModelExpanded = false },
+                        isFetching = isFetchingManagedModels,
+                        fetchingText = fetchingModelsMsg
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))

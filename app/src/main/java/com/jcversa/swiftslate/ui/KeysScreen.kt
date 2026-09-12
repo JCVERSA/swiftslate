@@ -40,7 +40,10 @@ import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.model.PrefKeys
 import com.jcversa.swiftslate.model.ProviderType
+import com.jcversa.swiftslate.provider.DeepSeekConfig
 import com.jcversa.swiftslate.provider.GroqConfig
+import com.jcversa.swiftslate.provider.NvidiaConfig
+import com.jcversa.swiftslate.provider.OpenRouterConfig
 import com.jcversa.swiftslate.ui.components.LocalSlateRhythm
 import com.jcversa.swiftslate.ui.components.SlateCard
 import com.jcversa.swiftslate.ui.components.SlateItemCard
@@ -92,12 +95,18 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
     // Provider display names stay literals: proper nouns, like the pre-redesign "Groq"/"Gemini".
     val providerName = when (providerType) {
         ProviderType.GROQ -> "Groq AI"
+        ProviderType.NVIDIA -> "NVIDIA NIM"
+        ProviderType.OPENROUTER -> "OpenRouter"
+        ProviderType.DEEPSEEK -> "DeepSeek"
         ProviderType.CUSTOM -> "Custom OpenAI Provider"
         else -> "Google Gemini AI"
     }
 
     val apiKeyUrl = when (providerType) {
         ProviderType.GROQ -> "https://console.groq.com/keys"
+        ProviderType.NVIDIA -> "https://build.nvidia.com/settings/api-keys"
+        ProviderType.OPENROUTER -> "https://openrouter.ai/settings/keys"
+        ProviderType.DEEPSEEK -> "https://platform.deepseek.com/api_keys"
         ProviderType.CUSTOM -> null
         else -> "https://aistudio.google.com/api-keys"
     }
@@ -237,6 +246,12 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                                         }
                                         providerType == ProviderType.GROQ ->
                                             openAIClient.validateKey(trimmedKey, GroqConfig.ENDPOINT)
+                                        providerType == ProviderType.NVIDIA ->
+                                            openAIClient.validateKey(trimmedKey, NvidiaConfig.ENDPOINT)
+                                        providerType == ProviderType.OPENROUTER ->
+                                            openAIClient.validateKey(trimmedKey, OpenRouterConfig.ENDPOINT)
+                                        providerType == ProviderType.DEEPSEEK ->
+                                            openAIClient.validateKey(trimmedKey, DeepSeekConfig.ENDPOINT)
                                         providerType == ProviderType.CUSTOM ->
                                             openAIClient.validateKey(trimmedKey, customEndpoint)
                                         else ->
