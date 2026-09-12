@@ -252,6 +252,20 @@
     <string name="settings_engine_title" tools:ignore="MissingTranslation">AI Service Engine</string>
     <string name="settings_temperature_hint" tools:ignore="MissingTranslation">Higher value yields more creative results</string>
     <string name="settings_prefix_title" tools:ignore="MissingTranslation">Trigger Activation Prefix</string>
+    <string name="settings_reliability_title" tools:ignore="MissingTranslation">Background reliability</string>
+    <string name="settings_reliability_desc" tools:ignore="MissingTranslation">Keep SwiftSlate ready after a restart. Android reconnects the accessibility service only when you have enabled it.</string>
+    <string name="settings_reliability_accessibility_needed" tools:ignore="MissingTranslation">Accessibility service is not enabled yet.</string>
+    <string name="settings_reliability_battery_needed" tools:ignore="MissingTranslation">Battery restrictions may stop SwiftSlate in the background.</string>
+    <string name="settings_reliability_ready" tools:ignore="MissingTranslation">Accessibility and battery settings look ready.</string>
+    <string name="settings_reliability_open_accessibility" tools:ignore="MissingTranslation">Enable accessibility</string>
+    <string name="settings_reliability_open_battery" tools:ignore="MissingTranslation">Open battery settings</string>
+    <string name="service_reliability_channel_name" tools:ignore="MissingTranslation">Service reliability</string>
+    <string name="service_reliability_channel_desc" tools:ignore="MissingTranslation">Alerts when SwiftSlate needs a system setting to stay available.</string>
+    <string name="service_reliability_notification_title" tools:ignore="MissingTranslation">Keep SwiftSlate available</string>
+    <string name="service_reliability_accessibility_message" tools:ignore="MissingTranslation">Enable SwiftSlate in Accessibility settings so it can reconnect after a restart.</string>
+    <string name="service_reliability_battery_message" tools:ignore="MissingTranslation">Allow SwiftSlate unrestricted background use so your phone does not stop it.</string>
+    <string name="service_reliability_open_accessibility" tools:ignore="MissingTranslation">Accessibility</string>
+    <string name="service_reliability_open_battery" tools:ignore="MissingTranslation">Battery</string>
     <string name="settings_backup_title" tools:ignore="MissingTranslation">Backup &amp; Migration Vault</string>
     <string name="settings_about_title" tools:ignore="MissingTranslation">About SwiftSlate</string>
     <string name="settings_build_version" tools:ignore="MissingTranslation">Build v%1$s</string>

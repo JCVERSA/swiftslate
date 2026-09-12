@@ -123,6 +123,7 @@ class AssistantService : AccessibilityService() {
             commandManager = CommandManager(applicationContext)
             statsManager = StatsManager(applicationContext)
             updateTriggers()
+            BackgroundReliability.refreshRecoveryNotification(applicationContext)
         } catch (e: Exception) {
             // This callback runs on the binder thread with no framework guard: an exception
             // here propagates to AccessibilityManagerService, which drops the service into the

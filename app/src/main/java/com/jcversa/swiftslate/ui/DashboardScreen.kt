@@ -43,6 +43,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.jcversa.swiftslate.R
 import com.jcversa.swiftslate.SwiftSlateApp
 import com.jcversa.swiftslate.manager.CommandManager
+import com.jcversa.swiftslate.service.BackgroundReliability
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.manager.StatsManager
 import com.jcversa.swiftslate.model.PrefKeys
@@ -149,6 +150,7 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
             favoriteCommand = statsManager.favoriteCommand
             dailyCounts = statsManager.dailyCounts()
             showKilledBanner = killed
+            BackgroundReliability.refreshRecoveryNotification(context)
         }
     }
 

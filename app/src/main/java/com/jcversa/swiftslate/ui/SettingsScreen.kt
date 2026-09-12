@@ -25,6 +25,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.jcversa.swiftslate.BuildConfig
 import com.jcversa.swiftslate.R
 import com.jcversa.swiftslate.api.ApiClientUtils
@@ -44,6 +47,7 @@ import com.jcversa.swiftslate.model.PrefKeys
 import com.jcversa.swiftslate.model.ProviderType
 import com.jcversa.swiftslate.provider.EndpointValidator
 import com.jcversa.swiftslate.provider.Providers
+import com.jcversa.swiftslate.service.BackgroundReliability
 import com.jcversa.swiftslate.ui.components.LocalSlateRhythm
 import com.jcversa.swiftslate.ui.components.SlateCard
 import com.jcversa.swiftslate.ui.components.SlateDivider
@@ -56,6 +60,25 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val uriHandler = LocalUriHandler.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var accessibilityEnabled by remember {
+        mutableStateOf(BackgroundReliability.isAccessibilityServiceEnabled(context))
+    }
+    var batteryOptimizationExempt by remember {
+        mutableStateOf(BackgroundReliability.isBatteryOptimizationExempt(context))
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                accessibilityEnabled = BackgroundReliability.isAccessibilityServiceEnabled(context)
+                batteryOptimizationExempt = BackgroundReliability.isBatteryOptimizationExempt(context)
+                BackgroundReliability.refreshRecoveryNotification(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     val scope = rememberCoroutineScope()
     var saveEndpointJob by remember { mutableStateOf<Job?>(null) }
@@ -838,8 +861,121 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
 
         Spacer(modifier = Modifier.height(rhythm.cardGap))
 
-        // Card 3: Backup Vault
+        // Card 3: Background reliability
         AnimateEntrance(index = 3) {
+            SlateCard {
+                Column(modifier = Modifier.padding(2.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Security,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.settings_reliability_title),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.settings_reliability_desc),
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (accessibilityEnabled && batteryOptimizationExempt) {
+                            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.28f)
+                        } else {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.34f)
+                        },
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (accessibilityEnabled && batteryOptimizationExempt) {
+                                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f)
+                            } else {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                            }
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = when {
+                                    !accessibilityEnabled -> Icons.Rounded.PowerSettingsNew
+                                    batteryOptimizationExempt -> Icons.Rounded.CheckCircle
+                                    else -> Icons.Rounded.BatteryAlert
+                                },
+                                contentDescription = null,
+                                tint = if (accessibilityEnabled && batteryOptimizationExempt) {
+                                    MaterialTheme.colorScheme.tertiary
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = when {
+                                    !accessibilityEnabled -> stringResource(R.string.settings_reliability_accessibility_needed)
+                                    batteryOptimizationExempt -> stringResource(R.string.settings_reliability_ready)
+                                    else -> stringResource(R.string.settings_reliability_battery_needed)
+                                },
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (!accessibilityEnabled) {
+                                BackgroundReliability.openAccessibilitySettings(context)
+                            } else {
+                                BackgroundReliability.openBatterySettings(context)
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.BatteryChargingFull,
+                            contentDescription = null,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            stringResource(
+                                if (!accessibilityEnabled) {
+                                    R.string.settings_reliability_open_accessibility
+                                } else {
+                                    R.string.settings_reliability_open_battery
+                                }
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(rhythm.cardGap))
+
+        // Card 4: Backup Vault
+        AnimateEntrance(index = 4) {
             SlateCard {
                 Column(modifier = Modifier.padding(2.dp)) {
                 Row(
