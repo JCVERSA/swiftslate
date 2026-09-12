@@ -71,6 +71,11 @@
     <string name="onboarding_key_title">Ajoutez votre clé API</string>
     <string name="onboarding_key_message">Ajoutez une clé API %1$s. Elle est conservée de façon sécurisée sur cet appareil et n’est plus affichée après validation.</string>
     <string name="onboarding_key_validate">Valider et enregistrer la clé</string>
+    <string name="onboarding_key_validating">Validation…</string>
+    <string name="onboarding_key_placeholder">Entrez votre clé API</string>
+    <string name="onboarding_key_saved_title">Clé API enregistrée</string>
+    <string name="onboarding_key_saved_message">Votre clé %1$s est stockée de façon sécurisée sur cet appareil.</string>
+    <string name="onboarding_key_edit">Modifier la clé</string>
     <string name="onboarding_key_success">Clé validée et enregistrée de façon sécurisée.</string>
     <string name="onboarding_key_failed">La clé n’a pas pu être validée. Vérifiez-la puis réessayez.</string>
     <string name="onboarding_accessibility_title">Activez l’assistant</string>

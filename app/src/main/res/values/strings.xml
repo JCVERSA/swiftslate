@@ -77,6 +77,11 @@
     <string name="onboarding_key_title" tools:ignore="MissingTranslation">Add your API key</string>
     <string name="onboarding_key_message" tools:ignore="MissingTranslation">Add a %1$s API key. It is stored securely on this device and never displayed after validation.</string>
     <string name="onboarding_key_validate" tools:ignore="MissingTranslation">Validate and save key</string>
+    <string name="onboarding_key_validating" tools:ignore="MissingTranslation">Validating…</string>
+    <string name="onboarding_key_placeholder" tools:ignore="MissingTranslation">Enter your API key</string>
+    <string name="onboarding_key_saved_title" tools:ignore="MissingTranslation">API key saved</string>
+    <string name="onboarding_key_saved_message" tools:ignore="MissingTranslation">Your %1$s key is stored securely on this device.</string>
+    <string name="onboarding_key_edit" tools:ignore="MissingTranslation">Edit key</string>
     <string name="onboarding_key_success" tools:ignore="MissingTranslation">Key validated and saved securely.</string>
     <string name="onboarding_key_failed" tools:ignore="MissingTranslation">The key could not be validated. Check it and try again.</string>
     <string name="onboarding_accessibility_title" tools:ignore="MissingTranslation">Enable the assistant</string>
