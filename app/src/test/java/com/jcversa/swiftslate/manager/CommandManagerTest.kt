@@ -307,7 +307,8 @@ class CommandManagerTest {
     fun importCommands_keepsOnlyUpToTheMaximum() {
         val arr = JSONArray()
         for (i in 0 until (CommandManager.MAX_CUSTOM_COMMANDS + 5)) {
-            arr.put(JSONObject().put("trigger", "?c$i").put("prompt", "p").put("type", "AI"))
+            val name = i.toString().padStart(3, '0')
+            arr.put(JSONObject().put("trigger", "?c$name").put("prompt", "p").put("type", "AI"))
         }
         assertTrue(commandManager.importCommands(arr.toString()))
         val stored = JSONArray(commandManager.exportCommands())
