@@ -47,6 +47,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.animation.core.EaseOutQuart
+import kotlinx.coroutines.delay
 import com.jcversa.swiftslate.ui.components.bounceClick
 import com.jcversa.swiftslate.ui.CommandsScreen
 import com.jcversa.swiftslate.ui.DashboardScreen
@@ -68,8 +79,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
+            var showSplash by rememberSaveable { mutableStateOf(true) }
             SwiftSlateTheme {
-                SwiftSlateMainScreen()
+                if (showSplash) {
+                    SwiftSlateSplashScreen(onDismiss = { showSplash = false })
+                } else {
+                    SwiftSlateMainScreen()
+                }
             }
         }
     }
@@ -220,6 +236,139 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
                     screens[tab]?.invoke()
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun SwiftSlateSplashScreen(onDismiss: () -> Unit) {
+    val scale = remember { androidx.compose.animation.core.Animatable(0.7f) }
+    val pathProgress = remember { androidx.compose.animation.core.Animatable(0f) }
+    val glowRadius = remember { androidx.compose.animation.core.Animatable(0f) }
+    val textAlpha = remember { androidx.compose.animation.core.Animatable(0f) }
+    val dismissProgress = remember { androidx.compose.animation.core.Animatable(1f) }
+
+    LaunchedEffect(Unit) {
+        // Step 1: Scale/bounce in the central terminal node
+        scale.animateTo(
+            targetValue = 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow
+            )
+        )
+        // Step 2: Draw the terminal symbol outline
+        pathProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(900, easing = EaseOutQuart)
+        )
+        // Step 3: Radiate glowing backdrop wave
+        glowRadius.animateTo(
+            targetValue = 150f,
+            animationSpec = tween(500, easing = FastOutSlowInEasing)
+        )
+        // Step 4: Fade in branding text
+        textAlpha.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(400)
+        )
+        // Wait for aesthetic flow
+        delay(700)
+        // Step 5: Slide up and fade out into the active workspace
+        dismissProgress.animateTo(
+            targetValue = 0f,
+            animationSpec = tween(500, easing = EaseOutQuart)
+        )
+        onDismiss()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0F172A)) // High-contrast deep slate background
+            .graphicsLayer {
+                alpha = dismissProgress.value
+                scaleX = 0.96f + (0.04f * dismissProgress.value)
+                scaleY = 0.96f + (0.04f * dismissProgress.value)
+                translationY = - (1f - dismissProgress.value) * 120f
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        // Canvas-based premium vector drawing
+        Canvas(
+            modifier = Modifier
+                .size(240.dp)
+                .graphicsLayer {
+                    scaleX = scale.value
+                    scaleY = scale.value
+                }
+        ) {
+            val width = size.width
+            val height = size.height
+            val centerX = width / 2
+            val centerY = height / 2
+
+            // Draw glowing backdrop blur circles
+            if (glowRadius.value > 0f) {
+                drawCircle(
+                    color = Color(0xFF6366F1).copy(alpha = 0.12f * (1f - glowRadius.value / 150f)),
+                    radius = glowRadius.value * 2f,
+                    center = androidx.compose.ui.geometry.Offset(centerX, centerY)
+                )
+            }
+
+            // Draw Slate Terminal Prompt symbol ">"
+            val path = Path().apply {
+                moveTo(centerX - 35f, centerY - 25f)
+                lineTo(centerX - 5f, centerY)
+                lineTo(centerX - 35f, centerY + 25f)
+            }
+
+            drawPath(
+                path = path,
+                color = Color(0xFF6366F1),
+                style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
+            )
+
+            // Draw typing block prompt "_"
+            if (pathProgress.value > 0.4f) {
+                val blockProgress = (pathProgress.value - 0.4f) / 0.6f
+                val blockStartX = centerX + 15f
+                val blockEndX = blockStartX + (35f * blockProgress)
+                drawLine(
+                    color = Color(0xFF818CF8),
+                    start = androidx.compose.ui.geometry.Offset(blockStartX, centerY + 25f),
+                    end = androidx.compose.ui.geometry.Offset(blockEndX, centerY + 25f),
+                    strokeWidth = 6.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            }
+        }
+
+        // Branding Title
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 90.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "SWIFTSLATE",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White,
+                letterSpacing = 6.sp,
+                modifier = Modifier.graphicsLayer { alpha = textAlpha.value }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "AI ACCESSIBILITY COMPANION",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF64748B),
+                letterSpacing = 2.sp,
+                modifier = Modifier.graphicsLayer { alpha = textAlpha.value }
+            )
         }
     }
 }
