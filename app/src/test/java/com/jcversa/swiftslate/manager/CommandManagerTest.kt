@@ -376,6 +376,32 @@ class CommandManagerTest {
         assertEquals("original", commandManager.findCommand("y ?keep")!!.prompt)
     }
 
+    @Test
+    fun saveCustomCommand_rejectsCollisionWithBuiltInOrExistingAlias() {
+        assertFalse(commandManager.saveCustomCommand(Command("?copycat", "shadow built-in")))
+        assertTrue(commandManager.saveCustomCommand(Command("?greet", "say hello", aliases = listOf("?hello"))))
+        assertFalse(commandManager.saveCustomCommand(Command("?other", "conflicting", aliases = listOf("?helloworld"))))
+        assertFalse(commandManager.saveCustomCommand(Command("?helloagain", "conflicting")))
+    }
+
+    @Test
+    fun saveCustomCommand_rejectsDynamicTranslateCollision() {
+        assertFalse(commandManager.saveCustomCommand(Command("?translate", "shadow translation")))
+        assertFalse(commandManager.saveCustomCommand(Command("?translate:es", "shadow translation")))
+    }
+
+    @Test
+    fun importCommands_dropsGlobalCollisions() {
+        val json = JSONArray()
+            .put(JSONObject().put("trigger", "?first").put("prompt", "one").put("aliases", JSONArray().put("?shared")))
+            .put(JSONObject().put("trigger", "?shared").put("prompt", "two"))
+            .put(JSONObject().put("trigger", "?copycat").put("prompt", "three"))
+        assertTrue(commandManager.importCommands(json.toString()))
+        val stored = JSONArray(commandManager.exportCommands())
+        assertEquals(1, stored.length())
+        assertEquals("?first", stored.getJSONObject(0).getString("trigger"))
+    }
+
     // --- cache invalidation (the prefix is part of the cache key) ---
 
     @Test

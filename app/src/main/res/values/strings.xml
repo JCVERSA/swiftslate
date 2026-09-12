@@ -70,6 +70,8 @@
     <string name="onboarding_progress" tools:ignore="MissingTranslation">Step %1$d of %2$d</string>
     <string name="onboarding_provider_title" tools:ignore="MissingTranslation">Choose your provider</string>
     <string name="onboarding_provider_message" tools:ignore="MissingTranslation">This provider will handle your AI commands. You can change it later in Settings.</string>
+    <string name="onboarding_model_title" tools:ignore="MissingTranslation">Choose your model</string>
+    <string name="onboarding_model_message" tools:ignore="MissingTranslation">Select the model that will process your commands. You can change it later in Settings.</string>
     <string name="onboarding_key_title" tools:ignore="MissingTranslation">Add your API key</string>
     <string name="onboarding_key_message" tools:ignore="MissingTranslation">Add a %1$s API key. It is stored securely on this device and never displayed after validation.</string>
     <string name="onboarding_key_validate" tools:ignore="MissingTranslation">Validate and save key</string>

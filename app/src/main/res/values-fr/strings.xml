@@ -64,6 +64,8 @@
     <string name="onboarding_progress">Étape %1$d sur %2$d</string>
     <string name="onboarding_provider_title">Choisissez votre fournisseur</string>
     <string name="onboarding_provider_message">Ce fournisseur traitera vos commandes IA. Vous pourrez le modifier plus tard dans les Paramètres.</string>
+    <string name="onboarding_model_title">Choisissez votre modèle</string>
+    <string name="onboarding_model_message">Sélectionnez le modèle qui traitera vos commandes. Vous pourrez le modifier plus tard dans les Paramètres.</string>
     <string name="onboarding_key_title">Ajoutez votre clé API</string>
     <string name="onboarding_key_message">Ajoutez une clé API %1$s. Elle est conservée de façon sécurisée sur cet appareil et n’est plus affichée après validation.</string>
     <string name="onboarding_key_validate">Valider et enregistrer la clé</string>

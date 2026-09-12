@@ -59,6 +59,9 @@ import com.jcversa.swiftslate.api.ApiClientUtils
 import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.service.CommandOutcome
+import com.jcversa.swiftslate.model.DeepSeekModels
+import com.jcversa.swiftslate.model.NvidiaModels
+import com.jcversa.swiftslate.model.OpenRouterModels
 import com.jcversa.swiftslate.model.PrefKeys
 import com.jcversa.swiftslate.model.ProviderType
 import com.jcversa.swiftslate.provider.DeepSeekConfig
@@ -81,6 +84,24 @@ private val onboardingProviders = listOf(
     ProviderType.DEEPSEEK
 )
 
+private fun onboardingModels(provider: String): List<String> = when (provider) {
+    ProviderType.NVIDIA -> listOf(
+        NvidiaModels.DEFAULT,
+        "meta/llama-3.3-70b-instruct",
+        "mistralai/mistral-large-2-instruct"
+    )
+    ProviderType.OPENROUTER -> listOf(
+        OpenRouterModels.DEFAULT,
+        "deepseek/deepseek-chat-v3-0324:free",
+        "qwen/qwen3-32b:free"
+    )
+    else -> listOf(
+        DeepSeekModels.DEFAULT,
+        "deepseek-chat",
+        "deepseek-reasoner"
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(
@@ -100,6 +121,7 @@ fun OnboardingScreen(
                 ?.takeIf { it in onboardingProviders } ?: ProviderType.NVIDIA
         )
     }
+    var selectedModel by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf("") }
     var isTestingKey by remember { mutableStateOf(false) }
     var keyMessage by remember { mutableStateOf<String?>(null) }
@@ -123,9 +145,12 @@ fun OnboardingScreen(
     }
 
     LaunchedEffect(providerType) {
+        val availableModels = onboardingModels(providerType)
+        val storedModel = prefs.getString(config.modelPrefKey, "").orEmpty()
+        selectedModel = storedModel.takeIf { it in availableModels } ?: config.defaultModel
         prefs.edit()
             .putString(PrefKeys.PROVIDER_TYPE, providerType)
-            .putString(config.modelPrefKey, config.defaultModel)
+            .putString(config.modelPrefKey, selectedModel)
             .apply()
         keyMessage = null
         keySuccess = false
@@ -239,7 +264,7 @@ fun OnboardingScreen(
             color = MaterialTheme.colorScheme.onBackground
         )
         Text(
-            text = stringResource(R.string.onboarding_progress, step + 1, 4),
+            text = stringResource(R.string.onboarding_progress, step + 1, 5),
             fontSize = 13.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -320,6 +345,49 @@ fun OnboardingScreen(
             }
             2 -> {
                 SlateCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.Settings, null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.onboarding_model_title), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Text(
+                            stringResource(R.string.onboarding_model_message),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        onboardingModels(providerType).forEach { candidate ->
+                            val selected = candidate == selectedModel
+                            Surface(
+                                onClick = {
+                                    selectedModel = candidate
+                                    prefs.edit().putString(config.modelPrefKey, candidate).apply()
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                border = if (selected) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        candidate,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (selected) Icon(Icons.Rounded.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        }
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(onClick = { step = 1 }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.onboarding_back)) }
+                    Button(onClick = { step = 3 }, enabled = selectedModel.isNotBlank(), modifier = Modifier.weight(1f)) { Text(stringResource(R.string.onboarding_next)) }
+                }
+            }
+            3 -> {
+                SlateCard {
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Rounded.Settings, null, tint = MaterialTheme.colorScheme.primary)
@@ -346,8 +414,8 @@ fun OnboardingScreen(
                     }
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedButton(onClick = { step = 1 }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.onboarding_back)) }
-                    Button(onClick = { step = 3 }, enabled = serviceEnabled, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.onboarding_next)) }
+                    OutlinedButton(onClick = { step = 2 }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.onboarding_back)) }
+                    Button(onClick = { step = 4 }, enabled = serviceEnabled, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.onboarding_next)) }
                 }
             }
             else -> {
@@ -380,7 +448,7 @@ fun OnboardingScreen(
                     }
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedButton(onClick = { step = 2 }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.onboarding_back)) }
+                    OutlinedButton(onClick = { step = 3 }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.onboarding_back)) }
                     Button(onClick = { finishSetup(false) }, enabled = testOutput != null, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.onboarding_finish)) }
                 }
             }
