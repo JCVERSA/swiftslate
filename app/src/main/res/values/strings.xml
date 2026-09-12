@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">SwiftSlate</string>
     <string name="accessibility_service_label">SwiftSlate Assistant</string>
     <string name="accessibility_service_desc">Provides system-wide AI text replacements when trigger commands are typed.</string>
@@ -158,42 +158,44 @@
 
     <!-- TODO translate: redesign labels, fall back to English in the other locales until then.
          Added with the UI port: dashboard/keys/commands/settings subtitles, metric cards,
-         filter pills, command tags and section titles. -->
+         filter pills, command tags and section titles. Each carries
+         tools:ignore="MissingTranslation" so lint stays green — remove the attribute from
+         a string once its translations land. -->
     <!-- Dashboard -->
-    <string name="dashboard_subtitle">Your AI Writing Companion</string>
-    <string name="dashboard_cd_alert">Alert</string>
-    <string name="dashboard_engine_status">Engine Status</string>
-    <string name="dashboard_connected">Connected</string>
-    <string name="dashboard_metric_actions">Actions</string>
-    <string name="dashboard_cd_requests">Requests</string>
-    <string name="dashboard_metric_integrations">Integrations</string>
-    <string name="dashboard_metric_keys">Configured Keys</string>
-    <string name="dashboard_cd_key_missing">Key missing</string>
-    <string name="dashboard_chart_title">Daily Usage Frequency</string>
-    <string name="dashboard_cd_chart">Stats</string>
+    <string name="dashboard_subtitle" tools:ignore="MissingTranslation">Your AI Writing Companion</string>
+    <string name="dashboard_cd_alert" tools:ignore="MissingTranslation">Alert</string>
+    <string name="dashboard_engine_status" tools:ignore="MissingTranslation">Engine Status</string>
+    <string name="dashboard_connected" tools:ignore="MissingTranslation">Connected</string>
+    <string name="dashboard_metric_actions" tools:ignore="MissingTranslation">Actions</string>
+    <string name="dashboard_cd_requests" tools:ignore="MissingTranslation">Requests</string>
+    <string name="dashboard_metric_integrations" tools:ignore="MissingTranslation">Integrations</string>
+    <string name="dashboard_metric_keys" tools:ignore="MissingTranslation">Configured Keys</string>
+    <string name="dashboard_cd_key_missing" tools:ignore="MissingTranslation">Key missing</string>
+    <string name="dashboard_chart_title" tools:ignore="MissingTranslation">Daily Usage Frequency</string>
+    <string name="dashboard_cd_chart" tools:ignore="MissingTranslation">Stats</string>
     <!-- Keys -->
-    <string name="keys_subtitle">Hardware-secured API authentication</string>
-    <string name="keys_register_title">Register API Key</string>
-    <string name="keys_list_title">Registered Keyrings</string>
-    <string name="keys_encrypted_note">AES-256 Hardware Encrypted</string>
+    <string name="keys_subtitle" tools:ignore="MissingTranslation">Hardware-secured API authentication</string>
+    <string name="keys_register_title" tools:ignore="MissingTranslation">Register API Key</string>
+    <string name="keys_list_title" tools:ignore="MissingTranslation">Registered Keyrings</string>
+    <string name="keys_encrypted_note" tools:ignore="MissingTranslation">AES-256 Hardware Encrypted</string>
     <!-- Commands -->
-    <string name="commands_subtitle">Manage writing triggers &amp; custom shortcuts</string>
-    <string name="commands_filter_all">All</string>
-    <string name="commands_filter_ai">AI Actions</string>
-    <string name="commands_filter_replacer">Text Replacers</string>
-    <string name="commands_empty_category">No commands in this category</string>
-    <string name="commands_tag_ai">AI ACTION</string>
-    <string name="commands_tag_replacer">QUICK REPLACE</string>
-    <string name="commands_prompt_heading_ai">AI ASSISTANT INSTRUCTION PROMPT:</string>
-    <string name="commands_prompt_heading_replacer">REPLACEMENT TEXT:</string>
-    <string name="commands_edit_custom_title">Edit Custom Command</string>
+    <string name="commands_subtitle" tools:ignore="MissingTranslation">Manage writing triggers &amp; custom shortcuts</string>
+    <string name="commands_filter_all" tools:ignore="MissingTranslation">All</string>
+    <string name="commands_filter_ai" tools:ignore="MissingTranslation">AI Actions</string>
+    <string name="commands_filter_replacer" tools:ignore="MissingTranslation">Text Replacers</string>
+    <string name="commands_empty_category" tools:ignore="MissingTranslation">No commands in this category</string>
+    <string name="commands_tag_ai" tools:ignore="MissingTranslation">AI ACTION</string>
+    <string name="commands_tag_replacer" tools:ignore="MissingTranslation">QUICK REPLACE</string>
+    <string name="commands_prompt_heading_ai" tools:ignore="MissingTranslation">AI ASSISTANT INSTRUCTION PROMPT:</string>
+    <string name="commands_prompt_heading_replacer" tools:ignore="MissingTranslation">REPLACEMENT TEXT:</string>
+    <string name="commands_edit_custom_title" tools:ignore="MissingTranslation">Edit Custom Command</string>
     <!-- Settings -->
-    <string name="settings_subtitle">Configure AI orchestration &amp; system settings</string>
-    <string name="settings_engine_title">AI Service Engine</string>
-    <string name="settings_temperature_hint">Higher value yields more creative results</string>
-    <string name="settings_prefix_title">Trigger Activation Prefix</string>
-    <string name="settings_backup_title">Backup &amp; Migration Vault</string>
-    <string name="settings_about_title">About SwiftSlate</string>
-    <string name="settings_build_version">Build v%1$s</string>
-    <string name="settings_sponsor_hint">Support future development</string>
+    <string name="settings_subtitle" tools:ignore="MissingTranslation">Configure AI orchestration &amp; system settings</string>
+    <string name="settings_engine_title" tools:ignore="MissingTranslation">AI Service Engine</string>
+    <string name="settings_temperature_hint" tools:ignore="MissingTranslation">Higher value yields more creative results</string>
+    <string name="settings_prefix_title" tools:ignore="MissingTranslation">Trigger Activation Prefix</string>
+    <string name="settings_backup_title" tools:ignore="MissingTranslation">Backup &amp; Migration Vault</string>
+    <string name="settings_about_title" tools:ignore="MissingTranslation">About SwiftSlate</string>
+    <string name="settings_build_version" tools:ignore="MissingTranslation">Build v%1$s</string>
+    <string name="settings_sponsor_hint" tools:ignore="MissingTranslation">Support future development</string>
 </resources>
