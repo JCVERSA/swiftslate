@@ -158,6 +158,7 @@ fun OnboardingScreen(
     var isTestingCommand by remember { mutableStateOf(false) }
 
     val config = Providers.forType(providerType)
+    val keystoreAvailable = keyManager.keystoreAvailable
     val onboardingKeyFailed = stringResource(R.string.onboarding_key_failed)
     val keystoreError = stringResource(R.string.keys_keystore_error)
     val authRequired = stringResource(R.string.error_provider_auth_required)
@@ -368,6 +369,7 @@ fun OnboardingScreen(
                                 isEditingKey = isEditingKey,
                                 apiKey = apiKey,
                                 isTestingKey = isTestingKey,
+                                keystoreAvailable = keystoreAvailable,
                                 keyMessage = keyMessage,
                                 serviceEnabled = serviceEnabled,
                                 testOutput = testOutput,
@@ -542,6 +544,7 @@ private fun OnboardingStepContent(
     isEditingKey: Boolean,
     apiKey: String,
     isTestingKey: Boolean,
+    keystoreAvailable: Boolean,
     keyMessage: String?,
     serviceEnabled: Boolean,
     testOutput: String?,
@@ -566,6 +569,7 @@ private fun OnboardingStepContent(
             isEditingKey = isEditingKey,
             apiKey = apiKey,
             isTestingKey = isTestingKey,
+            keystoreAvailable = keystoreAvailable,
             keyMessage = keyMessage,
             onApiKeyChanged = onApiKeyChanged,
             onEditKey = onEditKey,
@@ -631,6 +635,7 @@ private fun ApiKeyStep(
     isEditingKey: Boolean,
     apiKey: String,
     isTestingKey: Boolean,
+    keystoreAvailable: Boolean,
     keyMessage: String?,
     onApiKeyChanged: (String) -> Unit,
     onEditKey: () -> Unit,
@@ -696,7 +701,7 @@ private fun ApiKeyStep(
                 )
                 Button(
                     onClick = onValidateKey,
-                    enabled = apiKey.isNotBlank() && !isTestingKey,
+                    enabled = apiKey.isNotBlank() && !isTestingKey && keystoreAvailable,
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 52.dp)
