@@ -98,9 +98,9 @@
     <string name="settings_provider_title">Model Provider</string>
     <string name="settings_provider_gemini">Google Gemini</string>
     <string name="settings_provider_groq">Groq</string>
-    <string name="settings_provider_nvidia">NVIDIA NIM</string>
-    <string name="settings_provider_openrouter">OpenRouter</string>
-    <string name="settings_provider_deepseek">DeepSeek</string>
+    <string name="settings_provider_nvidia" tools:ignore="MissingTranslation">NVIDIA NIM</string>
+    <string name="settings_provider_openrouter" tools:ignore="MissingTranslation">OpenRouter</string>
+    <string name="settings_provider_deepseek" tools:ignore="MissingTranslation">DeepSeek</string>
     <string name="settings_provider_custom">Custom (OpenAI Compatible)</string>
     <string name="settings_model_title">Model</string>
     <string name="settings_temperature_title">Temperature</string>
