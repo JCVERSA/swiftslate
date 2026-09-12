@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">Tím nahradíte všechny své stávající vlastní příkazy. Pokračovat?</string>
     <string name="backup_import_cancel">Zrušit</string>
     <string name="settings_check_updates">Zkontrolovat aktualizace</string>
-    <string name="settings_made_by">Vyrobeno s láskou Musheerem Alamem</string>
+    <string name="settings_made_by">Vyrobeno s láskou JCVERSA</string>
     <string name="settings_sponsor">Sponzorujte na GitHubu</string>
     <string name="commands_collapse">Sbalit</string>
     <string name="commands_expand">Rozbalit</string>

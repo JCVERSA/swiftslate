@@ -522,7 +522,7 @@ jobs:
           {
             echo "### Preview APK ready"
             echo
-            echo "Installs as a **separate app** (\`com.musheer360.swiftslate.preview\`, shown as"
+            echo "Installs as a **separate app** (\`com.jcversa.swiftslate.preview\`, shown as"
             echo "**SwiftSlate Preview**), so it will not touch your stable install, its API keys,"
             echo "its commands or its accessibility setting."
             echo

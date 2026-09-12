@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">Это заменит все ваши существующие пользовательские команды. Продолжить?</string>
     <string name="backup_import_cancel">Отмена</string>
     <string name="settings_check_updates">Проверить обновления</string>
-    <string name="settings_made_by">Сделано с любовью Musheer Alam</string>
+    <string name="settings_made_by">Сделано с любовью JCVERSA</string>
     <string name="settings_sponsor">Поддержать на GitHub</string>
     <string name="commands_collapse">Свернуть</string>
     <string name="commands_expand">Развернуть</string>

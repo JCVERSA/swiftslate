@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">Ово ће заменити све ваше постојеће прилагођене наредбе. Наставити?</string>
     <string name="backup_import_cancel">Откажи</string>
     <string name="settings_check_updates">Провери ажурирања</string>
-    <string name="settings_made_by">Направљено са љубављу од Musheer Alam</string>
+    <string name="settings_made_by">Направљено са љубављу од JCVERSA</string>
     <string name="settings_sponsor">Спонзориши на GitHub-у</string>
     <string name="commands_collapse">Скупи</string>
     <string name="commands_expand">Прошири</string>

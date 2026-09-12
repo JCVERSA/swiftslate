@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">Αυτό θα αντικαταστήσει όλες τις υπάρχουσες προσαρμοσμένες εντολές σας. Θέλετε να συνεχίσετε;</string>
     <string name="backup_import_cancel">Ακύρωση</string>
     <string name="settings_check_updates">Έλεγχος για ενημερώσεις</string>
-    <string name="settings_made_by">Φτιαγμένο με αγάπη από τον Musheer Alam</string>
+    <string name="settings_made_by">Φτιαγμένο με αγάπη από τον JCVERSA</string>
     <string name="settings_sponsor">Υποστήριξη στο GitHub</string>
     <string name="commands_collapse">Σύμπτυξη</string>
     <string name="commands_expand">Επέκταση</string>

@@ -88,7 +88,7 @@
     <string name="dashboard_no_data">—</string>
     <string name="dashboard_last_7_days">पिछले 7 दिन</string>
     <string name="settings_temperature_title">तापमान</string>
-    <string name="settings_made_by">Musheer Alam द्वारा प्यार से बनाया गया</string>
+    <string name="settings_made_by">JCVERSA द्वारा प्यार से बनाया गया</string>
     <string name="settings_sponsor">GitHub पर प्रायोजित करें</string>
 
     <!-- Toasts and errors -->

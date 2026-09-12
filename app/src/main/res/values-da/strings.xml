@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">Dette vil erstatte alle dine eksisterende brugerdefinerede kommandoer. Fortsæt?</string>
     <string name="backup_import_cancel">Annuller</string>
     <string name="settings_check_updates">Søg efter opdateringer</string>
-    <string name="settings_made_by">Lavet med kærlighed af Musheer Alam</string>
+    <string name="settings_made_by">Lavet med kærlighed af JCVERSA</string>
     <string name="settings_sponsor">Sponsor på GitHub</string>
     <string name="commands_collapse">Skjul</string>
     <string name="commands_expand">Vis</string>
