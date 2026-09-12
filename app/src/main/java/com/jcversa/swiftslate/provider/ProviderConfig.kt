@@ -7,6 +7,7 @@ import com.jcversa.swiftslate.model.NvidiaModels
 import com.jcversa.swiftslate.model.OpenRouterModels
 import com.jcversa.swiftslate.model.PrefKeys
 import com.jcversa.swiftslate.model.ProviderType
+import org.json.JSONObject
 
 /** Which transport client handles a provider's requests. */
 enum class Transport { GEMINI_NATIVE, OPENAI_COMPAT }
@@ -65,6 +66,17 @@ object NvidiaConfig : ProviderConfig {
     override val defaultModel = NvidiaModels.DEFAULT
     override fun sanitizeModel(stored: String?): String = NvidiaModels.sanitize(stored)
     override fun resolveEndpoint(customEndpoint: String): String = ENDPOINT
+
+    override fun reasoningParams(model: String): Map<String, Any> =
+        if (NvidiaModels.shouldDisableThinking(model)) {
+            mapOf(
+                "chat_template_kwargs" to JSONObject().apply {
+                    put("enable_thinking", false)
+                }
+            )
+        } else {
+            emptyMap()
+        }
 }
 
 /** OpenRouter — OpenAI-compatible gateway with a user-owned OpenRouter key. */

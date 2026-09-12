@@ -87,6 +87,14 @@ class ProviderConfigTest {
     }
 
     @Test
+    fun nvidia_nemotron_fast_path_disables_thinking() {
+        val params = NvidiaConfig.reasoningParams(NvidiaModels.DEFAULT)
+        val chatTemplate = params["chat_template_kwargs"] as org.json.JSONObject
+        assertFalse(chatTemplate.getBoolean("enable_thinking"))
+        assertTrue(NvidiaConfig.reasoningParams("some/other-model").isEmpty())
+    }
+
+    @Test
     fun isConfigured_only_custom_requires_both() {
         assertTrue(GeminiConfig.isConfigured("", ""))
         assertTrue(GroqConfig.isConfigured("m", ""))
@@ -106,7 +114,7 @@ class ProviderConfigTest {
     fun gemini_config_sanitizes_and_exposes_thinking_level() {
         assertEquals(GeminiModels.DEFAULT, GeminiConfig.sanitizeModel("gemini-2.5-flash-lite")) // retired
         assertEquals("gemini-3.7-pro", GeminiConfig.sanitizeModel("  gemini-3.7-pro  ")) // dynamic pass-through
-        assertEquals("low", GeminiConfig.thinkingLevel(GeminiModels.DEFAULT))
+        assertEquals("minimal", GeminiConfig.thinkingLevel(GeminiModels.DEFAULT))
     }
 
     @Test

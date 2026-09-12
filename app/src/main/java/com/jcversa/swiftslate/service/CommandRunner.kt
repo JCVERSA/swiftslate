@@ -9,6 +9,7 @@ import com.jcversa.swiftslate.api.GeminiClient
 import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.model.PrefKeys
+import com.jcversa.swiftslate.model.ProviderType
 import com.jcversa.swiftslate.provider.Providers
 import com.jcversa.swiftslate.provider.Transport
 import java.util.Locale
@@ -131,7 +132,12 @@ suspend fun runTextCommand(
             Transport.OPENAI_COMPAT -> openAIClient.generate(
                 prompt, text, key, model, temperature, endpoint,
                 useJsonObjectMode = provider.useJsonObjectMode(useStructuredOutput),
-                extraParams = provider.reasoningParams(model))
+                extraParams = provider.reasoningParams(model),
+                maxOutputTokens = if (providerType == ProviderType.NVIDIA) {
+                    ApiClientUtils.suggestedMaxOutputTokens(text)
+                } else {
+                    null
+                })
             Transport.GEMINI_NATIVE -> geminiClient.generate(
                 prompt, text, key, model, temperature, useStructuredOutput,
                 thinkingLevel = provider.thinkingLevel(model))

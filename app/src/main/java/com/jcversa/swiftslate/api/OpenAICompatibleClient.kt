@@ -198,14 +198,21 @@ class OpenAICompatibleClient {
         temperature: Double,
         endpoint: String,
         useJsonObjectMode: Boolean = false,
-        extraParams: Map<String, Any> = emptyMap()
+        extraParams: Map<String, Any> = emptyMap(),
+        maxOutputTokens: Int? = null
     ): Result<GenerateResult> = withContext(Dispatchers.IO) {
-        var result = doGenerate(prompt, text, apiKey, model, temperature, endpoint, useJsonObjectMode, extraParams)
+        var result = doGenerate(
+            prompt, text, apiKey, model, temperature, endpoint, useJsonObjectMode, extraParams,
+            maxOutputTokens
+        )
 
         // Retry once for transient network/server errors (with 1.5s backoff)
         if (result.isFailure && result.exceptionOrNull().isTransientNetwork()) {
             kotlinx.coroutines.delay(1500)
-            result = doGenerate(prompt, text, apiKey, model, temperature, endpoint, useJsonObjectMode, extraParams)
+            result = doGenerate(
+                prompt, text, apiKey, model, temperature, endpoint, useJsonObjectMode, extraParams,
+                maxOutputTokens
+            )
         }
 
         val cleaned = stripHttpPrefix(result.map { it.text })
@@ -230,7 +237,8 @@ class OpenAICompatibleClient {
         temperature: Double,
         endpoint: String,
         withJsonObject: Boolean = false,
-        extraParams: Map<String, Any> = emptyMap()
+        extraParams: Map<String, Any> = emptyMap(),
+        maxOutputTokens: Int? = null
     ): Result<GenerateResult> {
         if (EndpointValidator.validate(endpoint) != EndpointValidator.Error.NONE) {
             return Result.failure(Exception("Endpoint must be https:// or an http:// private-LAN address"))
@@ -266,6 +274,11 @@ class OpenAICompatibleClient {
                     })
                 })
                 put("temperature", temperature)
+                if (maxOutputTokens != null) {
+                    // NIM otherwise inherits a chat-sized completion budget, which is
+                    // disproportionate for a one-shot text transformation.
+                    put("max_tokens", maxOutputTokens)
+                }
                 if (withJsonObject) {
                     put("response_format", JSONObject().apply {
                         put("type", "json_object")

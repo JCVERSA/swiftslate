@@ -5,6 +5,15 @@ object NvidiaModels {
     const val DEFAULT = "nvidia/nemotron-3-super-120b-a12b"
 
     fun sanitize(value: String?): String = value?.trim().orEmpty().ifBlank { DEFAULT }
+
+    /**
+     * Nemotron Super is a reasoning model and enables thinking by default. SwiftSlate's
+     * requests are short, single-pass text transformations, so the reasoning trace adds
+     * latency without improving the requested operation. The API exposes this as a chat
+     * template flag rather than reasoning_effort.
+     */
+    fun shouldDisableThinking(model: String): Boolean =
+        model.contains("nemotron-3-super", ignoreCase = true)
 }
 
 object OpenRouterModels {
