@@ -429,6 +429,7 @@ fun OnboardingScreen(
         }
     }
 }
+}
 
 @Composable
 private fun OnboardingHeader(step: Int, totalSteps: Int) {
@@ -977,12 +978,6 @@ private fun isSwiftSlateServiceEnabled(context: Context): Boolean {
         val manager = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
         manager.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC).any {
             it.resolveInfo.serviceInfo.packageName == context.packageName
-        }
-    } catch (_: Exception) {
-        false
-    }
-}
-context.packageName
         }
     } catch (_: Exception) {
         false
