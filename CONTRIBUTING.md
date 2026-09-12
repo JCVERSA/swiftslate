@@ -85,7 +85,7 @@ manual testing on a real device is still essential:
 2. Make your changes
 3. Test on a real device with the Accessibility Service enabled
 4. Run `./gradlew assembleDebug` — it must build cleanly
-5. Open a PR against `master` — fill in the template
+5. Open a PR against `main` — fill in the template
 
 ## What I Won't Merge
 

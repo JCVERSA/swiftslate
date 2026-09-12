@@ -130,7 +130,7 @@ Ships with Google Gemini, Groq, or connect **any OpenAI-compatible endpoint** �
 **AI commands** send text to your provider for intelligent transformation. **Text replacer commands** run entirely offline for instant local text manipulation — no API key needed.
 
 ### 🔒 Encrypted Key Storage
-API keys are encrypted with **AES-256-GCM** using the Android Keystore before being written to disk — they never leave your device unencrypted.
+API keys are encrypted with **AES-256-GCM** using the Android Keystore before being written to disk — they never leave your device unencrypted. Keys are kept separately for each configured provider.
 
 ### 🌍 Localized in 40 Languages
 The UI ships in 40 languages and automatically follows your device's language, falling back to English when a translation isn't available.
@@ -222,7 +222,7 @@ Beyond AI, you can create **text replacer commands** that run **entirely offline
 | **Custom (OpenAI-compatible)** | Any model your endpoint supports | Works with Ollama, LM Studio, vLLM, any `/v1/chat/completions` endpoint |
 
 > [!TIP]
-> For local LLMs, set the endpoint to your machine's local address (e.g., `http://localhost:11434/v1` for Ollama). HTTP is allowed for `localhost`, `127.0.0.1`, and `10.0.2.2`.
+> For local LLMs, use an address reachable from the Android device. On the Android emulator, the host machine is typically `http://10.0.2.2:11434/v1`; on a physical device, use the machine's private-LAN IP. `localhost` and `127.0.0.1` refer to the Android device itself. HTTP is restricted to private-LAN endpoints.
 
 <br>
 
@@ -374,11 +374,11 @@ SwiftSlate supports multiple API keys with intelligent rotation:
 | **Round-Robin Rotation** | Keys are used in turn to spread usage evenly across all configured keys |
 | **Rate-Limit Handling** | If a key gets rate-limited (HTTP 429), SwiftSlate tracks the cooldown and skips it automatically |
 | **Invalid Key Detection** | Keys returning 401/403 errors are marked invalid and excluded from rotation |
-| **Encrypted Storage** | All keys encrypted with AES-256-GCM via Android Keystore before being saved locally |
-| **Live Validation** | Keys are validated against the provider's API before being saved |
+| **Encrypted Storage** | All keys encrypted with AES-256-GCM via Android Keystore before being saved locally; storage is isolated per provider |
+| **Live Validation** | Keys are validated against the selected provider's API before being saved |
 
 > [!TIP]
-> Adding **2–3 API keys from different accounts** helps avoid rate limits during heavy use. On the free tier, all keys under the same account share a single quota — so rotation only helps with keys from separate accounts.
+> Adding **2–3 API keys from different accounts** helps avoid rate limits during heavy use. Keys are managed separately for Gemini, Groq, and Custom providers. On the free tier, all keys under the same account share a single quota — so rotation only helps with keys from separate accounts.
 
 <br>
 
@@ -498,7 +498,7 @@ SwiftSlate's UI is available in **40 languages**:
 | 🇸🇮 Slovenian `sl` | 🇷🇸 Serbian `sr` | 🇹🇭 Thai `th` | 🇹🇷 Turkish `tr` |
 | 🇺🇦 Ukrainian `uk` | 🇻🇳 Vietnamese `vi` | 🇨🇳 Chinese `zh` | 🇨🇳 Chinese (Simplified) `zh-rCN` |
 
-The app automatically uses your device's language, and falls back to English otherwise.
+The app automatically uses your device's language, and falls back to English otherwise. Some recently added redesign labels are currently English-only and intentionally use that fallback until their translations land.
 
 Adding a translation is a single directory: drop `values-<locale>/strings.xml` into `app/src/main/res/` and it ships automatically — the build derives the shipped locale list from that folder, so nothing else needs editing. Contributions welcome.
 
@@ -513,7 +513,8 @@ Adding a translation is a single directory: drop `values-<locale>/strings.xml` i
 |:--|:--------|:------------------------|
 | 👁️ | **Text Monitoring** | Only processes text when a trigger command is detected at the end. All other typing is completely ignored. Password fields are always skipped. |
 | 📡 | **Data Transmission** | Text is sent **only** to the configured AI provider (Google Gemini, Groq, or your custom endpoint). The only other network contact is a daily GitHub Releases check for update notifications — your text is never part of it. Text replacer commands never leave your device. |
-| 🔐 | **Key Storage** | API keys are encrypted with AES-256-GCM using the Android Keystore system. Encryption failures throw rather than falling back to plaintext. |
+| 🌐 | **Local HTTP** | HTTPS is preferred. HTTP is accepted only for private-LAN endpoints and the app warns that this traffic is unencrypted. |
+| 🔐 | **Key Storage** | API keys are encrypted with AES-256-GCM using the Android Keystore system and isolated per provider. Encryption failures throw rather than falling back to plaintext. |
 | 📊 | **Analytics** | **None.** Zero telemetry, zero tracking, zero crash reporting. |
 | 📖 | **Open Source** | The entire codebase is open for inspection under the MIT License. |
 | 🔑 | **Permissions** | Requires Internet (provider API calls + update check), Accessibility Service, notification, and vibration (haptics) permissions. |

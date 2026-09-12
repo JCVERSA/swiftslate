@@ -70,8 +70,14 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
     val geminiClient = remember { GeminiClient() }
     val openAIClient = remember { OpenAICompatibleClient() }
 
-    LaunchedEffect(Unit) {
-        keys = withContext(Dispatchers.IO) { keyManager.getKeys() }
+    // Read on every recomposition: the Settings tab can change the active provider while this
+    // movable screen is kept alive by MainActivity's tab container.
+    val providerType = ProviderType.sanitize(
+        prefs.getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI)
+    )
+
+    LaunchedEffect(providerType) {
+        keys = withContext(Dispatchers.IO) { keyManager.getKeys(providerType) }
     }
 
     val validAddedMsg = stringResource(R.string.keys_valid_added)
@@ -82,10 +88,6 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
     val signinRequiredMsg = stringResource(R.string.error_provider_auth_required)
     val endpointNeedsV1Msg = stringResource(R.string.keys_endpoint_needs_v1)
     val rhythm = LocalSlateRhythm.current
-
-    val providerType = remember(prefs) {
-        ProviderType.sanitize(prefs.getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI))
-    }
 
     // Provider display names stay literals: proper nouns, like the pre-redesign "Groq"/"Gemini".
     val providerName = when (providerType) {
@@ -214,12 +216,12 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                             testResult = null
                             scope.launch {
                                 val trimmedKey = newKey.trim()
-                                if (withContext(Dispatchers.IO) { keyManager.getKeys() }.contains(trimmedKey)) {
+                                if (withContext(Dispatchers.IO) { keyManager.getKeys(providerType) }.contains(trimmedKey)) {
                                     isTesting = false
                                     // Re-adding an existing key means the user is retrying it after a
                                     // failure — clear any invalid/rate-limit bench so the service can
                                     // use it again immediately instead of waiting out the 15-min TTL.
-                                    withContext(Dispatchers.IO) { keyManager.clearMarks(trimmedKey) }
+                                    withContext(Dispatchers.IO) { keyManager.clearMarks(trimmedKey, providerType) }
                                     testResult = alreadyAddedMsg
                                     testSuccess = false
                                     return@launch
@@ -243,12 +245,12 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                                 }
                                 isTesting = false
                                 if (result.isSuccess) {
-                                    if (!withContext(Dispatchers.IO) { keyManager.addKey(trimmedKey) }) {
+                                    if (!withContext(Dispatchers.IO) { keyManager.addKey(trimmedKey, providerType) }) {
                                         testResult = keystoreErrorMsg
                                         testSuccess = false
                                         return@launch
                                     }
-                                    keys = withContext(Dispatchers.IO) { keyManager.getKeys() }
+                                    keys = withContext(Dispatchers.IO) { keyManager.getKeys(providerType) }
                                     newKey = ""
                                     testResult = validAddedMsg
                                     testSuccess = true
@@ -505,9 +507,9 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     keyToDelete = null
                     scope.launch {
-                        val removed = withContext(Dispatchers.IO) { keyManager.removeKey(keyValue) }
+                        val removed = withContext(Dispatchers.IO) { keyManager.removeKey(keyValue, providerType) }
                         if (removed) {
-                            keys = withContext(Dispatchers.IO) { keyManager.getKeys() }
+                            keys = withContext(Dispatchers.IO) { keyManager.getKeys(providerType) }
                         } else {
                             testResult = keystoreErrorMsg
                             testSuccess = false

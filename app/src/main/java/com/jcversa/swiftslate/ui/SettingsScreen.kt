@@ -97,6 +97,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     val prefixErrorAlphanumeric = stringResource(R.string.settings_prefix_error_alphanumeric)
     val endpointErrorScheme = stringResource(R.string.settings_endpoint_error_scheme)
     val endpointErrorSpaces = stringResource(R.string.settings_endpoint_error_spaces)
+    val endpointCleartextWarning = stringResource(R.string.settings_endpoint_cleartext_warning)
     val fetchModelsMsg = stringResource(R.string.settings_fetch_models)
     val fetchingModelsMsg = stringResource(R.string.settings_fetch_models_loading)
     val modelsLoadedMsg = stringResource(R.string.settings_fetch_models_success)
@@ -107,8 +108,8 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     // Registered keys are decrypted through the Keystore — load off the main thread, as
     // KeysScreen does. The first key is sent as Bearer when fetching models; keyless local
     // servers get no header at all.
-    LaunchedEffect(Unit) {
-        apiKeys = withContext(Dispatchers.IO) { keyManager.getKeys() }
+    LaunchedEffect(providerType) {
+        apiKeys = withContext(Dispatchers.IO) { keyManager.getKeys(providerType) }
     }
 
     // Fetches one provider's live model list (issue #148). Groq rides the existing
@@ -463,6 +464,14 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                         Text(
                             text = msg,
                             color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    if (endpointError == null && customEndpoint.trim().startsWith("http://", ignoreCase = true)) {
+                        Text(
+                            text = endpointCleartextWarning,
+                            color = MaterialTheme.colorScheme.tertiary,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(top = 4.dp)
                         )

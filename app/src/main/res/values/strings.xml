@@ -63,8 +63,9 @@
     <string name="settings_prefix_error_length">Must be exactly 1 character</string>
     <string name="settings_prefix_error_whitespace">Cannot be whitespace</string>
     <string name="settings_prefix_error_alphanumeric">Cannot be a letter or digit</string>
-    <string name="settings_endpoint_error_scheme">Must start with https://</string>
+    <string name="settings_endpoint_error_scheme">Use a valid https:// URL or a private-LAN http:// URL</string>
     <string name="settings_endpoint_error_spaces">URL cannot contain spaces</string>
+    <string name="settings_endpoint_cleartext_warning" tools:ignore="MissingTranslation">HTTP is unencrypted. Use this endpoint only on a trusted private network.</string>
 
     <!-- Backup -->
     <string name="backup_desc">Export or import your commands as a JSON file.</string>
@@ -132,7 +133,7 @@
     <string name="error_no_internet">No internet connection.</string>
     <string name="error_endpoint_unreachable">Could not reach the API. Check your endpoint URL.</string>
     <string name="error_bad_request">Request failed. Check your settings.</string>
-    <!-- TODO translate: new string, falls back to English in the other 50 locales until then.
+    <!-- TODO translate: new string, falls back to English in the other 40 locales until then.
          Added because HTTP 413 was previously reported as "Rate limited. Try again shortly.",
          which tells the user to wait when the fix is to select less text. -->
     <string name="error_input_too_long">Text is too long for this model\'s per-minute token limit. Try again with shorter text.</string>

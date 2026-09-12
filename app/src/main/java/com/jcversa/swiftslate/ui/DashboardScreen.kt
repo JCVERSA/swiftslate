@@ -45,6 +45,8 @@ import com.jcversa.swiftslate.SwiftSlateApp
 import com.jcversa.swiftslate.manager.CommandManager
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.manager.StatsManager
+import com.jcversa.swiftslate.model.PrefKeys
+import com.jcversa.swiftslate.model.ProviderType
 import com.jcversa.swiftslate.ui.components.LocalSlateRhythm
 import com.jcversa.swiftslate.ui.components.AnimateEntrance
 import com.jcversa.swiftslate.ui.components.SlateTextField
@@ -124,9 +126,13 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
         val lifecycle = lifecycleOwner.lifecycle
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             val (newEnabled, newKeyCount, killed) = withContext(Dispatchers.IO) {
+                val providerType = ProviderType.sanitize(
+                    context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                        .getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI)
+                )
                 Triple(
                     checkServiceEnabled(context),
-                    keyManager.getKeys().size,
+                    keyManager.getKeys(providerType).size,
                     readCrashMarker(context) > 0L || isServiceCrashed(context)
                 )
             }

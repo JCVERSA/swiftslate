@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   comment:
-    # workflow_run fires for push/master too (no PR). Only proceed when a PR is involved
+    # workflow_run fires for push/main too (no PR). Only proceed when a PR is involved
     # and the source workflow succeeded (preview APK only on success).
     # workflow_dispatch always runs so manual tests work.
     if: >-
@@ -53,18 +53,37 @@ jobs:
                 run = data;
                 core.info(`Manual dispatch: using run ${run.id} (${run.head_branch} ${run.head_sha.slice(0,7)})`);
               } else {
-                // No run_id supplied: pick latest successful Build APK run that has a preview artifact
-                const { data } = await github.request('GET /repos/{owner}/{repo}/actions/runs', {
+                // Resolve the active workflow by name, then choose its latest successful PR run.
+                // This keeps manual recovery working when GitHub assigns a new workflow id.
+                const { data: workflowData } = await github.request('GET /repos/{owner}/{repo}/actions/workflows', {
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  per_page: 10,
-                  // status success handled after fetch
+                  per_page: 100,
                 });
-                // This endpoint without workflow_id lists runs for all workflows; filter to Build APK
-                // Instead, list for the workflow id 239854478 if available
-                core.info('No run_id supplied for manual dispatch — please supply one');
-                core.setFailed('run_id required for manual dispatch without auto-resolve yet');
-                return;
+                const buildWorkflow = (workflowData.workflows || []).find(w => w.name === 'Build APK');
+                if (!buildWorkflow) {
+                  core.setFailed('Could not find the Build APK workflow');
+                  return;
+                }
+                const { data: runData } = await github.request(
+                  'GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs',
+                  {
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    workflow_id: buildWorkflow.id,
+                    status: 'completed',
+                    event: 'pull_request',
+                    per_page: 20,
+                  }
+                );
+                run = (runData.workflow_runs || []).find(candidate =>
+                  candidate.event === 'pull_request' && candidate.conclusion === 'success'
+                );
+                if (!run) {
+                  core.setFailed('No successful Build APK pull-request run found');
+                  return;
+                }
+                core.info(`Manual dispatch: auto-selected latest successful PR run ${run.id} (${run.head_sha.slice(0,7)})`);
               }
             } else {
               run = context.payload.workflow_run;
@@ -73,7 +92,7 @@ jobs:
                 return;
               }
               core.info(`workflow_run ${run.id} event=${run.event} conclusion=${run.conclusion} sha=${run.head_sha.slice(0,7)} branch=${run.head_branch} repo=${run.head_repository.full_name}`);
-              // Ignore non-PR events (push to master) — they have no PR to comment on
+              // Ignore non-PR events (push to main) — they have no PR to comment on
               if (run.event !== 'pull_request') {
                 core.info(`Skipping: event is ${run.event}, not pull_request`);
                 return;
@@ -160,7 +179,7 @@ jobs:
             }
 
             if (!prNumber) {
-              core.info('Could not resolve PR number — skipping comment. This happens for push/master runs with no PR.');
+              core.info('Could not resolve PR number — skipping comment. This happens for push/main runs with no PR.');
               return;
             }
 
