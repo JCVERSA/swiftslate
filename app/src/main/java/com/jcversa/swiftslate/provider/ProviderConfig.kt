@@ -1,69 +1,32 @@
 package com.jcversa.swiftslate.provider
 
+import com.jcversa.swiftslate.model.DeepSeekModels
 import com.jcversa.swiftslate.model.GeminiModels
 import com.jcversa.swiftslate.model.GroqModels
+import com.jcversa.swiftslate.model.NvidiaModels
+import com.jcversa.swiftslate.model.OpenRouterModels
 import com.jcversa.swiftslate.model.PrefKeys
 import com.jcversa.swiftslate.model.ProviderType
 
-/**
- * Which transport client handles a provider's requests.
- * - [GEMINI_NATIVE]: Gemini's own API format (GeminiClient).
- * - [OPENAI_COMPAT]: OpenAI-compatible chat completions (OpenAICompatibleClient),
- *   shared by Groq and Custom.
- */
+/** Which transport client handles a provider's requests. */
 enum class Transport { GEMINI_NATIVE, OPENAI_COMPAT }
 
 /**
  * Per-provider configuration: everything the request pipeline needs to know
- * about a provider, in one place. This replaces the inline provider `if/else`
- * ladder and the scattered defaults/endpoints/keys.
- *
- * Implementations are pure (no Android/network dependencies) so they are trivial
- * to reason about and test. The service reads SharedPreferences and passes the
- * relevant values in.
+ * about a provider, in one place. Implementations are pure (no Android/network
+ * dependencies) so they are straightforward to test.
  */
 interface ProviderConfig {
-
-    /** Provider id, matching a [ProviderType] constant. */
     val type: String
-
-    /** Which client transport to use. */
     val transport: Transport
-
-    /** SharedPreferences key holding this provider's selected model. */
     val modelPrefKey: String
-
-    /** Default model when none is stored. */
     val defaultModel: String
 
-    /** Normalize a stored model value (coercion where applicable). */
     fun sanitizeModel(stored: String?): String
-
-    /**
-     * Resolve the endpoint base URL. [customEndpoint] is the stored custom
-     * endpoint value, used only by providers that need it.
-     */
     fun resolveEndpoint(customEndpoint: String): String
-
-    /**
-     * Extra request-body params (e.g. reasoning controls) for [model].
-     * Empty for providers/models that take none.
-     */
     fun reasoningParams(model: String): Map<String, Any> = emptyMap()
-
-    /**
-     * Gemini-native thinking level (generationConfig.thinkingConfig.thinkingLevel)
-     * for [model], or null to send none. No-op for non-Gemini providers.
-     */
     fun thinkingLevel(model: String): String? = null
-
-    /**
-     * Whether the OpenAI-compatible request should use json_object response
-     * format, given whether structured output is currently enabled.
-     */
     fun useJsonObjectMode(structuredOutputEnabled: Boolean): Boolean = false
-
-    /** Whether the resolved [model]/[endpoint] are usable (Custom requires both). */
     fun isConfigured(model: String, endpoint: String): Boolean = true
 }
 
@@ -92,6 +55,43 @@ object GroqConfig : ProviderConfig {
     override fun useJsonObjectMode(structuredOutputEnabled: Boolean): Boolean = structuredOutputEnabled
 }
 
+/** NVIDIA NIM — OpenAI-compatible API at integrate.api.nvidia.com. */
+object NvidiaConfig : ProviderConfig {
+    const val ENDPOINT = "https://integrate.api.nvidia.com/v1"
+
+    override val type = ProviderType.NVIDIA
+    override val transport = Transport.OPENAI_COMPAT
+    override val modelPrefKey = PrefKeys.NVIDIA_MODEL
+    override val defaultModel = NvidiaModels.DEFAULT
+    override fun sanitizeModel(stored: String?): String = NvidiaModels.sanitize(stored)
+    override fun resolveEndpoint(customEndpoint: String): String = ENDPOINT
+}
+
+/** OpenRouter — OpenAI-compatible gateway with a user-owned OpenRouter key. */
+object OpenRouterConfig : ProviderConfig {
+    const val ENDPOINT = "https://openrouter.ai/api/v1"
+
+    override val type = ProviderType.OPENROUTER
+    override val transport = Transport.OPENAI_COMPAT
+    override val modelPrefKey = PrefKeys.OPENROUTER_MODEL
+    override val defaultModel = OpenRouterModels.DEFAULT
+    override fun sanitizeModel(stored: String?): String = OpenRouterModels.sanitize(stored)
+    override fun resolveEndpoint(customEndpoint: String): String = ENDPOINT
+}
+
+/** DeepSeek — OpenAI-compatible API at api.deepseek.com (without a /v1 suffix). */
+object DeepSeekConfig : ProviderConfig {
+    const val ENDPOINT = "https://api.deepseek.com"
+
+    override val type = ProviderType.DEEPSEEK
+    override val transport = Transport.OPENAI_COMPAT
+    override val modelPrefKey = PrefKeys.DEEPSEEK_MODEL
+    override val defaultModel = DeepSeekModels.DEFAULT
+    override fun sanitizeModel(stored: String?): String = DeepSeekModels.sanitize(stored)
+    override fun resolveEndpoint(customEndpoint: String): String = ENDPOINT
+    override fun useJsonObjectMode(structuredOutputEnabled: Boolean): Boolean = false
+}
+
 /** Custom OpenAI-compatible endpoint — user-supplied endpoint and model. */
 object CustomConfig : ProviderConfig {
     override val type = ProviderType.CUSTOM
@@ -108,6 +108,9 @@ object CustomConfig : ProviderConfig {
 object Providers {
     fun forType(type: String?): ProviderConfig = when (ProviderType.sanitize(type)) {
         ProviderType.GROQ -> GroqConfig
+        ProviderType.NVIDIA -> NvidiaConfig
+        ProviderType.OPENROUTER -> OpenRouterConfig
+        ProviderType.DEEPSEEK -> DeepSeekConfig
         ProviderType.CUSTOM -> CustomConfig
         else -> GeminiConfig
     }

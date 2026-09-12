@@ -42,11 +42,61 @@
     <string name="commands_error_conflict">Conflit avec la commande existante \'%1$s\' — un déclencheur est un préfixe de l\'autre</string>
     <string name="commands_error_empty_trigger">Le déclencheur doit avoir un nom après le préfixe</string>
 
+    <string name="commands_alias_label">Alias (facultatifs)</string>
+    <string name="commands_alias_placeholder">ex. : %1$scorriger</string>
+    <string name="commands_alias_add">Ajouter l’alias</string>
+    <string name="commands_alias_update">Enregistrer l’alias</string>
+    <string name="commands_alias_edit">Modifier l’alias</string>
+    <string name="commands_alias_remove">Supprimer l’alias</string>
+    <string name="commands_aliases_heading">Alias</string>
+    <string name="commands_alias_error_prefix">L’alias doit commencer par \'%1$s\'</string>
+    <string name="commands_alias_error_duplicate">Cet alias est déjà utilisé</string>
+    <string name="commands_alias_error_limit">Vous pouvez ajouter jusqu’à cinq alias</string>
+    <string name="commands_alias_error_invalid">Alias invalide ou trop long</string>
+    <string name="commands_preview_input_label">Texte d’exemple à tester</string>
+    <string name="commands_preview_default_input">Voici une phrase d’exemple à transformer.</string>
+    <string name="commands_preview_button">Tester la commande</string>
+    <string name="commands_preview_loading">Test en cours…</string>
+    <string name="commands_preview_output">Résultat de l’aperçu</string>
+    <string name="commands_preview_unavailable">La commande n’a pas pu être testée. Vérifiez qu’une clé API valide est configurée.</string>
+    <string name="commands_preview_timeout">Le test a expiré. Réessayez.</string>
+
+
+    <string name="onboarding_title">Configurer SwiftSlate</string>
+    <string name="onboarding_progress">Étape %1$d sur %2$d</string>
+    <string name="onboarding_provider_title">Choisissez votre fournisseur</string>
+    <string name="onboarding_provider_message">Ce fournisseur traitera vos commandes IA. Vous pourrez le modifier plus tard dans les Paramètres.</string>
+    <string name="onboarding_model_title">Choisissez votre modèle</string>
+    <string name="onboarding_model_message">Sélectionnez le modèle qui traitera vos commandes. Vous pourrez le modifier plus tard dans les Paramètres.</string>
+    <string name="onboarding_key_title">Ajoutez votre clé API</string>
+    <string name="onboarding_key_message">Ajoutez une clé API %1$s. Elle est conservée de façon sécurisée sur cet appareil et n’est plus affichée après validation.</string>
+    <string name="onboarding_key_validate">Valider et enregistrer la clé</string>
+    <string name="onboarding_key_success">Clé validée et enregistrée de façon sécurisée.</string>
+    <string name="onboarding_key_failed">La clé n’a pas pu être validée. Vérifiez-la puis réessayez.</string>
+    <string name="onboarding_accessibility_title">Activez l’assistant</string>
+    <string name="onboarding_accessibility_message">Android a besoin du service d’accessibilité SwiftSlate pour détecter vos déclencheurs et remplacer le texte.</string>
+    <string name="onboarding_open_accessibility">Ouvrir les réglages d’accessibilité Android</string>
+    <string name="onboarding_accessibility_ready">L’assistant SwiftSlate est activé.</string>
+    <string name="onboarding_accessibility_waiting">Activez SwiftSlate puis revenez ici.</string>
+    <string name="onboarding_test_title">Testez votre configuration</string>
+    <string name="onboarding_test_message">Exécutez une requête d’exemple sans danger pour vérifier le fournisseur, la clé, le modèle et l’assistant.</string>
+    <string name="onboarding_test_button">Lancer le test</string>
+    <string name="onboarding_test_failed">Le test a échoué. Vérifiez votre connexion et votre configuration, puis réessayez.</string>
+    <string name="onboarding_back">Retour</string>
+    <string name="onboarding_next">Continuer</string>
+    <string name="onboarding_finish">Terminer la configuration</string>
+    <string name="onboarding_later">Continuer sans terminer</string>
+    <string name="dashboard_onboarding_reminder">Votre configuration est incomplète. Vous pouvez la terminer dans les Paramètres.</string>
+    <string name="dashboard_onboarding_dismiss">Fermer</string>
+
     <!-- Settings -->
     <string name="settings_title">Paramètres</string>
     <string name="settings_provider_title">Fournisseur</string>
     <string name="settings_provider_gemini">Google Gemini</string>
     <string name="settings_provider_groq">Groq</string>
+    <string name="settings_provider_nvidia">NVIDIA NIM</string>
+    <string name="settings_provider_openrouter">OpenRouter</string>
+    <string name="settings_provider_deepseek">DeepSeek</string>
     <string name="settings_provider_custom">Personnalisé (compatible OpenAI)</string>
     <string name="settings_model_title">Modèle</string>
     <string name="settings_endpoint_title">Endpoint</string>
@@ -106,6 +156,13 @@
     <string name="process_text_copied">Copié</string>
     <string name="process_text_no_selection">Aucun texte sélectionné</string>
     <string name="process_text_no_commands">Aucune commande disponible. Ajoutez-en une dans SwiftSlate.</string>
+    <string name="process_quick_actions">Actions rapides</string>
+    <string name="process_quick_fix">Corriger</string>
+    <string name="process_quick_improve">Améliorer</string>
+    <string name="process_quick_shorten">Raccourcir</string>
+    <string name="process_quick_formal">Formel</string>
+    <string name="process_quick_casual">Décontracté</string>
+    <string name="process_quick_reply">Répondre</string>
     <string name="toast_restore_failed">Impossible de restaurer le texte d\'origine</string>
     <string name="toast_nothing_to_undo">Rien à annuler</string>
     <string name="toast_undo_failed">Impossible d\'annuler</string>

@@ -139,6 +139,28 @@ class CommandManagerTest {
     }
 
     @Test
+    fun saveCustomCommand_aliasIsPersistedAndFindable() {
+        assertTrue(commandManager.saveCustomCommand(
+            Command("?greet", "Say hello", aliases = listOf("?hello", "?salut"))
+        ))
+        val result = commandManager.findCommand("hi?hello")
+        assertNotNull(result)
+        assertEquals("?greet", result!!.trigger)
+        assertEquals(listOf("?hello", "?salut"), result.aliases)
+    }
+
+    @Test
+    fun findCommandMatch_aliasReportsTheMatchedAlias() {
+        assertTrue(commandManager.saveCustomCommand(
+            Command("?greet", "Say hello", aliases = listOf("?hello"))
+        ))
+        val match = commandManager.findCommandMatch("hi?hello")
+        assertNotNull(match)
+        assertEquals("?greet", match!!.command.trigger)
+        assertEquals("?hello", match.matchedTrigger)
+    }
+
+    @Test
     fun removeCustomCommand_makesUnfindable() {
         commandManager.saveCustomCommand(Command("?greet", "Say hello"))
         commandManager.removeCustomCommand("?greet")
@@ -197,6 +219,15 @@ class CommandManagerTest {
         val commands = commandManager.getCommands()
         assertTrue(commands.any { it.trigger == "!myCmd" })
         assertFalse(commands.any { it.trigger == "?myCmd" })
+    }
+
+    @Test
+    fun setTriggerPrefix_migratesAliasesToo() {
+        commandManager.saveCustomCommand(Command("?myCmd", "do something", aliases = listOf("?alias")))
+        commandManager.setTriggerPrefix("!")
+        val command = commandManager.getCommands().first { it.trigger == "!myCmd" }
+        assertEquals(listOf("!alias"), command.aliases)
+        assertEquals("!myCmd", commandManager.findCommand("text!alias")!!.trigger)
     }
 
 
@@ -276,7 +307,8 @@ class CommandManagerTest {
     fun importCommands_keepsOnlyUpToTheMaximum() {
         val arr = JSONArray()
         for (i in 0 until (CommandManager.MAX_CUSTOM_COMMANDS + 5)) {
-            arr.put(JSONObject().put("trigger", "?c$i").put("prompt", "p").put("type", "AI"))
+            val name = i.toString().padStart(3, '0')
+            arr.put(JSONObject().put("trigger", "?c$name").put("prompt", "p").put("type", "AI"))
         }
         assertTrue(commandManager.importCommands(arr.toString()))
         val stored = JSONArray(commandManager.exportCommands())
@@ -343,6 +375,32 @@ class CommandManagerTest {
         assertTrue(commandManager.saveCustomCommand(Command("?keep", "original")))
         assertFalse(commandManager.saveCustomCommand(Command("bad", "x"), replacing = "?keep"))
         assertEquals("original", commandManager.findCommand("y ?keep")!!.prompt)
+    }
+
+    @Test
+    fun saveCustomCommand_rejectsCollisionWithBuiltInOrExistingAlias() {
+        assertFalse(commandManager.saveCustomCommand(Command("?copycat", "shadow built-in")))
+        assertTrue(commandManager.saveCustomCommand(Command("?greet", "say hello", aliases = listOf("?hello"))))
+        assertFalse(commandManager.saveCustomCommand(Command("?other", "conflicting", aliases = listOf("?helloworld"))))
+        assertFalse(commandManager.saveCustomCommand(Command("?helloagain", "conflicting")))
+    }
+
+    @Test
+    fun saveCustomCommand_rejectsDynamicTranslateCollision() {
+        assertFalse(commandManager.saveCustomCommand(Command("?translate", "shadow translation")))
+        assertFalse(commandManager.saveCustomCommand(Command("?translate:es", "shadow translation")))
+    }
+
+    @Test
+    fun importCommands_dropsGlobalCollisions() {
+        val json = JSONArray()
+            .put(JSONObject().put("trigger", "?first").put("prompt", "one").put("aliases", JSONArray().put("?shared")))
+            .put(JSONObject().put("trigger", "?shared").put("prompt", "two"))
+            .put(JSONObject().put("trigger", "?copycat").put("prompt", "three"))
+        assertTrue(commandManager.importCommands(json.toString()))
+        val stored = JSONArray(commandManager.exportCommands())
+        assertEquals(1, stored.length())
+        assertEquals("?first", stored.getJSONObject(0).getString("trigger"))
     }
 
     // --- cache invalidation (the prefix is part of the cache key) ---

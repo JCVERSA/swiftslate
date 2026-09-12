@@ -68,6 +68,16 @@ class CatalogTest {
         assertTrue(GroqModels.isChatCandidate("allam-2-7b"))
     }
 
+    @Test
+    fun openai_compatible_filter_excludes_non_chat_models() {
+        assertTrue(OpenAIModels.isChatCandidate("meta/llama-3.1-8b-instruct"))
+        assertTrue(OpenAIModels.isChatCandidate("deepseek-flash"))
+        assertFalse(OpenAIModels.isChatCandidate("text-embedding-3-small"))
+        assertFalse(OpenAIModels.isChatCandidate("whisper-1"))
+        assertFalse(OpenAIModels.isChatCandidate("some-reranker"))
+        assertFalse(OpenAIModels.isChatCandidate("moderation-latest"))
+    }
+
     // ---------- GeminiModels ----------
 
     @Test
