@@ -878,8 +878,15 @@ fun CommandsScreen(commandManager: CommandManager) {
                                     command = Command(trimmedTrigger, prompt.trim(), false, selectedType, aliases),
                                     replacing = editingTrigger ?: trimmedTrigger
                                 )
+                                if (!saved) {
+                                    // Keep the form intact and explain a rejection from the
+                                    // manager as well. This covers a concurrent edit or a
+                                    // collision introduced outside this screen, which the local
+                                    // preflight checks cannot observe.
+                                    errorMessage = errorDuplicateMsg
+                                    return@Button
+                                }
                                 commands = commandManager.getCommands()
-                                if (!saved) return@Button
                                 trigger = ""
                                 prompt = ""
                                 aliasInput = ""
