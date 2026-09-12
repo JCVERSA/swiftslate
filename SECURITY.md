@@ -4,7 +4,7 @@
 
 If you discover a security vulnerability in SwiftSlate, please report it privately:
 
-**Email:** me@musheer360.com
+**Email:** jcversa16@gmail.com
 
 **Subject line:** `[SwiftSlate Security] Brief description`
 
