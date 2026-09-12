@@ -137,6 +137,7 @@ fun OnboardingScreen(
     val onboardingKeyFailed = stringResource(R.string.onboarding_key_failed)
     val keystoreError = stringResource(R.string.keys_keystore_error)
     val authRequired = stringResource(R.string.error_provider_auth_required)
+    val onboardingTestFailed = stringResource(R.string.onboarding_test_failed)
 
     val providerLabel = when (providerType) {
         ProviderType.OPENROUTER -> stringResource(R.string.settings_provider_openrouter)
@@ -238,14 +239,14 @@ fun OnboardingScreen(
                     }
                 }
             } catch (_: Exception) {
-                CommandOutcome.Failure(context.getString(R.string.onboarding_test_failed))
+                CommandOutcome.Failure(onboardingTestFailed)
             }
             isTestingCommand = false
             when (outcome) {
                 is CommandOutcome.Success -> testOutput = outcome.text
                 is CommandOutcome.Unavailable -> testError = outcome.message
-                is CommandOutcome.Failure -> testError = context.getString(R.string.onboarding_test_failed)
-                is CommandOutcome.Refusal -> testError = context.getString(R.string.onboarding_test_failed)
+                is CommandOutcome.Failure -> testError = onboardingTestFailed
+                is CommandOutcome.Refusal -> testError = onboardingTestFailed
             }
         }
     }
