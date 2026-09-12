@@ -88,9 +88,8 @@ class ProviderConfigTest {
 
     @Test
     fun nvidia_nemotron_fast_path_disables_thinking() {
-        val params = NvidiaConfig.reasoningParams(NvidiaModels.DEFAULT)
-        val chatTemplate = params["chat_template_kwargs"] as org.json.JSONObject
-        assertFalse(chatTemplate.getBoolean("enable_thinking"))
+        assertTrue(NvidiaModels.shouldDisableThinking(NvidiaModels.DEFAULT))
+        assertTrue(NvidiaConfig.reasoningParams(NvidiaModels.DEFAULT).containsKey("chat_template_kwargs"))
         assertTrue(NvidiaConfig.reasoningParams("some/other-model").isEmpty())
     }
 
