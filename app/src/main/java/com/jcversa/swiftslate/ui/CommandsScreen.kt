@@ -78,6 +78,7 @@ fun CommandsScreen(commandManager: CommandManager) {
     var prompt by rememberSaveable { mutableStateOf("") }
     var aliasInput by remember { mutableStateOf("") }
     var aliases by remember { mutableStateOf<List<String>>(emptyList()) }
+    var editingAlias by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var selectedType by rememberSaveable { mutableStateOf(CommandType.AI) }
     var editingTrigger by rememberSaveable { mutableStateOf<String?>(null) }
@@ -104,18 +105,40 @@ fun CommandsScreen(commandManager: CommandManager) {
 
     fun addAlias() {
         val alias = aliasInput.trim()
+        val currentTrigger = trigger.trim()
+        val updatedAliases = if (editingAlias != null) {
+            aliases.map { if (it == editingAlias) alias else it }
+        } else {
+            aliases + alias
+        }
+        val aliasNamesConflict: (String, String) -> Boolean = { first, second ->
+            first == second || first.startsWith(second) || second.startsWith(first)
+        }
+        val aliasesConflict = updatedAliases.indices.any { index ->
+            ((index + 1) until updatedAliases.size).any { other ->
+                aliasNamesConflict(updatedAliases[index], updatedAliases[other])
+            }
+        }
+        val otherCommands = commands.filter { it.trigger != editingTrigger }
         when {
             alias.isBlank() -> return
             !alias.startsWith(prefix) || alias.length <= prefix.length -> errorMessage = aliasPrefixError
             alias.length > CommandManager.MAX_ALIAS_LENGTH -> errorMessage = aliasInvalidError
-            aliases.size >= CommandManager.MAX_ALIASES -> errorMessage = aliasLimitError
-            alias == trigger.trim() || aliases.contains(alias) -> errorMessage = aliasDuplicateError
-            commands.any { command ->
-                command.trigger == alias || command.aliases.contains(alias)
+            updatedAliases.size > CommandManager.MAX_ALIASES -> errorMessage = aliasLimitError
+            alias == currentTrigger || aliasesConflict -> errorMessage = aliasDuplicateError
+            currentTrigger.isNotBlank() &&
+                !CommandManager.areValidAliases(updatedAliases, currentTrigger, prefix) ->
+                errorMessage = aliasInvalidError
+            otherCommands.any { command ->
+                val names = listOf(command.trigger) + command.aliases
+                updatedAliases.any { candidate ->
+                    names.any { existing -> aliasNamesConflict(candidate, existing) }
+                }
             } -> errorMessage = aliasDuplicateError
             else -> {
-                aliases = aliases + alias
+                aliases = updatedAliases
                 aliasInput = ""
+                editingAlias = null
                 errorMessage = null
             }
         }
@@ -446,6 +469,7 @@ fun CommandsScreen(commandManager: CommandManager) {
                                                         prompt = cmd.prompt
                                                         aliases = cmd.aliases
                                                         aliasInput = ""
+                                                        editingAlias = null
                                                         selectedType = cmd.type
                                                         editingTrigger = cmd.trigger
                                                         errorMessage = null
@@ -696,8 +720,11 @@ fun CommandsScreen(commandManager: CommandManager) {
                             modifier = Modifier.padding(start = 4.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.AddCircle,
-                                contentDescription = stringResource(R.string.commands_alias_add),
+                                imageVector = if (editingAlias != null) Icons.Rounded.CheckCircle else Icons.Rounded.AddCircle,
+                                contentDescription = stringResource(
+                                    if (editingAlias != null) R.string.commands_alias_update
+                                    else R.string.commands_alias_add
+                                ),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
@@ -724,7 +751,28 @@ fun CommandsScreen(commandManager: CommandManager) {
                                             modifier = Modifier.padding(start = 8.dp, top = 5.dp, bottom = 5.dp)
                                         )
                                         IconButton(
-                                            onClick = { aliases = aliases - alias },
+                                            onClick = {
+                                                aliasInput = alias
+                                                editingAlias = alias
+                                                errorMessage = null
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Edit,
+                                                contentDescription = stringResource(R.string.commands_alias_edit),
+                                                modifier = Modifier.size(14.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = {
+                                                aliases = aliases - alias
+                                                if (editingAlias == alias) {
+                                                    editingAlias = null
+                                                    aliasInput = ""
+                                                }
+                                            },
                                             modifier = Modifier.size(28.dp)
                                         ) {
                                             Icon(
@@ -821,6 +869,7 @@ fun CommandsScreen(commandManager: CommandManager) {
                                 previewError = null
                                 previewInput = ""
                                 editingTrigger = null
+                                editingAlias = null
                                 selectedType = CommandType.AI
                                 isFormExpanded = false
                             },
@@ -896,6 +945,7 @@ fun CommandsScreen(commandManager: CommandManager) {
                                 previewError = null
                                 previewInput = ""
                                 editingTrigger = null
+                                editingAlias = null
                                 selectedType = CommandType.AI
                                 isFormExpanded = false
                             }
@@ -931,6 +981,7 @@ fun CommandsScreen(commandManager: CommandManager) {
                         prompt = ""
                         errorMessage = null
                         editingTrigger = null
+                        editingAlias = null
                         selectedType = CommandType.AI
                         isFormExpanded = false
                     }

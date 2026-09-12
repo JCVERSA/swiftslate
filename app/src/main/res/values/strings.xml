@@ -51,6 +51,8 @@
     <string name="commands_alias_label" tools:ignore="MissingTranslation">Aliases (optional)</string>
     <string name="commands_alias_placeholder" tools:ignore="MissingTranslation">e.g. %1$scorrect</string>
     <string name="commands_alias_add" tools:ignore="MissingTranslation">Add alias</string>
+    <string name="commands_alias_update" tools:ignore="MissingTranslation">Save alias</string>
+    <string name="commands_alias_edit" tools:ignore="MissingTranslation">Edit alias</string>
     <string name="commands_alias_remove" tools:ignore="MissingTranslation">Remove alias</string>
     <string name="commands_aliases_heading" tools:ignore="MissingTranslation">Aliases</string>
     <string name="commands_alias_error_prefix" tools:ignore="MissingTranslation">Alias must start with \'%1$s\'</string>

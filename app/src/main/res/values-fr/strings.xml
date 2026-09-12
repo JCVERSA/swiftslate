@@ -45,6 +45,8 @@
     <string name="commands_alias_label">Alias (facultatifs)</string>
     <string name="commands_alias_placeholder">ex. : %1$scorriger</string>
     <string name="commands_alias_add">Ajouter l’alias</string>
+    <string name="commands_alias_update">Enregistrer l’alias</string>
+    <string name="commands_alias_edit">Modifier l’alias</string>
     <string name="commands_alias_remove">Supprimer l’alias</string>
     <string name="commands_aliases_heading">Alias</string>
     <string name="commands_alias_error_prefix">L’alias doit commencer par \'%1$s\'</string>
