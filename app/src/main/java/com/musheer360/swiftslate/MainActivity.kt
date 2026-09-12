@@ -32,6 +32,22 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import com.musheer360.swiftslate.ui.components.bounceClick
 import com.musheer360.swiftslate.ui.CommandsScreen
 import com.musheer360.swiftslate.ui.DashboardScreen
 import com.musheer360.swiftslate.ui.KeysScreen
@@ -65,6 +81,18 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
     val haptic = LocalHapticFeedback.current
     var selectedTab by rememberSaveable { mutableStateOf(Tab.Dashboard) }
 
+    // Start-up app-opening fluid entrance animation
+    val introProgress = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(Unit) {
+        introProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = spring(
+                dampingRatio = 0.85f, // Sweet, subtle physical springiness
+                stiffness = Spring.StiffnessLow
+            )
+        )
+    }
+
     // Request notification permission on first launch (Android 13+)
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -89,34 +117,68 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
     }
 
     Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                alpha = introProgress.value
+                translationY = (1f - introProgress.value) * 32.dp.toPx()
+                val scale = 0.96f + (0.04f * introProgress.value)
+                scaleX = scale
+                scaleY = scale
+            },
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.background,
-                tonalElevation = 0.dp
+            Surface(
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .padding(start = 24.dp, end = 24.dp, bottom = 12.dp)
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                border = androidx.compose.foundation.BorderStroke(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                ),
+                tonalElevation = 4.dp
             ) {
-                Tab.entries.forEach { tab ->
-                    NavigationBarItem(
-                        icon = {
-                            Icon(
-                                tab.icon,
-                                contentDescription = stringResource(tab.titleRes)
-                            )
-                        },
-                        label = null,
-                        selected = selectedTab == tab,
-                        onClick = {
-                            if (selectedTab != tab) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                selectedTab = tab
-                            }
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp, horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Tab.entries.forEach { tab ->
+                        val isSelected = selectedTab == tab
+                        val backgroundAlpha by androidx.compose.animation.core.animateFloatAsState(
+                            targetValue = if (isSelected) 1f else 0f,
+                            animationSpec = tween(250),
+                            label = "tab_bg_alpha"
                         )
-                    )
+                        val iconColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        val containerColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(containerColor.copy(alpha = if (isSelected) backgroundAlpha else 0f))
+                                .bounceClick {
+                                    if (selectedTab != tab) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        selectedTab = tab
+                                    }
+                                }
+                                .padding(horizontal = 20.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = tab.icon,
+                                contentDescription = stringResource(tab.titleRes),
+                                tint = iconColor,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -142,8 +204,9 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
                     AnimatedContentTransitionScope.SlideDirection.Left
                 else
                     AnimatedContentTransitionScope.SlideDirection.Right
-                slideIntoContainer(direction, tween(250, easing = FastOutSlowInEasing)) togetherWith
-                    slideOutOfContainer(direction, tween(250, easing = FastOutSlowInEasing))
+                val duration = 300
+                (slideIntoContainer(direction, tween(duration, easing = FastOutSlowInEasing)) + fadeIn(tween(duration))) togetherWith
+                    (slideOutOfContainer(direction, tween(duration, easing = FastOutSlowInEasing)) + fadeOut(tween(duration)))
             },
             label = "tab_transition"
         ) { tab ->

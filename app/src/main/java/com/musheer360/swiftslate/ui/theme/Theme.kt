@@ -12,39 +12,41 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
+    // Pure-black backdrop (AMOLED): the one deliberate deviation from the redesign's
+    // navy background — keeps the OLED battery story and the README claim true.
     background = Color(0xFF000000),
-    surface = Color(0xFF0D0D0D),
-    surfaceVariant = Color(0xFF1A1A1A),
-    surfaceContainerHigh = Color(0xFF222222),
-    onBackground = Color(0xFFE0E2E6),
-    onSurface = Color(0xFFE0E2E6),
-    onSurfaceVariant = Color(0xFF8A8A90),
-    outline = Color(0xFF2A2A2E),
-    primary = Color(0xFFE0E2E6),
-    onPrimary = Color(0xFF000000),
-    primaryContainer = Color(0xFF1A1A1A),
-    onPrimaryContainer = Color(0xFFE0E2E6),
-    error = Color(0xFFFF453A),
-    tertiary = Color(0xFF30D158),
-    tertiaryContainer = Color(0xFFFFD60A)
+    surface = Color(0xFF101323),
+    surfaceVariant = Color(0xFF1B1E32),
+    surfaceContainerHigh = Color(0xFF222741),
+    onBackground = Color(0xFFF3F4F6),
+    onSurface = Color(0xFFF3F4F6),
+    onSurfaceVariant = Color(0xFF9CA3AF),
+    outline = Color(0xFF2E3554),
+    primary = Color(0xFF6366F1),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFF252A4A),
+    onPrimaryContainer = Color(0xFFE0E7FF),
+    error = Color(0xFFEF4444),
+    tertiary = Color(0xFF10B981),
+    tertiaryContainer = Color(0xFF065F46)
 )
 
 private val LightColorScheme = lightColorScheme(
-    background = Color(0xFFFCFCFC),
-    surface = Color(0xFFF2F2F4),
-    surfaceVariant = Color(0xFFE8E8EA),
-    surfaceContainerHigh = Color(0xFFDFDFE1),
-    onBackground = Color(0xFF1A1A1E),
-    onSurface = Color(0xFF1A1A1E),
-    onSurfaceVariant = Color(0xFF6E6E73),
-    outline = Color(0xFFD5D5DA),
-    primary = Color(0xFF1A1A1E),
-    onPrimary = Color(0xFFFCFCFC),
-    primaryContainer = Color(0xFFEEEEF0),
-    onPrimaryContainer = Color(0xFF1A1A1E),
-    error = Color(0xFFFF3B30),
-    tertiary = Color(0xFF34C759),
-    tertiaryContainer = Color(0xFFFF9500)
+    background = Color(0xFFF8FAFC),
+    surface = Color(0xFFFFFFFF),
+    surfaceVariant = Color(0xFFF1F5F9),
+    surfaceContainerHigh = Color(0xFFE2E8F0),
+    onBackground = Color(0xFF0F172A),
+    onSurface = Color(0xFF0F172A),
+    onSurfaceVariant = Color(0xFF64748B),
+    outline = Color(0xFFCBD5E1),
+    primary = Color(0xFF4F46E5),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFEEF2FF),
+    onPrimaryContainer = Color(0xFF312E81),
+    error = Color(0xFFEF4444),
+    tertiary = Color(0xFF10B981),
+    tertiaryContainer = Color(0xFFD1FAE5)
 )
 
 @Composable

@@ -136,6 +136,9 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     implementation("androidx.compose.material:material-icons-core")
+    // Rounded icon set used by the redesigned screens. R8 strips unreferenced icons in
+    // release builds, so only the ~30 used vectors ship (tens of KB, not the whole set).
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.work:work-runtime:2.11.2")
 
     testImplementation("junit:junit:4.13.2")

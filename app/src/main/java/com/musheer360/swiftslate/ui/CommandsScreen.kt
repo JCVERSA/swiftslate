@@ -7,6 +7,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,16 +15,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -31,6 +32,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -40,10 +43,10 @@ import com.musheer360.swiftslate.manager.CommandManager
 import com.musheer360.swiftslate.model.Command
 import com.musheer360.swiftslate.model.CommandType
 import com.musheer360.swiftslate.ui.components.LocalSlateRhythm
-import com.musheer360.swiftslate.ui.components.ScreenTitle
 import com.musheer360.swiftslate.ui.components.SlateCard
 import com.musheer360.swiftslate.ui.components.SlateItemCard
 import com.musheer360.swiftslate.ui.components.SlateTextField
+import com.musheer360.swiftslate.ui.components.AnimateEntrance
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,13 +73,21 @@ fun CommandsScreen(commandManager: CommandManager) {
     val collapseLabel = stringResource(R.string.commands_collapse)
     val expandLabel = stringResource(R.string.commands_expand)
 
-    // Search & collapse state
+    // Search, filter, and collapse state
     var searchQuery by rememberSaveable { mutableStateOf("") }
+    var selectedFilterTab by rememberSaveable { mutableStateOf(0) } // 0 = All, 1 = AI, 2 = Replace
     var expandedIds by remember { mutableStateOf(emptySet<String>()) }
 
-    val filteredCommands = remember(displayCommands, searchQuery) {
-        if (searchQuery.isBlank()) displayCommands
-        else displayCommands.filter { it.trigger.contains(searchQuery, ignoreCase = true) }
+    val filteredCommands = remember(displayCommands, searchQuery, selectedFilterTab) {
+        val baseList = displayCommands.filter {
+            if (searchQuery.isBlank()) true
+            else it.trigger.contains(searchQuery, ignoreCase = true)
+        }
+        when (selectedFilterTab) {
+            1 -> baseList.filter { it.type == CommandType.AI }
+            2 -> baseList.filter { it.type == CommandType.TEXT_REPLACER }
+            else -> baseList
+        }
     }
 
     val chevronRotation by animateFloatAsState(
@@ -90,33 +101,65 @@ fun CommandsScreen(commandManager: CommandManager) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer { }
             .padding(horizontal = rhythm.screenPaddingH, vertical = rhythm.screenPaddingV)
     ) {
-        ScreenTitle(stringResource(R.string.commands_title))
+        // Redesigned Top Header Row
+        AnimateEntrance(index = 0) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = rhythm.cardGap),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = stringResource(R.string.commands_title),
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = stringResource(R.string.commands_subtitle),
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
 
-        // Search pill
+        // Elegant Search bar
         if (displayCommands.isNotEmpty()) {
-            val searchLabel = stringResource(R.string.commands_search_hint)
+            AnimateEntrance(index = 1) {
+                val searchLabel = stringResource(R.string.commands_search_hint)
+            val searchShape = RoundedCornerShape(16.dp)
+            val searchBorderGradient = Brush.horizontalGradient(
+                colors = listOf(
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
+                )
+            )
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = rhythm.cardGap)
+                    .padding(bottom = 12.dp)
+                    .border(1.dp, searchBorderGradient, searchShape)
                     .semantics { contentDescription = searchLabel },
-                shape = RoundedCornerShape(10.dp),
-                color = MaterialTheme.colorScheme.surface
+                shape = searchShape,
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 2.dp
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 44.dp)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .heightIn(min = 48.dp)
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Search,
+                        imageVector = Icons.Rounded.Search,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
@@ -124,10 +167,11 @@ fun CommandsScreen(commandManager: CommandManager) {
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         singleLine = true,
-                        textStyle = LocalTextStyle.current.copy(
-                            fontSize = rhythm.emphasisSize,
+                        textStyle = TextStyle(
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontFamily = FontFamily.SansSerif
                         ),
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         modifier = Modifier.weight(1f),
@@ -136,7 +180,7 @@ fun CommandsScreen(commandManager: CommandManager) {
                                 if (searchQuery.isEmpty()) {
                                     Text(
                                         text = searchLabel,
-                                        fontSize = rhythm.emphasisSize,
+                                        fontSize = 14.sp,
                                         fontWeight = FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -147,24 +191,22 @@ fun CommandsScreen(commandManager: CommandManager) {
                     )
                     if (searchQuery.isNotEmpty()) {
                         Icon(
-                            imageVector = Icons.Default.Close,
+                            imageVector = Icons.Rounded.Close,
                             contentDescription = stringResource(R.string.commands_search_close),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
                                 .size(18.dp)
-                                .clickable(interactionSource = null, indication = null) {
-                                    searchQuery = ""
-                                }
+                                .clickable { searchQuery = "" }
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                     }
                     Icon(
-                        imageVector = if (expandedIds.isEmpty()) Icons.AutoMirrored.Filled.List else Icons.Default.KeyboardArrowDown,
+                        imageVector = if (expandedIds.isEmpty()) Icons.Rounded.FormatListBulleted else Icons.Rounded.UnfoldLess,
                         contentDescription = if (expandedIds.isEmpty()) expandLabel else collapseLabel,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
                             .size(20.dp)
-                            .clickable(interactionSource = null, indication = null) {
+                            .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 expandedIds = if (expandedIds.isEmpty()) {
                                     filteredCommands.map { it.trigger }.toSet()
@@ -175,112 +217,224 @@ fun CommandsScreen(commandManager: CommandManager) {
                     )
                 }
             }
+        }
 
-            // Commands list
-            SlateCard(modifier = Modifier.weight(1f)) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
-                    verticalArrangement = Arrangement.spacedBy(rhythm.listGap),
-                    contentPadding = PaddingValues(bottom = 4.dp)
+            // Quick Category Filter Tabs (Pills style)
+            AnimateEntrance(index = 2) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (filteredCommands.isEmpty() && searchQuery.isNotBlank()) {
-                        item {
-                            Text(
-                                text = stringResource(R.string.commands_search_empty),
-                                fontSize = rhythm.bodySize,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                                textAlign = TextAlign.Center
-                            )
+                    val filters = listOf(
+                        stringResource(R.string.commands_filter_all),
+                        stringResource(R.string.commands_filter_ai),
+                        stringResource(R.string.commands_filter_replacer)
+                    )
+                    filters.forEachIndexed { index, label ->
+                        val isSelected = selectedFilterTab == index
+                        val bg = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+                        val fg = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        val border = if (isSelected) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+
+                        Surface(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                selectedFilterTab = index
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            color = bg,
+                            border = if (!isSelected) androidx.compose.foundation.BorderStroke(1.dp, border) else null,
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.padding(horizontal = 14.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = fg
+                                )
+                            }
                         }
                     }
-                    items(filteredCommands, key = { it.trigger }) { cmd ->
-                        val isExpanded = cmd.trigger in expandedIds
-                        SlateItemCard(
-                            modifier = Modifier.clickable(
-                                interactionSource = null,
-                                indication = null,
-                                onClickLabel = if (isExpanded) collapseLabel else expandLabel
-                            ) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                expandedIds = if (isExpanded) expandedIds - cmd.trigger
-                                else expandedIds + cmd.trigger
+                }
+            }
+
+            // Commands list container card
+            AnimateEntrance(index = 3) {
+                SlateCard(modifier = Modifier.weight(1f)) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(12.dp)),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(bottom = 4.dp)
+                    ) {
+                        if (filteredCommands.isEmpty()) {
+                            item {
+                                Text(
+                                    text = if (searchQuery.isNotBlank()) stringResource(R.string.commands_search_empty) else stringResource(R.string.commands_empty_category),
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 32.dp),
+                                    textAlign = TextAlign.Center
+                                )
                             }
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = cmd.trigger,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = rhythm.emphasisSize,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    if (!cmd.isBuiltIn) {
-                                        Spacer(modifier = Modifier.weight(1f))
-                                        Text(
-                                            text = stringResource(R.string.commands_edit_command),
-                                            fontSize = rhythm.bodySize,
-                                            fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.clickable(
-                                                interactionSource = null,
-                                                indication = null
-                                            ) {
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                trigger = cmd.trigger
-                                                prompt = cmd.prompt
-                                                selectedType = cmd.type
-                                                editingTrigger = cmd.trigger
-                                                errorMessage = null
-                                                isFormExpanded = true
-                                            }
-                                        )
-                                        Text(
-                                            text = " | ",
-                                            fontSize = rhythm.bodySize,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Text(
-                                            text = stringResource(R.string.commands_delete_command),
-                                            fontSize = rhythm.bodySize,
-                                            fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.clickable(
-                                                interactionSource = null,
-                                                indication = null
-                                            ) {
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                commandToDelete = cmd.trigger
-                                            }
-                                        )
-                                    } else {
-                                        Spacer(modifier = Modifier.weight(1f))
-                                        Text(
-                                            text = stringResource(R.string.commands_built_in),
-                                            fontSize = rhythm.bodySize,
-                                            fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                                AnimatedVisibility(
-                                    visible = isExpanded,
-                                    enter = expandVertically(
-                                        animationSpec = tween(250),
-                                        expandFrom = Alignment.Top
-                                    ) + fadeIn(tween(200)),
-                                    exit = shrinkVertically(
-                                        animationSpec = tween(250),
-                                        shrinkTowards = Alignment.Top
-                                    ) + fadeOut(tween(150))
+                        }
+                        items(filteredCommands, key = { it.trigger }) { cmd ->
+                            val isExpanded = cmd.trigger in expandedIds
+                            SlateItemCard(
+                                modifier = Modifier.clickable(
+                                    interactionSource = null,
+                                    indication = null,
+                                    onClickLabel = if (isExpanded) collapseLabel else expandLabel
                                 ) {
-                                    Column {
-                                        Spacer(modifier = Modifier.height(rhythm.formGap))
-                                        Text(
-                                            text = cmd.prompt,
-                                            fontSize = rhythm.bodySize,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                        )
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    expandedIds = if (isExpanded) expandedIds - cmd.trigger
+                                    else expandedIds + cmd.trigger
+                                }
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = cmd.trigger,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 15.sp,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier
+                                                    .background(
+                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                                                        RoundedCornerShape(6.dp)
+                                                    )
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            // Beautiful tag for command type
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = if (cmd.type == CommandType.AI)
+                                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                                else
+                                                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                                            ) {
+                                                Text(
+                                                    text = if (cmd.type == CommandType.AI) stringResource(R.string.commands_tag_ai) else stringResource(R.string.commands_tag_replacer),
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = if (cmd.type == CommandType.AI)
+                                                        MaterialTheme.colorScheme.primary
+                                                    else
+                                                        MaterialTheme.colorScheme.tertiary,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                                )
+                                            }
+                                        }
+
+                                        // Actions panel
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            if (!cmd.isBuiltIn) {
+                                                IconButton(
+                                                    onClick = {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        trigger = cmd.trigger
+                                                        prompt = cmd.prompt
+                                                        selectedType = cmd.type
+                                                        editingTrigger = cmd.trigger
+                                                        errorMessage = null
+                                                        isFormExpanded = true
+                                                    },
+                                                    modifier = Modifier.size(32.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Rounded.Edit,
+                                                        contentDescription = stringResource(R.string.commands_edit_command),
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                                IconButton(
+                                                    onClick = {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        commandToDelete = cmd.trigger
+                                                    },
+                                                    modifier = Modifier.size(32.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Rounded.Delete,
+                                                        contentDescription = stringResource(R.string.commands_delete_command),
+                                                        tint = MaterialTheme.colorScheme.error,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                            } else {
+                                                Surface(
+                                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                                    shape = RoundedCornerShape(6.dp)
+                                                ) {
+                                                    Text(
+                                                        text = stringResource(R.string.commands_built_in).uppercase(),
+                                                        fontSize = 8.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                    AnimatedVisibility(
+                                        visible = isExpanded,
+                                        enter = expandVertically(
+                                            animationSpec = tween(250),
+                                            expandFrom = Alignment.Top
+                                        ) + fadeIn(tween(200)),
+                                        exit = shrinkVertically(
+                                            animationSpec = tween(250),
+                                            shrinkTowards = Alignment.Top
+                                        ) + fadeOut(tween(150))
+                                    ) {
+                                        Column {
+                                            Spacer(modifier = Modifier.height(10.dp))
+                                            Surface(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                                shape = RoundedCornerShape(10.dp),
+                                                border = androidx.compose.foundation.BorderStroke(
+                                                    1.dp,
+                                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                                                )
+                                            ) {
+                                                Column(modifier = Modifier.padding(12.dp)) {
+                                                    Text(
+                                                        text = if (cmd.type == CommandType.AI) stringResource(R.string.commands_prompt_heading_ai) else stringResource(R.string.commands_prompt_heading_replacer),
+                                                        fontSize = 8.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        letterSpacing = 1.sp
+                                                    )
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Text(
+                                                        text = cmd.prompt,
+                                                        fontSize = 12.sp,
+                                                        fontFamily = if (cmd.type == CommandType.TEXT_REPLACER) FontFamily.Monospace else FontFamily.SansSerif,
+                                                        lineHeight = 16.sp,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -294,7 +448,7 @@ fun CommandsScreen(commandManager: CommandManager) {
 
         Spacer(modifier = Modifier.height(rhythm.cardGap))
 
-        // Collapsible form card — at the bottom
+        // Collapsible form card — styled as a pristine expandable bottom dock
         SlateCard {
             Row(
                 modifier = Modifier
@@ -310,14 +464,23 @@ fun CommandsScreen(commandManager: CommandManager) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = stringResource(R.string.commands_add_custom_title),
-                    fontSize = rhythm.emphasisSize,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (editingTrigger != null) Icons.Rounded.EditNote else Icons.Rounded.AddBox,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (editingTrigger != null) stringResource(R.string.commands_edit_custom_title) else stringResource(R.string.commands_add_custom_title),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
                 Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
+                    imageVector = Icons.Rounded.ExpandMore,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.graphicsLayer { rotationZ = chevronRotation }
@@ -356,7 +519,11 @@ fun CommandsScreen(commandManager: CommandManager) {
                                 inactiveBorderColor = MaterialTheme.colorScheme.outline
                             )
                         ) {
-                            Text(stringResource(R.string.commands_type_ai))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.AutoAwesome, null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(stringResource(R.string.commands_type_ai), fontSize = 11.sp)
+                            }
                         }
                         SegmentedButton(
                             selected = selectedType == CommandType.TEXT_REPLACER,
@@ -374,20 +541,17 @@ fun CommandsScreen(commandManager: CommandManager) {
                                 inactiveBorderColor = MaterialTheme.colorScheme.outline
                             )
                         ) {
-                            Text(stringResource(R.string.commands_type_replacer))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.FindReplace, null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(stringResource(R.string.commands_type_replacer), fontSize = 11.sp)
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.height(rhythm.groupGap))
                     SlateTextField(
                         value = trigger,
                         onValueChange = {
-                            // take(), not a conditional guard: rejecting an over-limit value
-                            // outright leaves the platform's IME composing state (autocorrect,
-                            // predictive text, multi-char composition) pointing at text Compose
-                            // never accepted, which some keyboards resync from badly — the next
-                            // keystroke lands as a cursor move or a silently dropped edit
-                            // instead of a change. Truncating always accepts *some* update, so
-                            // Compose and the IME stay in sync. See #129.
                             trigger = it.take(CommandManager.MAX_TRIGGER_LENGTH)
                             errorMessage = null
                         },
@@ -398,8 +562,6 @@ fun CommandsScreen(commandManager: CommandManager) {
                     SlateTextField(
                         value = prompt,
                         onValueChange = {
-                            // See the trigger field's onValueChange above for why take() and
-                            // not a conditional guard.
                             prompt = it.take(CommandManager.MAX_PROMPT_LENGTH)
                             errorMessage = null
                         },
@@ -460,8 +622,6 @@ fun CommandsScreen(commandManager: CommandManager) {
                                     return@Button
                                 }
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                // Single atomic write: replaces the command being edited (or the
-                                // same trigger, when adding) without a delete-then-add window.
                                 val saved = commandManager.saveCustomCommand(
                                     command = Command(trimmedTrigger, prompt.trim(), false, selectedType),
                                     replacing = editingTrigger ?: trimmedTrigger
@@ -477,10 +637,15 @@ fun CommandsScreen(commandManager: CommandManager) {
                             }
                         },
                         enabled = trigger.isNotBlank() && trigger.trim() != prefix && prompt.isNotBlank(),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
                     ) {
-                        Text(if (editingTrigger != null) stringResource(R.string.commands_save_command) else stringResource(R.string.commands_add_command))
+                        Text(
+                            text = if (editingTrigger != null) stringResource(R.string.commands_save_command) else stringResource(R.string.commands_add_command),
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }

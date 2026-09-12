@@ -4,25 +4,33 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.SharedPreferences
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.musheer360.swiftslate.R
@@ -34,10 +42,10 @@ import com.musheer360.swiftslate.model.PrefKeys
 import com.musheer360.swiftslate.model.ProviderType
 import com.musheer360.swiftslate.provider.GroqConfig
 import com.musheer360.swiftslate.ui.components.LocalSlateRhythm
-import com.musheer360.swiftslate.ui.components.ScreenTitle
 import com.musheer360.swiftslate.ui.components.SlateCard
 import com.musheer360.swiftslate.ui.components.SlateItemCard
 import com.musheer360.swiftslate.ui.components.SlateTextField
+import com.musheer360.swiftslate.ui.components.AnimateEntrance
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -75,186 +83,416 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
     val endpointNeedsV1Msg = stringResource(R.string.keys_endpoint_needs_v1)
     val rhythm = LocalSlateRhythm.current
 
+    val providerType = remember(prefs) {
+        ProviderType.sanitize(prefs.getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI))
+    }
+
+    // Provider display names stay literals: proper nouns, like the pre-redesign "Groq"/"Gemini".
+    val providerName = when (providerType) {
+        ProviderType.GROQ -> "Groq AI"
+        ProviderType.CUSTOM -> "Custom OpenAI Provider"
+        else -> "Google Gemini AI"
+    }
+
+    val apiKeyUrl = when (providerType) {
+        ProviderType.GROQ -> "https://console.groq.com/keys"
+        ProviderType.CUSTOM -> null
+        else -> "https://aistudio.google.com/api-keys"
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer { } // Creates a hardware layer for smooth NavHost slide animations
             .padding(horizontal = rhythm.screenPaddingH, vertical = rhythm.screenPaddingV)
     ) {
-        ScreenTitle(stringResource(R.string.keys_title))
-
-        if (!keyManager.keystoreAvailable) {
-            SlateCard {
-                Text(
-                    text = keystoreErrorMsg,
-                    color = MaterialTheme.colorScheme.error,
-                    fontSize = rhythm.bodySize
-                )
-            }
-            Spacer(modifier = Modifier.height(rhythm.cardGap))
-        }
-
-        SlateCard {
-            SlateTextField(
-                value = newKey,
-                onValueChange = { if (it.length <= 256) newKey = it },
-                placeholder = { Text(stringResource(R.string.keys_api_key_label)) },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation()
-            )
-            Spacer(modifier = Modifier.height(rhythm.groupGap))
-            Button(
-                onClick = {
-                    if (newKey.isNotBlank()) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        isTesting = true
-                        testResult = null
-                        scope.launch {
-                            val trimmedKey = newKey.trim()
-                            if (withContext(Dispatchers.IO) { keyManager.getKeys() }.contains(trimmedKey)) {
-                                isTesting = false
-                                // Re-adding an existing key means the user is retrying it after a
-                                // failure — clear any invalid/rate-limit bench so the service can
-                                // use it again immediately instead of waiting out the 15-min TTL.
-                                withContext(Dispatchers.IO) { keyManager.clearMarks(trimmedKey) }
-                                testResult = alreadyAddedMsg
-                                testSuccess = false
-                                return@launch
-                            }
-                            val result = run {
-                                val providerType = ProviderType.sanitize(prefs.getString(PrefKeys.PROVIDER_TYPE, null))
-                                val customEndpoint = (prefs.getString(PrefKeys.CUSTOM_ENDPOINT, "") ?: "").trim()
-                                when {
-                                    providerType == ProviderType.CUSTOM && customEndpoint.isBlank() -> {
-                                        isTesting = false
-                                        testResult = customEndpointRequiredMsg
-                                        testSuccess = false
-                                        return@launch
-                                    }
-                                    providerType == ProviderType.GROQ ->
-                                        openAIClient.validateKey(trimmedKey, GroqConfig.ENDPOINT)
-                                    providerType == ProviderType.CUSTOM ->
-                                        openAIClient.validateKey(trimmedKey, customEndpoint)
-                                    else ->
-                                        geminiClient.validateKey(trimmedKey)
-                                }
-                            }
-                            isTesting = false
-                            if (result.isSuccess) {
-                                if (!withContext(Dispatchers.IO) { keyManager.addKey(trimmedKey) }) {
-                                    testResult = keystoreErrorMsg
-                                    testSuccess = false
-                                    return@launch
-                                }
-                                keys = withContext(Dispatchers.IO) { keyManager.getKeys() }
-                                newKey = ""
-                                testResult = validAddedMsg
-                                testSuccess = true
-                                // Clear clipboard to prevent API key leaking via paste history
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
-                            } else {
-                                // Two-layer redaction: some OpenAI-compatible endpoints echo the
-                                // submitted key back in error.message ("Incorrect API key
-                                // provided: sk-ab...XYZ"). redactSecrets strips known key shapes;
-                                // redactSubmittedKey strips the exact key just tried, covering
-                                // Custom-provider formats no prefix regex can know. This is the
-                                // one path that shows a raw provider message — the accessibility
-                                // service maps every message onto a localized string instead — so
-                                // it is the one path that has to strip secrets before display.
-                                val raw = result.exceptionOrNull()?.message ?: ""
-                                testResult = when {
-                                    raw.contains(ApiClientUtils.SIGNIN_REQUIRED_MARKER) -> signinRequiredMsg
-                                    raw.contains(ApiClientUtils.NEEDS_V1_MARKER) -> endpointNeedsV1Msg
-                                    else -> ApiClientUtils.redactSecrets(
-                                        ApiClientUtils.redactSubmittedKey(raw, trimmedKey)
-                                    ).ifEmpty { validationFailedMsg }
-                                }
-                                testSuccess = false
-                            }
-                        }
-                    }
-                },
-                enabled = newKey.isNotBlank() && !isTesting && keyManager.keystoreAvailable,
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+        // Redesigned Top Header Row
+        AnimateEntrance(index = 0) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = rhythm.cardGap),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(if (isTesting) stringResource(R.string.keys_testing) else stringResource(R.string.keys_add_key))
-            }
-            if (testResult != null) {
-                Text(
-                    text = testResult!!,
-                    color = if (testSuccess) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
-                    fontSize = rhythm.bodySize,
-                    modifier = Modifier.padding(top = rhythm.formGap)
-                )
-            }
-            val (apiKeyUrl, providerName) = when (prefs.getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI) ?: ProviderType.GEMINI) {
-                ProviderType.GROQ -> "https://console.groq.com/keys" to "Groq"
-                ProviderType.CUSTOM -> null to null
-                else -> "https://aistudio.google.com/api-keys" to "Gemini"
-            }
-            if (apiKeyUrl != null && providerName != null) {
-                Text(
-                    text = stringResource(R.string.keys_get_api_key, providerName),
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = rhythm.bodySize,
-                    modifier = Modifier
-                        .clickable(interactionSource = null, indication = null) { uriHandler.openUri(apiKeyUrl) }
-                        .padding(top = rhythm.formGap)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(rhythm.cardGap))
-
-        if (keys.isNotEmpty()) {
-            SlateCard(modifier = Modifier.weight(1f)) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
-                    verticalArrangement = Arrangement.spacedBy(rhythm.listGap),
-                    contentPadding = PaddingValues(bottom = 4.dp)
-                ) {
-                    itemsIndexed(keys, key = { index, k -> "$index-${k.hashCode()}" }) { index, key ->
-                        SlateItemCard {
-                            Text(
-                                text = "••••••••" + key.takeLast(4),
-                                fontWeight = FontWeight.Medium,
-                                fontSize = rhythm.emphasisSize,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f).semantics(mergeDescendants = true) {}
-                            )
-                            Text(
-                                text = stringResource(R.string.delete_confirm_button),
-                                fontSize = rhythm.bodySize,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.clickable(
-                                    interactionSource = null,
-                                    indication = null
-                                ) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    keyToDelete = key
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        } else {
-            SlateCard(modifier = Modifier.weight(1f)) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
+                Column {
                     Text(
-                        text = stringResource(R.string.keys_empty),
-                        fontSize = rhythm.bodySize,
+                        text = stringResource(R.string.keys_title),
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = stringResource(R.string.keys_subtitle),
+                        fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
+
+        if (!keyManager.keystoreAvailable) {
+            SlateCard {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(2.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ErrorOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = keystoreErrorMsg,
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(rhythm.cardGap))
+        }
+
+        // Key Input Card
+        AnimateEntrance(index = 1) {
+            SlateCard {
+                Column(modifier = Modifier.padding(2.dp)) {
+                // Header of Section
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.VpnKey,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.keys_register_title),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    // Active Provider Badge
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                        )
+                    ) {
+                        Text(
+                            text = providerName.uppercase(),
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
+                SlateTextField(
+                    value = newKey,
+                    onValueChange = { if (it.length <= 256) newKey = it },
+                    placeholder = { Text(stringResource(R.string.keys_api_key_label)) },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation()
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Button(
+                    onClick = {
+                        if (newKey.isNotBlank()) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            isTesting = true
+                            testResult = null
+                            scope.launch {
+                                val trimmedKey = newKey.trim()
+                                if (withContext(Dispatchers.IO) { keyManager.getKeys() }.contains(trimmedKey)) {
+                                    isTesting = false
+                                    // Re-adding an existing key means the user is retrying it after a
+                                    // failure — clear any invalid/rate-limit bench so the service can
+                                    // use it again immediately instead of waiting out the 15-min TTL.
+                                    withContext(Dispatchers.IO) { keyManager.clearMarks(trimmedKey) }
+                                    testResult = alreadyAddedMsg
+                                    testSuccess = false
+                                    return@launch
+                                }
+                                val result = run {
+                                    val customEndpoint = (prefs.getString(PrefKeys.CUSTOM_ENDPOINT, "") ?: "").trim()
+                                    when {
+                                        providerType == ProviderType.CUSTOM && customEndpoint.isBlank() -> {
+                                            isTesting = false
+                                            testResult = customEndpointRequiredMsg
+                                            testSuccess = false
+                                            return@launch
+                                        }
+                                        providerType == ProviderType.GROQ ->
+                                            openAIClient.validateKey(trimmedKey, GroqConfig.ENDPOINT)
+                                        providerType == ProviderType.CUSTOM ->
+                                            openAIClient.validateKey(trimmedKey, customEndpoint)
+                                        else ->
+                                            geminiClient.validateKey(trimmedKey)
+                                    }
+                                }
+                                isTesting = false
+                                if (result.isSuccess) {
+                                    if (!withContext(Dispatchers.IO) { keyManager.addKey(trimmedKey) }) {
+                                        testResult = keystoreErrorMsg
+                                        testSuccess = false
+                                        return@launch
+                                    }
+                                    keys = withContext(Dispatchers.IO) { keyManager.getKeys() }
+                                    newKey = ""
+                                    testResult = validAddedMsg
+                                    testSuccess = true
+                                    // Clear clipboard to prevent API key leaking via paste history
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+                                } else {
+                                    val raw = result.exceptionOrNull()?.message ?: ""
+                                    testResult = when {
+                                        raw.contains(ApiClientUtils.SIGNIN_REQUIRED_MARKER) -> signinRequiredMsg
+                                        raw.contains(ApiClientUtils.NEEDS_V1_MARKER) -> endpointNeedsV1Msg
+                                        else -> ApiClientUtils.redactSecrets(
+                                            ApiClientUtils.redactSubmittedKey(raw, trimmedKey)
+                                        ).ifEmpty { validationFailedMsg }
+                                    }
+                                    testSuccess = false
+                                }
+                            }
+                        }
+                    },
+                    enabled = newKey.isNotBlank() && !isTesting && keyManager.keystoreAvailable,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                ) {
+                    if (isTesting) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.5.dp
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(stringResource(R.string.keys_testing), fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Text(stringResource(R.string.keys_add_key), fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Smoothly animated result banners
+                AnimatedVisibility(
+                    visible = testResult != null,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    testResult?.let { msg ->
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (testSuccess) MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.25f)
+                                    else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (testSuccess) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f)
+                                else MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (testSuccess) Icons.Rounded.CheckCircle else Icons.Rounded.Cancel,
+                                    contentDescription = null,
+                                    tint = if (testSuccess) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = msg,
+                                    color = if (testSuccess) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (apiKeyUrl != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Surface(
+                        onClick = { uriHandler.openUri(apiKeyUrl) },
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Rounded.VpnKey,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = stringResource(R.string.keys_get_api_key, providerName),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Rounded.OpenInNew,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+        Spacer(modifier = Modifier.height(rhythm.cardGap))
+
+        // Active Keys List
+        AnimateEntrance(index = 2) {
+            if (keys.isNotEmpty()) {
+                Column(modifier = Modifier.fillMaxHeight()) {
+                    Text(
+                        text = stringResource(R.string.keys_list_title),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    SlateCard(modifier = Modifier.weight(1f)) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(12.dp)),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 4.dp)
+                ) {
+                    itemsIndexed(keys, key = { index, k -> "$index-${k.hashCode()}" }) { index, key ->
+                        SlateItemCard {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Pulsing/Glowing Active Dot on key icon container
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                                            CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Lock,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    // Status light
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .background(Color(0xFF10B981), CircleShape)
+                                            .align(Alignment.TopEnd)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.semantics(mergeDescendants = true) {}) {
+                                    Text(
+                                        text = "•••• •••• •••• " + key.takeLast(4),
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.keys_encrypted_note),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            IconButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    keyToDelete = key
+                                },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.DeleteOutline,
+                                    contentDescription = stringResource(R.string.delete_confirm_button),
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        SlateCard(modifier = Modifier.fillMaxHeight()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.LockOpen,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = stringResource(R.string.keys_empty),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+    }
     }
 
     keyToDelete?.let { keyValue ->
