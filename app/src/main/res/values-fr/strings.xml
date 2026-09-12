@@ -41,6 +41,13 @@
     <string name="commands_error_duplicate">Une commande avec ce déclencheur existe déjà</string>
     <string name="commands_error_conflict">Conflit avec la commande existante \'%1$s\' — un déclencheur est un préfixe de l\'autre</string>
     <string name="commands_error_empty_trigger">Le déclencheur doit avoir un nom après le préfixe</string>
+    <string name="commands_preview_input_label">Texte d’exemple à tester</string>
+    <string name="commands_preview_default_input">Voici une phrase d’exemple à transformer.</string>
+    <string name="commands_preview_button">Tester la commande</string>
+    <string name="commands_preview_loading">Test en cours…</string>
+    <string name="commands_preview_output">Résultat de l’aperçu</string>
+    <string name="commands_preview_unavailable">La commande n’a pas pu être testée. Vérifiez qu’une clé API valide est configurée.</string>
+    <string name="commands_preview_timeout">Le test a expiré. Réessayez.</string>
 
     <!-- Settings -->
     <string name="settings_title">Paramètres</string>
@@ -109,6 +116,13 @@
     <string name="process_text_copied">Copié</string>
     <string name="process_text_no_selection">Aucun texte sélectionné</string>
     <string name="process_text_no_commands">Aucune commande disponible. Ajoutez-en une dans SwiftSlate.</string>
+    <string name="process_quick_actions">Actions rapides</string>
+    <string name="process_quick_fix">Corriger</string>
+    <string name="process_quick_improve">Améliorer</string>
+    <string name="process_quick_shorten">Raccourcir</string>
+    <string name="process_quick_formal">Formel</string>
+    <string name="process_quick_casual">Décontracté</string>
+    <string name="process_quick_reply">Répondre</string>
     <string name="toast_restore_failed">Impossible de restaurer le texte d\'origine</string>
     <string name="toast_nothing_to_undo">Rien à annuler</string>
     <string name="toast_undo_failed">Impossible d\'annuler</string>

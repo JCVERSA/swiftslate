@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -39,19 +40,32 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jcversa.swiftslate.R
+import com.jcversa.swiftslate.SwiftSlateApp
+import com.jcversa.swiftslate.api.GeminiClient
+import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.CommandManager
 import com.jcversa.swiftslate.model.Command
 import com.jcversa.swiftslate.model.CommandType
+import com.jcversa.swiftslate.service.CommandOutcome
+import com.jcversa.swiftslate.service.runTextCommand
 import com.jcversa.swiftslate.ui.components.LocalSlateRhythm
 import com.jcversa.swiftslate.ui.components.SlateCard
 import com.jcversa.swiftslate.ui.components.SlateItemCard
 import com.jcversa.swiftslate.ui.components.SlateTextField
 import com.jcversa.swiftslate.ui.components.AnimateEntrance
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommandsScreen(commandManager: CommandManager) {
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    val geminiClient = remember { GeminiClient() }
+    val openAIClient = remember { OpenAICompatibleClient() }
     var commands by remember { mutableStateOf(commandManager.getCommands()) }
     val displayCommands = remember(commands) {
         val (builtIn, custom) = commands.partition { it.isBuiltIn }
@@ -65,6 +79,10 @@ fun CommandsScreen(commandManager: CommandManager) {
     var editingTrigger by rememberSaveable { mutableStateOf<String?>(null) }
     var commandToDelete by remember { mutableStateOf<String?>(null) }
     var isFormExpanded by rememberSaveable { mutableStateOf(false) }
+    var previewInput by rememberSaveable { mutableStateOf("") }
+    var previewOutput by remember { mutableStateOf<String?>(null) }
+    var previewError by remember { mutableStateOf<String?>(null) }
+    var isPreviewing by remember { mutableStateOf(false) }
     val prefix = commandManager.getTriggerPrefix()
     val errorPrefixMsg = stringResource(R.string.commands_error_prefix, prefix)
     val errorDuplicateMsg = stringResource(R.string.commands_error_duplicate)
@@ -72,6 +90,54 @@ fun CommandsScreen(commandManager: CommandManager) {
     val errorEmptyTrigger = stringResource(R.string.commands_error_empty_trigger)
     val collapseLabel = stringResource(R.string.commands_collapse)
     val expandLabel = stringResource(R.string.commands_expand)
+    val previewDefaultInput = stringResource(R.string.commands_preview_default_input)
+    val previewUnavailable = stringResource(R.string.commands_preview_unavailable)
+    val previewTimeout = stringResource(R.string.commands_preview_timeout)
+
+    fun previewCommand() {
+        val sample = previewInput.trim().ifBlank { previewDefaultInput }
+        val commandPrompt = prompt.trim()
+        if (commandPrompt.isBlank() || isPreviewing) return
+        previewOutput = null
+        previewError = null
+        isPreviewing = true
+        scope.launch {
+            val outcome = if (selectedType == CommandType.TEXT_REPLACER) {
+                CommandOutcome.Success(commandPrompt)
+            } else {
+                val app = context.applicationContext as? SwiftSlateApp
+                if (app == null) {
+                    CommandOutcome.Unavailable(previewUnavailable)
+                } else {
+                    try {
+                        withContext(Dispatchers.IO) {
+                            withTimeout(90_000L) {
+                                runTextCommand(
+                                    context.applicationContext,
+                                    app.keyManager,
+                                    geminiClient,
+                                    openAIClient,
+                                    commandPrompt,
+                                    sample
+                                )
+                            }
+                        }
+                    } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
+                        CommandOutcome.Failure(previewTimeout)
+                    } catch (_: Exception) {
+                        CommandOutcome.Failure(previewUnavailable)
+                    }
+                }
+            }
+            isPreviewing = false
+            when (outcome) {
+                is CommandOutcome.Success -> previewOutput = outcome.text
+                is CommandOutcome.Refusal -> previewError = previewUnavailable
+                is CommandOutcome.Unavailable -> previewError = outcome.message
+                is CommandOutcome.Failure -> previewError = outcome.message
+            }
+        }
+    }
 
     // Search, filter, and collapse state
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -353,6 +419,9 @@ fun CommandsScreen(commandManager: CommandManager) {
                                                         selectedType = cmd.type
                                                         editingTrigger = cmd.trigger
                                                         errorMessage = null
+                                                        previewInput = ""
+                                                        previewOutput = null
+                                                        previewError = null
                                                         isFormExpanded = true
                                                     },
                                                     modifier = Modifier.size(32.dp)
@@ -564,11 +633,61 @@ fun CommandsScreen(commandManager: CommandManager) {
                         onValueChange = {
                             prompt = it.take(CommandManager.MAX_PROMPT_LENGTH)
                             errorMessage = null
+                            previewOutput = null
+                            previewError = null
                         },
                         label = { Text(if (selectedType == CommandType.AI) stringResource(R.string.commands_prompt_label) else stringResource(R.string.commands_replacement_label)) },
                         singleLine = false,
                         modifier = Modifier.height(100.dp)
                     )
+                    Spacer(modifier = Modifier.height(rhythm.formGap))
+                    SlateTextField(
+                        value = previewInput,
+                        onValueChange = { previewInput = it.take(10_000) },
+                        label = { Text(stringResource(R.string.commands_preview_input_label)) },
+                        placeholder = { Text(previewDefaultInput) },
+                        singleLine = false,
+                        modifier = Modifier.height(84.dp)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = rhythm.formGap),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isPreviewing) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(10.dp))
+                        }
+                        TextButton(
+                            onClick = { previewCommand() },
+                            enabled = prompt.isNotBlank() && !isPreviewing
+                        ) {
+                            Text(if (isPreviewing) stringResource(R.string.commands_preview_loading) else stringResource(R.string.commands_preview_button))
+                        }
+                    }
+                    previewOutput?.let { output ->
+                        SlateCard(modifier = Modifier.padding(top = rhythm.formGap)) {
+                            Column {
+                                Text(
+                                    text = stringResource(R.string.commands_preview_output),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    letterSpacing = 1.sp
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(text = output, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                    previewError?.let { msg ->
+                        Text(
+                            text = msg,
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = rhythm.bodySize,
+                            modifier = Modifier.padding(top = rhythm.formGap)
+                        )
+                    }
                     errorMessage?.let { msg ->
                         Text(
                             text = msg,
@@ -584,6 +703,9 @@ fun CommandsScreen(commandManager: CommandManager) {
                                 trigger = ""
                                 prompt = ""
                                 errorMessage = null
+                                previewOutput = null
+                                previewError = null
+                                previewInput = ""
                                 editingTrigger = null
                                 selectedType = CommandType.AI
                                 isFormExpanded = false
@@ -631,6 +753,9 @@ fun CommandsScreen(commandManager: CommandManager) {
                                 trigger = ""
                                 prompt = ""
                                 errorMessage = null
+                                previewOutput = null
+                                previewError = null
+                                previewInput = ""
                                 editingTrigger = null
                                 selectedType = CommandType.AI
                                 isFormExpanded = false

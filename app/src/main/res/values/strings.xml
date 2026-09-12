@@ -47,6 +47,13 @@
     <string name="commands_error_duplicate">A command with this trigger already exists</string>
     <string name="commands_error_conflict">Conflicts with existing command \'%1$s\' — one trigger is a prefix of the other</string>
     <string name="commands_error_empty_trigger">Trigger must have a name after the prefix</string>
+    <string name="commands_preview_input_label">Example text to test</string>
+    <string name="commands_preview_default_input">This is an example sentence to transform.</string>
+    <string name="commands_preview_button">Test command</string>
+    <string name="commands_preview_loading">Testing…</string>
+    <string name="commands_preview_output">Preview result</string>
+    <string name="commands_preview_unavailable">The command could not be tested. Check that a valid API key is configured.</string>
+    <string name="commands_preview_timeout">The test timed out. Try again.</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
@@ -112,6 +119,13 @@
     <string name="process_text_copied">Copied</string>
     <string name="process_text_no_selection">No text selected</string>
     <string name="process_text_no_commands">No commands available. Add one in SwiftSlate.</string>
+    <string name="process_quick_actions">Quick actions</string>
+    <string name="process_quick_fix">Fix</string>
+    <string name="process_quick_improve">Improve</string>
+    <string name="process_quick_shorten">Shorten</string>
+    <string name="process_quick_formal">Formal</string>
+    <string name="process_quick_casual">Casual</string>
+    <string name="process_quick_reply">Reply</string>
     <string name="toast_restore_failed">Could not restore original text</string>
     <string name="toast_nothing_to_undo">Nothing to undo</string>
     <string name="toast_undo_failed">Could not undo</string>
