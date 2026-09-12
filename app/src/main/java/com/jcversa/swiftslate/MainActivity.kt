@@ -14,6 +14,7 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -34,13 +35,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -53,7 +50,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.animation.core.EaseOutQuart
 import kotlinx.coroutines.delay
-import com.jcversa.swiftslate.ui.components.bounceClick
 import com.jcversa.swiftslate.ui.CommandsScreen
 import com.jcversa.swiftslate.ui.DashboardScreen
 import com.jcversa.swiftslate.ui.KeysScreen
@@ -123,8 +119,8 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
     val motion = LocalSlateMotion.current
     var selectedTab by rememberSaveable { mutableStateOf(Tab.Dashboard) }
 
-    // Start-up app-opening fluid entrance animation. The same policy also makes this instant when
-    // Android's reduced-motion setting is active.
+    // The opening motion is shared by every form factor and becomes instantaneous when Android
+    // asks the app to reduce motion.
     val introProgress = remember { androidx.compose.animation.core.Animatable(0f) }
     LaunchedEffect(Unit, motion.reduceMotion) {
         introProgress.animateTo(
@@ -133,10 +129,10 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
         )
     }
 
-    // Request notification permission on first launch (Android 13+)
+    // Request notification permission on first launch (Android 13+).
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { _ -> // Result not needed — we just need to prompt once
+    ) { _ ->
         context.getSharedPreferences("settings", Context.MODE_PRIVATE)
             .edit().putBoolean("notification_permission_requested", true).apply()
     }
@@ -145,157 +141,108 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             try {
                 val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-                val alreadyRequested = prefs.getBoolean("notification_permission_requested", false)
-                if (!alreadyRequested) {
+                if (!prefs.getBoolean("notification_permission_requested", false)) {
                     permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             } catch (_: Exception) {
-                // A corrupted pref must not crash this activity — it shares the process with
-                // the accessibility service (#125).
+                // A corrupted pref must not crash the activity that shares a process with the
+                // accessibility service.
             }
         }
     }
 
-    Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .graphicsLayer {
-                alpha = introProgress.value
-                translationY = (1f - introProgress.value) * 32.dp.toPx()
-                val scale = 0.96f + (0.04f * introProgress.value)
-                scaleX = scale
-                scaleY = scale
-            },
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            Surface(
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val windowLayout = remember(maxWidth) { SlateWindowLayout.fromWidth(maxWidth) }
+        val isCompact = windowLayout == SlateWindowLayout.Compact
+        val isExpanded = windowLayout == SlateWindowLayout.Expanded
+
+        Scaffold(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    alpha = introProgress.value
+                    translationY = (1f - introProgress.value) * 32.dp.toPx()
+                    val scale = 0.96f + (0.04f * introProgress.value)
+                    scaleX = scale
+                    scaleY = scale
+                },
+            containerColor = MaterialTheme.colorScheme.background,
+            bottomBar = {
+                if (isCompact) {
+                    SwiftSlateCompactNavigation(
+                        selectedTab = selectedTab,
+                        onSelect = { selectedTab = it }
+                    )
+                }
+            }
+        ) { innerPadding ->
+            val screens = remember {
+                Tab.entries.associateWith { tab ->
+                    movableContentOf {
+                        when (tab) {
+                            Tab.Dashboard -> DashboardScreen(vm.keyManager, vm.commandManager, vm.statsManager)
+                            Tab.Keys -> KeysScreen(vm.keyManager, vm.prefs)
+                            Tab.Commands -> CommandsScreen(vm.commandManager)
+                            Tab.Settings -> SettingsScreen(vm.commandManager, vm.prefs, vm.keyManager)
+                        }
+                    }
+                }
+            }
+
+            Row(
                 modifier = Modifier
-                    .navigationBarsPadding()
-                    .padding(start = 20.dp, end = 20.dp, bottom = 12.dp)
-                    .fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
-                border = androidx.compose.foundation.BorderStroke(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
-                ),
-                shadowElevation = 6.dp,
-                tonalElevation = 3.dp
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
+                if (!isCompact) {
+                    SwiftSlateNavigationRail(
+                        selectedTab = selectedTab,
+                        expanded = isExpanded,
+                        onSelect = { selectedTab = it }
+                    )
+                }
+
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(horizontal = if (isCompact) 0.dp else 12.dp),
+                    contentAlignment = Alignment.TopCenter
                 ) {
-                    Tab.entries.forEach { tab ->
-                        val isSelected = selectedTab == tab
-                        val backgroundAlpha by androidx.compose.animation.core.animateFloatAsState(
-                            targetValue = if (isSelected) 1f else 0f,
-                            animationSpec = motion.spatialFloatSpec(),
-                            label = "tab_background"
-                        )
-                        val iconColor = if (isSelected) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
+                    AnimatedContent(
+                    targetState = selectedTab,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .widthIn(max = 1120.dp),
+                    transitionSpec = {
+                        if (motion.reduceMotion) {
+                            fadeIn(animationSpec = androidx.compose.animation.core.snap()) togetherWith
+                                fadeOut(animationSpec = androidx.compose.animation.core.snap())
                         } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                            val direction = if (targetState.ordinal > initialState.ordinal)
+                                AnimatedContentTransitionScope.SlideDirection.Left
+                            else
+                                AnimatedContentTransitionScope.SlideDirection.Right
+                            val duration = if (isCompact) 220 else 260
+                            val tabEase = CubicBezierEasing(0.23f, 1f, 0.32f, 1f)
+                            (slideIntoContainer(direction, tween(duration, easing = tabEase)) + fadeIn(tween(duration))) togetherWith
+                                (slideOutOfContainer(direction, tween(duration, easing = tabEase)) + fadeOut(tween(duration)))
                         }
-                        val iconScale by androidx.compose.animation.core.animateFloatAsState(
-                            targetValue = if (isSelected) 1f else 0.92f,
-                            animationSpec = motion.spatialFloatSpec(),
-                            label = "tab_icon_scale"
-                        )
-                        val iconRotation by androidx.compose.animation.core.animateFloatAsState(
-                            targetValue = if (isSelected) 0f else -4f,
-                            animationSpec = motion.spatialFloatSpec(),
-                            label = "tab_icon_rotation"
-                        )
-                        val containerColor = MaterialTheme.colorScheme.primaryContainer
-
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(containerColor.copy(alpha = backgroundAlpha))
-                                .bounceClick {
-                                    if (selectedTab != tab) selectedTab = tab
-                                }
-                                .padding(horizontal = 2.dp, vertical = 7.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                Icon(
-                                    imageVector = tab.icon,
-                                    contentDescription = null,
-                                    tint = iconColor,
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .graphicsLayer {
-                                            scaleX = iconScale
-                                            scaleY = iconScale
-                                            rotationZ = iconRotation
-                                        }
-                                )
-                                Text(
-                                    text = stringResource(tab.titleRes),
-                                    color = iconColor,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    maxLines = 1
-                                )
-                            }
+                    },
+                    label = "tab_transition"
+                ) { tab ->
+                    // A single rhythm is still shared by every destination, while its available
+                    // width now grows naturally beside the rail on larger windows.
+                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                        val rhythm = remember(maxWidth, maxHeight) {
+                            SlateRhythm.forSize(maxWidth, maxHeight)
+                        }
+                        CompositionLocalProvider(LocalSlateRhythm provides rhythm) {
+                            screens[tab]?.invoke()
                         }
                     }
                 }
-            }
-        }
-    ) { innerPadding ->
-        val screens = remember {
-            Tab.entries.associateWith { tab ->
-                movableContentOf {
-                    when (tab) {
-                        Tab.Dashboard -> DashboardScreen(vm.keyManager, vm.commandManager, vm.statsManager)
-                        Tab.Keys -> KeysScreen(vm.keyManager, vm.prefs)
-                        Tab.Commands -> CommandsScreen(vm.commandManager)
-                        Tab.Settings -> SettingsScreen(vm.commandManager, vm.prefs, vm.keyManager)
-                    }
-                }
-            }
-        }
-
-        AnimatedContent(
-            targetState = selectedTab,
-            modifier = Modifier.padding(innerPadding),
-            transitionSpec = {
-                if (motion.reduceMotion) {
-                    fadeIn(animationSpec = androidx.compose.animation.core.snap()) togetherWith
-                        fadeOut(animationSpec = androidx.compose.animation.core.snap())
-                } else {
-                    val direction = if (targetState.ordinal > initialState.ordinal)
-                        AnimatedContentTransitionScope.SlideDirection.Left
-                    else
-                        AnimatedContentTransitionScope.SlideDirection.Right
-                    // Strong ease-out: the destination becomes readable immediately, then
-                    // settles quickly instead of making tab navigation feel like a carousel.
-                    val duration = 220
-                    val tabEase = CubicBezierEasing(0.23f, 1f, 0.32f, 1f)
-                    (slideIntoContainer(direction, tween(duration, easing = tabEase)) + fadeIn(tween(duration))) togetherWith
-                        (slideOutOfContainer(direction, tween(duration, easing = tabEase)) + fadeOut(tween(duration)))
-                }
-            },
-            label = "tab_transition"
-        ) { tab ->
-            // One rhythm for every tab, derived from the height the content area
-            // actually has after the nav bar and system insets. Resolving it here
-            // rather than per screen is what keeps padding, gaps and type identical
-            // across Dashboard, Keys, Commands and Settings.
-            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                val rhythm = remember(maxHeight) { SlateRhythm.forHeight(maxHeight) }
-                CompositionLocalProvider(LocalSlateRhythm provides rhythm) {
-                    screens[tab]?.invoke()
                 }
             }
         }

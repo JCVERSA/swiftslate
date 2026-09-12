@@ -108,6 +108,26 @@ data class SlateRhythm(
             )
         }
 
+        /**
+         * Resolves the shared rhythm from the actual window dimensions. Height keeps the existing
+         * compact/relaxed behavior; width adds breathing room only when a rail or a large pane is
+         * present, so phone layouts keep their one-handed density.
+         */
+        fun forSize(availableWidth: Dp, availableHeight: Dp): SlateRhythm {
+            val base = forHeight(availableHeight)
+            val wide = availableWidth >= 840.dp
+            val medium = availableWidth >= 600.dp
+            return base.copy(
+                screenPaddingH = when {
+                    wide -> 32.dp
+                    medium -> 24.dp
+                    else -> 20.dp
+                },
+                cardGap = if (wide) 12.dp else base.cardGap,
+                listGap = if (wide) 10.dp else base.listGap
+            )
+        }
+
         /** Fallback for previews and any subtree without a provider. */
         val Relaxed: SlateRhythm = forHeight(RELAXED_HEIGHT.dp)
     }
