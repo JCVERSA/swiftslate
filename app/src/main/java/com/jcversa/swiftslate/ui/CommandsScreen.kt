@@ -48,6 +48,8 @@ import com.jcversa.swiftslate.ui.components.AnimateEntrance
 import com.jcversa.swiftslate.ui.components.LocalSlateRhythm
 import com.jcversa.swiftslate.ui.components.SlateCard
 import com.jcversa.swiftslate.ui.components.SlateItemCard
+import com.jcversa.swiftslate.ui.components.SlateMorphIcon
+import com.jcversa.swiftslate.ui.components.SlateMorphIconType
 import com.jcversa.swiftslate.ui.components.SlateTextField
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -425,10 +427,12 @@ fun CommandsScreen(commandManager: CommandManager) {
                             },
                             modifier = Modifier.size(48.dp)
                         ) {
-                            Icon(
-                                imageVector = if (expandedIds.isEmpty()) Icons.Rounded.UnfoldMore else Icons.Rounded.UnfoldLess,
+                            SlateMorphIcon(
+                                type = SlateMorphIconType.ExpandCollapse,
+                                toggled = expandedIds.isNotEmpty(),
+                                tint = MaterialTheme.colorScheme.primary,
                                 contentDescription = if (expandedIds.isEmpty()) expandLabel else collapseLabel,
-                                tint = MaterialTheme.colorScheme.primary
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
@@ -835,8 +839,9 @@ fun CommandsScreen(commandManager: CommandManager) {
                                 },
                                 modifier = Modifier.size(48.dp)
                             ) {
-                                Icon(
-                                    imageVector = if (editingAlias == null) Icons.Rounded.Add else Icons.Rounded.Check,
+                                SlateMorphIcon(
+                                    type = SlateMorphIconType.AddCheck,
+                                    toggled = editingAlias != null,
                                     contentDescription = if (editingAlias == null) {
                                         stringResource(R.string.commands_alias_add)
                                     } else {
@@ -847,7 +852,7 @@ fun CommandsScreen(commandManager: CommandManager) {
                                     } else {
                                         MaterialTheme.colorScheme.onSurfaceVariant
                                     },
-                                    modifier = Modifier.padding(14.dp)
+                                    modifier = Modifier.padding(12.dp)
                                 )
                             }
                         }

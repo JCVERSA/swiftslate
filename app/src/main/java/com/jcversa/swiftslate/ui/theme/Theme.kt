@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import com.jcversa.swiftslate.ui.components.SlateMotionProvider
 
 /**
  * SwiftSlate's visual signature is Sparkle Lavender: a luminous, slightly violet accent
@@ -152,7 +153,8 @@ fun SwiftSlateTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = SwiftSlateTypography,
-        shapes = SwiftSlateShapes,
-        content = content
-    )
+        shapes = SwiftSlateShapes
+    ) {
+        SlateMotionProvider(content)
+    }
 }

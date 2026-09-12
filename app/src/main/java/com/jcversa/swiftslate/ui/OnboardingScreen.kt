@@ -6,6 +6,13 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -70,8 +77,11 @@ import com.jcversa.swiftslate.provider.OpenRouterConfig
 import com.jcversa.swiftslate.provider.Providers
 import com.jcversa.swiftslate.service.runTextCommand
 import com.jcversa.swiftslate.api.GeminiClient
+import com.jcversa.swiftslate.ui.components.LocalSlateMotion
 import com.jcversa.swiftslate.ui.components.LocalSlateRhythm
 import com.jcversa.swiftslate.ui.components.SlateCard
+import com.jcversa.swiftslate.ui.components.SlateMorphIcon
+import com.jcversa.swiftslate.ui.components.SlateMorphIconType
 import com.jcversa.swiftslate.ui.components.SlateTextField
 import com.jcversa.swiftslate.ui.components.SlateMark
 import kotlinx.coroutines.Dispatchers
@@ -112,6 +122,7 @@ fun OnboardingScreen(
 ) {
     val context = LocalContext.current
     val rhythm = LocalSlateRhythm.current
+    val motion = LocalSlateMotion.current
     val scope = rememberCoroutineScope()
     val openAIClient = remember { OpenAICompatibleClient() }
     val geminiClient = remember { GeminiClient() }
@@ -276,7 +287,21 @@ fun OnboardingScreen(
             }
         }
 
-        when (step) {
+        AnimatedContent(
+            targetState = step,
+            transitionSpec = {
+                if (motion.reduceMotion) {
+                    fadeIn(animationSpec = androidx.compose.animation.core.snap()) togetherWith
+                        fadeOut(animationSpec = androidx.compose.animation.core.snap())
+                } else {
+                    val direction = if (targetState > initialState) 1 else -1
+                    (slideInHorizontally(tween(300)) { direction * it / 5 } + fadeIn(tween(220))) togetherWith
+                        (slideOutHorizontally(tween(240)) { -direction * it / 5 } + fadeOut(tween(160)))
+                }
+            },
+            label = "onboarding_step"
+        ) { currentStep ->
+        when (currentStep) {
             0 -> {
                 SlateCard {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -429,7 +454,13 @@ fun OnboardingScreen(
                 SlateCard {
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Rounded.PlayArrow, null, tint = MaterialTheme.colorScheme.primary)
+                            SlateMorphIcon(
+                                type = SlateMorphIconType.LoadingSuccess,
+                                toggled = testOutput != null,
+                                tint = if (testOutput != null) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp)
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(stringResource(R.string.onboarding_test_title), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         }
@@ -459,6 +490,7 @@ fun OnboardingScreen(
                     Button(onClick = { finishSetup(false) }, enabled = testOutput != null, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.onboarding_finish)) }
                 }
             }
+        }
         }
 
         TextButton(

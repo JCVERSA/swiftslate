@@ -1,9 +1,7 @@
 package com.jcversa.swiftslate.ui.components
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.EaseOutQuad
 import androidx.compose.animation.core.tween
 import kotlinx.coroutines.delay
@@ -20,6 +18,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
+import android.view.SoundEffectConstants
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -42,13 +44,13 @@ import androidx.compose.ui.geometry.Offset
 fun Modifier.bounceClick(onClick: () -> Unit = {}): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    val motion = LocalSlateMotion.current
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     val scale by animateFloatAsState(
         // A restrained 3% press confirms the tap without making the whole control jump.
-        targetValue = if (isPressed) 0.97f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
+        targetValue = if (isPressed && !motion.reduceMotion) 0.97f else 1f,
+        animationSpec = motion.effectFloatSpec(),
         label = "press_scale"
     )
     return this
@@ -59,7 +61,14 @@ fun Modifier.bounceClick(onClick: () -> Unit = {}): Modifier {
         .clickable(
             interactionSource = interactionSource,
             indication = null,
-            onClick = onClick
+            onClick = {
+                // Feedback is deliberately confined to controls that opt into bounceClick. This
+                // gives the expressive UI a tactile and audible confirmation without making every
+                // list row or passive state change noisy.
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                view.playSoundEffect(SoundEffectConstants.CLICK)
+                onClick()
+            }
         )
 }
 
@@ -72,17 +81,24 @@ fun AnimateEntrance(
     index: Int,
     content: @Composable () -> Unit
 ) {
+    val motion = LocalSlateMotion.current
     val visible = remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        // A small stagger adds spatial order without turning every tab change into a show.
-        delay(index * 45L)
+    LaunchedEffect(Unit, motion.reduceMotion) {
+        // A small stagger adds spatial order without turning every tab change into a show. It is
+        // removed entirely when Android asks the app to reduce motion.
+        if (!motion.reduceMotion) delay(index * 45L)
         visible.value = true
     }
     AnimatedVisibility(
         visible = visible.value,
-        enter = fadeIn(animationSpec = tween(220, easing = EaseOutQuad)) +
-                slideInVertically(animationSpec = tween(220, easing = EaseOutQuad)) { 12 },
-        exit = fadeOut(animationSpec = tween(120))
+        enter = if (motion.reduceMotion) {
+            fadeIn(animationSpec = motion.transitionSpec(0))
+        } else {
+            fadeIn(animationSpec = tween(220, easing = EaseOutQuad)) +
+                slideInVertically(animationSpec = tween(220, easing = EaseOutQuad)) { 12 } +
+                scaleIn(initialScale = 0.97f, animationSpec = tween(220, easing = EaseOutQuad))
+        },
+        exit = fadeOut(animationSpec = motion.transitionSpec(120))
     ) {
         content()
     }

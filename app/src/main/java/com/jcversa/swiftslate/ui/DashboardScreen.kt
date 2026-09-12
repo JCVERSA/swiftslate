@@ -48,6 +48,8 @@ import com.jcversa.swiftslate.model.PrefKeys
 import com.jcversa.swiftslate.model.ProviderType
 import com.jcversa.swiftslate.ui.components.LocalSlateRhythm
 import com.jcversa.swiftslate.ui.components.AnimateEntrance
+import com.jcversa.swiftslate.ui.components.SlateMorphIcon
+import com.jcversa.swiftslate.ui.components.SlateMorphIconType
 import com.jcversa.swiftslate.ui.components.SlateTextField
 import com.jcversa.swiftslate.ui.components.SlateMark
 import com.jcversa.swiftslate.ui.components.bounceClick
@@ -401,16 +403,19 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                                 shape = CircleShape
                             )
                     ) {
-                        // A stable indicator is intentional: service state is information,
-                        // not a loading animation, and the dashboard is viewed frequently.
-                        Box(
-                            modifier = Modifier
-                                .size(13.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isServiceEnabled) MaterialTheme.colorScheme.tertiary
-                                    else MaterialTheme.colorScheme.error
-                                )
+                        // The state change is meaningful feedback, but it is not a continuous
+                        // pulse: the morph only runs when Android reports a different service
+                        // state and settles immediately in reduced-motion mode.
+                        SlateMorphIcon(
+                            type = SlateMorphIconType.LoadingSuccess,
+                            toggled = isServiceEnabled,
+                            tint = if (isServiceEnabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                            contentDescription = if (isServiceEnabled) {
+                                stringResource(R.string.service_status_active)
+                            } else {
+                                stringResource(R.string.service_status_inactive)
+                            },
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
@@ -837,35 +842,33 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                 )
-                                if (isSandboxProcessing) {
+                                if (isSandboxProcessing || sandboxSuccess) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(10.dp),
-                                            strokeWidth = 1.5.dp,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = stringResource(R.string.dashboard_sandbox_replacing),
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                } else if (sandboxSuccess) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.CheckCircle,
+                                        SlateMorphIcon(
+                                            type = SlateMorphIconType.LoadingSuccess,
+                                            toggled = sandboxSuccess,
+                                            tint = if (sandboxSuccess) {
+                                                MaterialTheme.colorScheme.tertiary
+                                            } else {
+                                                MaterialTheme.colorScheme.primary
+                                            },
                                             contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.tertiary,
-                                            modifier = Modifier.size(12.dp)
+                                            modifier = Modifier.size(14.dp)
                                         )
-                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Spacer(modifier = Modifier.width(5.dp))
                                         Text(
-                                            text = stringResource(R.string.dashboard_sandbox_replaced),
+                                            text = if (sandboxSuccess) {
+                                                stringResource(R.string.dashboard_sandbox_replaced)
+                                            } else {
+                                                stringResource(R.string.dashboard_sandbox_replacing)
+                                            },
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.tertiary
+                                            color = if (sandboxSuccess) {
+                                                MaterialTheme.colorScheme.tertiary
+                                            } else {
+                                                MaterialTheme.colorScheme.primary
+                                            }
                                         )
                                     }
                                 }
@@ -889,7 +892,6 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                         Button(
                             onClick = {
                                 if (!isSandboxProcessing) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     isSandboxProcessing = true
                                 }
                             },
@@ -917,7 +919,6 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                         OutlinedButton(
                             onClick = {
                                 if (!isSandboxProcessing) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     sandboxText = sandboxDemoInput
                                     sandboxSuccess = false
                                 }

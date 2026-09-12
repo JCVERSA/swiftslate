@@ -27,9 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -44,8 +42,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -64,6 +60,7 @@ import com.jcversa.swiftslate.ui.KeysScreen
 import com.jcversa.swiftslate.ui.OnboardingScreen
 import com.jcversa.swiftslate.ui.SettingsScreen
 import com.jcversa.swiftslate.model.PrefKeys
+import com.jcversa.swiftslate.ui.components.LocalSlateMotion
 import com.jcversa.swiftslate.ui.components.LocalSlateRhythm
 import com.jcversa.swiftslate.ui.components.SlateRhythm
 import com.jcversa.swiftslate.ui.theme.SwiftSlateTheme
@@ -123,18 +120,16 @@ private fun shouldShowFirstRunAssistant(context: Context): Boolean {
 @Composable
 fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
     val context = LocalContext.current
-    val haptic = LocalHapticFeedback.current
+    val motion = LocalSlateMotion.current
     var selectedTab by rememberSaveable { mutableStateOf(Tab.Dashboard) }
 
-    // Start-up app-opening fluid entrance animation
+    // Start-up app-opening fluid entrance animation. The same policy also makes this instant when
+    // Android's reduced-motion setting is active.
     val introProgress = remember { androidx.compose.animation.core.Animatable(0f) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(Unit, motion.reduceMotion) {
         introProgress.animateTo(
             targetValue = 1f,
-            animationSpec = spring(
-                dampingRatio = 0.85f, // Sweet, subtle physical springiness
-                stiffness = Spring.StiffnessLow
-            )
+            animationSpec = motion.expressiveFloatSpec()
         )
     }
 
@@ -197,10 +192,7 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
                         val isSelected = selectedTab == tab
                         val backgroundAlpha by androidx.compose.animation.core.animateFloatAsState(
                             targetValue = if (isSelected) 1f else 0f,
-                            animationSpec = spring(
-                                dampingRatio = 0.9f,
-                                stiffness = Spring.StiffnessMediumLow
-                            ),
+                            animationSpec = motion.spatialFloatSpec(),
                             label = "tab_background"
                         )
                         val iconColor = if (isSelected) {
@@ -208,6 +200,16 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         }
+                        val iconScale by androidx.compose.animation.core.animateFloatAsState(
+                            targetValue = if (isSelected) 1f else 0.92f,
+                            animationSpec = motion.spatialFloatSpec(),
+                            label = "tab_icon_scale"
+                        )
+                        val iconRotation by androidx.compose.animation.core.animateFloatAsState(
+                            targetValue = if (isSelected) 0f else -4f,
+                            animationSpec = motion.spatialFloatSpec(),
+                            label = "tab_icon_rotation"
+                        )
                         val containerColor = MaterialTheme.colorScheme.primaryContainer
 
                         Box(
@@ -216,10 +218,7 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
                                 .clip(RoundedCornerShape(20.dp))
                                 .background(containerColor.copy(alpha = backgroundAlpha))
                                 .bounceClick {
-                                    if (selectedTab != tab) {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        selectedTab = tab
-                                    }
+                                    if (selectedTab != tab) selectedTab = tab
                                 }
                                 .padding(horizontal = 2.dp, vertical = 7.dp),
                             contentAlignment = Alignment.Center
@@ -232,7 +231,13 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
                                     imageVector = tab.icon,
                                     contentDescription = null,
                                     tint = iconColor,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .graphicsLayer {
+                                            scaleX = iconScale
+                                            scaleY = iconScale
+                                            rotationZ = iconRotation
+                                        }
                                 )
                                 Text(
                                     text = stringResource(tab.titleRes),
@@ -265,16 +270,21 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
             targetState = selectedTab,
             modifier = Modifier.padding(innerPadding),
             transitionSpec = {
-                val direction = if (targetState.ordinal > initialState.ordinal)
-                    AnimatedContentTransitionScope.SlideDirection.Left
-                else
-                    AnimatedContentTransitionScope.SlideDirection.Right
-                // Strong ease-out: the destination becomes readable immediately, then
-                // settles quickly instead of making tab navigation feel like a carousel.
-                val duration = 220
-                val tabEase = CubicBezierEasing(0.23f, 1f, 0.32f, 1f)
-                (slideIntoContainer(direction, tween(duration, easing = tabEase)) + fadeIn(tween(duration))) togetherWith
-                    (slideOutOfContainer(direction, tween(duration, easing = tabEase)) + fadeOut(tween(duration)))
+                if (motion.reduceMotion) {
+                    fadeIn(animationSpec = androidx.compose.animation.core.snap()) togetherWith
+                        fadeOut(animationSpec = androidx.compose.animation.core.snap())
+                } else {
+                    val direction = if (targetState.ordinal > initialState.ordinal)
+                        AnimatedContentTransitionScope.SlideDirection.Left
+                    else
+                        AnimatedContentTransitionScope.SlideDirection.Right
+                    // Strong ease-out: the destination becomes readable immediately, then
+                    // settles quickly instead of making tab navigation feel like a carousel.
+                    val duration = 220
+                    val tabEase = CubicBezierEasing(0.23f, 1f, 0.32f, 1f)
+                    (slideIntoContainer(direction, tween(duration, easing = tabEase)) + fadeIn(tween(duration))) togetherWith
+                        (slideOutOfContainer(direction, tween(duration, easing = tabEase)) + fadeOut(tween(duration)))
+                }
             },
             label = "tab_transition"
         ) { tab ->
@@ -295,21 +305,28 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
 @Composable
 fun SwiftSlateSplashScreen(onDismiss: () -> Unit) {
     val colors = MaterialTheme.colorScheme
+    val motion = LocalSlateMotion.current
     val scale = remember { androidx.compose.animation.core.Animatable(0.7f) }
     val pathProgress = remember { androidx.compose.animation.core.Animatable(0f) }
     val glowRadius = remember { androidx.compose.animation.core.Animatable(0f) }
     val textAlpha = remember { androidx.compose.animation.core.Animatable(0f) }
     val dismissProgress = remember { androidx.compose.animation.core.Animatable(1f) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(Unit, motion.reduceMotion) {
+        if (motion.reduceMotion) {
+            // Reduced motion keeps the same brand mark and content, but does not make the user
+            // wait through a decorative sequence before reaching the workspace.
+            scale.snapTo(1f)
+            pathProgress.snapTo(1f)
+            glowRadius.snapTo(150f)
+            textAlpha.snapTo(1f)
+            dismissProgress.snapTo(0f)
+            onDismiss()
+            return@LaunchedEffect
+        }
+
         // Step 1: Scale/bounce in the central terminal node
-        scale.animateTo(
-            targetValue = 1f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow
-            )
-        )
+        scale.animateTo(targetValue = 1f, animationSpec = motion.expressiveFloatSpec())
         // Step 2: Draw the terminal symbol outline
         pathProgress.animateTo(
             targetValue = 1f,
@@ -325,7 +342,6 @@ fun SwiftSlateSplashScreen(onDismiss: () -> Unit) {
             targetValue = 1f,
             animationSpec = tween(400)
         )
-        // Wait for aesthetic flow
         delay(700)
         // Step 5: Slide up and fade out into the active workspace
         dismissProgress.animateTo(

@@ -10,7 +10,6 @@ import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -30,7 +29,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -56,7 +54,10 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.jcversa.swiftslate.R
 import com.jcversa.swiftslate.model.Command
 import com.jcversa.swiftslate.ui.components.SlateCard
+import com.jcversa.swiftslate.ui.components.LocalSlateMotion
 import com.jcversa.swiftslate.ui.components.SlateItemCard
+import com.jcversa.swiftslate.ui.components.SlateMorphIcon
+import com.jcversa.swiftslate.ui.components.SlateMorphIconType
 import com.jcversa.swiftslate.ui.components.SlateToast
 import com.jcversa.swiftslate.ui.components.SlateToastTokens
 import com.jcversa.swiftslate.ui.theme.SwiftSlateTheme
@@ -189,6 +190,7 @@ private fun ProcessTextSheet(
     onDismiss: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
+    val motion = LocalSlateMotion.current
 
     // Built before the sheet so the command list is known at first composition; opening at the
     // height of an empty list and growing afterwards is what made the entrance stutter.
@@ -203,7 +205,7 @@ private fun ProcessTextSheet(
                 .padding(bottom = 24.dp)
                 // Picker -> loading -> result are different heights; animate between them with
                 // the same 250ms the rest of the app uses instead of snapping.
-                .animateContentSize(tween(ANIM_MS))
+                .animateContentSize(motion.sizeTransitionSpec(ANIM_MS))
         ) {
             Text(
                 text = stringResource(R.string.process_text_title),
@@ -226,7 +228,13 @@ private fun ProcessTextSheet(
                 }
                 is UiState.Loading -> SlateCard {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        SlateMorphIcon(
+                            type = SlateMorphIconType.LoadingSuccess,
+                            toggled = false,
+                            tint = MaterialTheme.colorScheme.primary,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
                         Spacer(Modifier.width(12.dp))
                         Text(
                             text = s.command.trigger,
