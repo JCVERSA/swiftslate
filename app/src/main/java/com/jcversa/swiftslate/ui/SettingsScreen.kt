@@ -67,6 +67,9 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     var batteryOptimizationExempt by remember {
         mutableStateOf(BackgroundReliability.isBatteryOptimizationExempt(context))
     }
+    var privacyMode by remember {
+        mutableStateOf(prefs.getBoolean(PrefKeys.PRIVACY_MODE, false))
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -974,8 +977,74 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
 
         Spacer(modifier = Modifier.height(rhythm.cardGap))
 
-        // Card 4: Backup Vault
+        // Card 4: Privacy mode
         AnimateEntrance(index = 4) {
+            SlateCard {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Lock,
+                        contentDescription = null,
+                        tint = if (privacyMode) {
+                            MaterialTheme.colorScheme.tertiary
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.settings_privacy_title),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = stringResource(R.string.settings_privacy_desc),
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = privacyMode,
+                        onCheckedChange = { enabled ->
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            privacyMode = enabled
+                            prefs.edit().putBoolean(PrefKeys.PRIVACY_MODE, enabled).apply()
+                        }
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(
+                        if (privacyMode) {
+                            R.string.settings_privacy_enabled
+                        } else {
+                            R.string.settings_privacy_disabled
+                        }
+                    ),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (privacyMode) {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.padding(horizontal = 2.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(rhythm.cardGap))
+
+        // Card 5: Backup Vault
+        AnimateEntrance(index = 5) {
             SlateCard {
                 Column(modifier = Modifier.padding(2.dp)) {
                 Row(

@@ -40,6 +40,9 @@ object PrefKeys {
     /** Epoch millis when structured output was last disabled (0 = never). */
     const val STRUCTURED_OUTPUT_DISABLED_AT = "structured_output_disabled_at"
 
+    /** Whether AI requests are disabled while local text replacers remain available. */
+    const val PRIVACY_MODE = "privacy_mode"
+
     /** Whether the first-run setup assistant has been completed or dismissed. */
     const val ONBOARDING_COMPLETED = "onboarding_completed"
 }

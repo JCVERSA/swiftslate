@@ -91,6 +91,13 @@ suspend fun runTextCommand(
     }
 
     val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    if (prefs.getBoolean(PrefKeys.PRIVACY_MODE, false)) {
+        // Text replacer commands never enter this function, so privacy mode keeps all local
+        // commands available while making the no-network guarantee explicit for every AI entry
+        // point (typed trigger, text-selection action, and command preview).
+        return CommandOutcome.Unavailable(context.getString(R.string.privacy_mode_blocked))
+    }
+
     val provider = Providers.forType(prefs.getString(PrefKeys.PROVIDER_TYPE, null))
     val providerType = provider.type
     val model = provider.sanitizeModel(prefs.getString(provider.modelPrefKey, provider.defaultModel))

@@ -259,6 +259,11 @@
     <string name="settings_reliability_ready" tools:ignore="MissingTranslation">Accessibility and battery settings look ready.</string>
     <string name="settings_reliability_open_accessibility" tools:ignore="MissingTranslation">Enable accessibility</string>
     <string name="settings_reliability_open_battery" tools:ignore="MissingTranslation">Open battery settings</string>
+    <string name="settings_privacy_title" tools:ignore="MissingTranslation">Privacy mode</string>
+    <string name="settings_privacy_desc" tools:ignore="MissingTranslation">Disable every AI network request. Local text replacers continue to work.</string>
+    <string name="settings_privacy_enabled" tools:ignore="MissingTranslation">Private: no text is sent to an AI provider.</string>
+    <string name="settings_privacy_disabled" tools:ignore="MissingTranslation">AI commands may use your configured provider.</string>
+    <string name="privacy_mode_blocked" tools:ignore="MissingTranslation">Privacy mode is enabled. AI commands are blocked; local replacements still work.</string>
     <string name="service_reliability_channel_name" tools:ignore="MissingTranslation">Service reliability</string>
     <string name="service_reliability_channel_desc" tools:ignore="MissingTranslation">Alerts when SwiftSlate needs a system setting to stay available.</string>
     <string name="service_reliability_notification_title" tools:ignore="MissingTranslation">Keep SwiftSlate available</string>

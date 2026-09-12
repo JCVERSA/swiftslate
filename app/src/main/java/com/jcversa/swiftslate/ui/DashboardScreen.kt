@@ -107,6 +107,12 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
     var isServiceEnabled by remember { mutableStateOf(checkServiceEnabled(context)) }
     var keyCount by remember { mutableIntStateOf(0) }
     var showKilledBanner by remember { mutableStateOf(false) }
+    var privacyMode by remember {
+        mutableStateOf(
+            context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                .getBoolean(PrefKeys.PRIVACY_MODE, false)
+        )
+    }
     var showOnboardingReminder by remember {
         mutableStateOf(
             context.getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -150,6 +156,8 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
             favoriteCommand = statsManager.favoriteCommand
             dailyCounts = statsManager.dailyCounts()
             showKilledBanner = killed
+            privacyMode = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                .getBoolean(PrefKeys.PRIVACY_MODE, false)
             BackgroundReliability.refreshRecoveryNotification(context)
         }
     }
@@ -207,6 +215,41 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+        }
+
+        if (privacyMode) {
+            AnimateEntrance(index = 1) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = rhythm.cardGap),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.22f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.35f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Lock,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(9.dp))
+                        Text(
+                            text = stringResource(R.string.settings_privacy_enabled),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
             }
         }

@@ -209,6 +209,11 @@
     <string name="settings_reliability_ready">Les réglages d\'accessibilité et de batterie semblent corrects.</string>
     <string name="settings_reliability_open_accessibility">Activer l\'accessibilité</string>
     <string name="settings_reliability_open_battery">Ouvrir les réglages de batterie</string>
+    <string name="settings_privacy_title">Mode confidentialité</string>
+    <string name="settings_privacy_desc">Désactive toutes les requêtes IA. Les remplacements locaux continuent de fonctionner.</string>
+    <string name="settings_privacy_enabled">Privé : aucun texte n\'est envoyé à un fournisseur IA.</string>
+    <string name="settings_privacy_disabled">Les commandes IA peuvent utiliser votre fournisseur configuré.</string>
+    <string name="privacy_mode_blocked">Le mode confidentialité est activé. Les commandes IA sont bloquées, mais les remplacements locaux fonctionnent toujours.</string>
     <string name="service_reliability_channel_name">Fiabilité du service</string>
     <string name="service_reliability_channel_desc">Avertit lorsqu\'un réglage système est nécessaire pour garder SwiftSlate disponible.</string>
     <string name="service_reliability_notification_title">Garder SwiftSlate disponible</string>
