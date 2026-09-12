@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">これにより、既存のカスタムコマンドがすべて置き換えられます。続行しますか？</string>
     <string name="backup_import_cancel">キャンセル</string>
     <string name="settings_check_updates">アップデートを確認</string>
-    <string name="settings_made_by">Musheer Alam によって愛情を込めて作られました</string>
+    <string name="settings_made_by">JCVERSA によって愛情を込めて作られました</string>
     <string name="settings_sponsor">GitHub でスポンサーになる</string>
     <string name="commands_collapse">折りたたむ</string>
     <string name="commands_expand">展開する</string>

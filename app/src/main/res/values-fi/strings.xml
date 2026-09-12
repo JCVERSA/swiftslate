@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">Tämä korvaa kaikki olemassa olevat mukautetut komentosi. Jatketaanko?</string>
     <string name="backup_import_cancel">Peruuta</string>
     <string name="settings_check_updates">Tarkista päivitykset</string>
-    <string name="settings_made_by">Tehty rakkaudella Musheer Alamin toimesta</string>
+    <string name="settings_made_by">Tehty rakkaudella JCVERSAin toimesta</string>
     <string name="settings_sponsor">Sponsoroi GitHubissa</string>
     <string name="commands_collapse">Sulje</string>
     <string name="commands_expand">Laajenna</string>

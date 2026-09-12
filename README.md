@@ -19,26 +19,22 @@ Type a trigger like **`?fix`** at the end of any text, in any app, and watch it 
 [![Gemini](https://img.shields.io/badge/Gemini_AI-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white)](#-supported-ai-providers)
 [![License: MIT](https://img.shields.io/badge/MIT-blue?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](LICENSE)
 
-[![Latest Release](https://img.shields.io/github/v/release/Musheer360/SwiftSlate?style=flat-square&label=Latest&color=brightgreen)](https://github.com/Musheer360/SwiftSlate/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/Musheer360/SwiftSlate/total?style=flat-square&label=Downloads&color=brightgreen)](https://github.com/Musheer360/SwiftSlate/releases)
-[![F-Droid](https://img.shields.io/f-droid/v/com.musheer360.swiftslate?style=flat-square)](https://f-droid.org/en/packages/com.musheer360.swiftslate/)
-[![GitHub Stars](https://img.shields.io/github/stars/Musheer360/SwiftSlate?style=flat-square&color=yellow)](https://github.com/Musheer360/SwiftSlate/stargazers)
+[![Latest Release](https://img.shields.io/github/v/release/JCVERSA/swiftslate?style=flat-square&label=Latest&color=brightgreen)](https://github.com/JCVERSA/swiftslate/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/JCVERSA/swiftslate/total?style=flat-square&label=Downloads&color=brightgreen)](https://github.com/JCVERSA/swiftslate/releases)
+[![GitHub Stars](https://img.shields.io/github/stars/JCVERSA/swiftslate?style=flat-square&color=yellow)](https://github.com/JCVERSA/swiftslate/stargazers)
 [![APK Size](https://img.shields.io/badge/APK_Size-~1.7_MB-blue?style=flat-square)](#)
-[![Build](https://img.shields.io/github/actions/workflow/status/Musheer360/SwiftSlate/build.yml?branch=master&style=flat-square&label=CI)](https://github.com/Musheer360/SwiftSlate/actions/workflows/build.yml)
+[![Build](https://img.shields.io/github/actions/workflow/status/JCVERSA/swiftslate/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/JCVERSA/swiftslate/actions/workflows/ci.yml)
 
 <br>
 
-<a href="https://trendshift.io/repositories/25274?utm_source=repository-badge&utm_medium=badge&utm_campaign=badge-repository-25274" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/25274" alt="Musheer360/SwiftSlate | Trendshift" width="250" height="55"/></a>
-<a href="https://trendshift.io/repositories/25274?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-25274" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/25274/daily?language=Kotlin" alt="Musheer360/SwiftSlate | Trendshift" width="250" height="55"/></a>
-<a href="https://trendshift.io/repositories/25274?utm_source=trendshift-badge&utm_medium=badge&utm_campaign=badge-trendshift-25274" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/25274/weekly?language=Kotlin" alt="Musheer360/SwiftSlate | Trendshift" width="250" height="55"/></a>
 
 <br>
 
-[<img src="https://img.shields.io/badge/⬇_Download_APK-282828?style=for-the-badge" alt="Download APK" height="36">](https://github.com/Musheer360/SwiftSlate/releases/latest)
+[<img src="https://img.shields.io/badge/⬇_Download_APK-282828?style=for-the-badge" alt="Download APK" height="36">](https://github.com/JCVERSA/swiftslate/releases/latest)
 &nbsp;&nbsp;
-[<img src="https://img.shields.io/badge/🐛_Report_Bug-282828?style=for-the-badge" alt="Report Bug" height="36">](https://github.com/Musheer360/SwiftSlate/issues)
+[<img src="https://img.shields.io/badge/🐛_Report_Bug-282828?style=for-the-badge" alt="Report Bug" height="36">](https://github.com/JCVERSA/swiftslate/issues)
 &nbsp;&nbsp;
-[<img src="https://img.shields.io/badge/💡_Request_Feature-282828?style=for-the-badge" alt="Request Feature" height="36">](https://github.com/Musheer360/SwiftSlate/issues)
+[<img src="https://img.shields.io/badge/💡_Request_Feature-282828?style=for-the-badge" alt="Request Feature" height="36">](https://github.com/JCVERSA/swiftslate/issues)
 
 <br>
 
@@ -244,13 +240,9 @@ Beyond AI, you can create **text replacer commands** that run **entirely offline
 > [!TIP]
 > The APK is only ~1.4 MB — lightweight with zero external dependencies for networking or JSON.
 
-**Option 1 — F-Droid:**
+**Install from GitHub Releases:**
 
-[<img src="https://f-droid.org/badge/get-it-on.png" alt="Get it on F-Droid" height="80">](https://f-droid.org/en/packages/com.musheer360.swiftslate/)
-
-**Option 2 — GitHub Releases:**
-
-**1.** Download the latest APK from the [**Releases**](https://github.com/Musheer360/SwiftSlate/releases/latest) page
+**1.** Download the latest APK from the [**Releases**](https://github.com/JCVERSA/swiftslate/releases/latest) page
 
 **2.** Install the APK on your device (allow installation from unknown sources if prompted)
 
@@ -553,7 +545,7 @@ Adding a translation is a single directory: drop `values-<locale>/strings.xml` i
 ## 🏛️ Architecture
 
 ```
-com.musheer360.swiftslate/
+com.jcversa.swiftslate/
 ├── service/
 │   ├── AssistantService.kt      # Core accessibility service — event listening, trigger
 │   │                            # detection, text replacement, undo, inline spinner
@@ -620,7 +612,7 @@ com.musheer360.swiftslate/
 
 ```bash
 # Clone the repository
-git clone https://github.com/Musheer360/SwiftSlate.git
+git clone https://github.com/JCVERSA/swiftslate.git
 cd SwiftSlate
 
 # Build debug APK
@@ -657,7 +649,7 @@ export KEY_PASSWORD=your_key_password
 
 Every pull request builds a **preview APK** you can install side by side with a stable release.
 
-It ships as a separate app — applicationId `com.musheer360.swiftslate.preview`, shown on your launcher as **SwiftSlate Preview** — so installing it never replaces your stable build and never touches its API keys, commands, stats or accessibility setting. Both appear as separate entries under Settings → Accessibility, and you can enable whichever you want to test.
+It ships as a separate app — applicationId `com.jcversa.swiftslate.preview`, shown on your launcher as **SwiftSlate Preview** — so installing it never replaces your stable build and never touches its API keys, commands, stats or accessibility setting. Both appear as separate entries under Settings → Accessibility, and you can enable whichever you want to test.
 
 1. Open the pull request's **Checks** tab and pick the latest **Build & Release** run
 2. Download the `SwiftSlate-preview-prNNN` artifact from the **Artifacts** section
@@ -727,7 +719,7 @@ SwiftSlate is made possible by the generous support of its sponsors. Thank you!
 </tr>
 </table>
 
-Want to see your name here? [**Become a sponsor →**](https://github.com/sponsors/Musheer360)
+Want to see your name here? [**Become a sponsor →**](https://github.com/sponsors/JCVERSA)
 
 <br>
 
@@ -736,7 +728,7 @@ Want to see your name here? [**Become a sponsor →**](https://github.com/sponso
 SwiftSlate is free, open source, and built in my spare time. If it's useful to you, consider supporting its development:
 
 - ⭐ **Star this repo** — it helps others discover SwiftSlate
-- 💖 [**Sponsor on GitHub**](https://github.com/sponsors/Musheer360) — even a small contribution keeps the project going
+- 💖 [**Sponsor on GitHub**](https://github.com/sponsors/JCVERSA) — even a small contribution keeps the project going
 
 <br>
 
@@ -750,11 +742,11 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 <div align="center">
 
-<a href="https://star-history.dera.page/#Musheer360/SwiftSlate&Date">
+<a href="https://star-history.dera.page/#JCVERSA/swiftslate&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=Musheer360/SwiftSlate&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=Musheer360/SwiftSlate&type=Date" />
-    <img alt="Star History Chart" src="https://star-history.dera.page/svg?repos=Musheer360/SwiftSlate&type=Date" width="600" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=JCVERSA/swiftslate&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=JCVERSA/swiftslate&type=Date" />
+    <img alt="Star History Chart" src="https://star-history.dera.page/svg?repos=JCVERSA/swiftslate&type=Date" width="600" />
   </picture>
 </a>
 
@@ -768,7 +760,7 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 <br>
 
-Made with ❤️ by [**Musheer Alam**](https://github.com/Musheer360)
+Made with ❤️ by [**JCVERSA**](https://github.com/JCVERSA) — based on [SwiftSlate by Musheer Alam](https://github.com/Musheer360/SwiftSlate)
 
 If SwiftSlate makes your typing life easier, consider giving it a ⭐
 

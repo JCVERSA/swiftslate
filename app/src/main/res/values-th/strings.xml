@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">การดำเนินการนี้จะแทนที่คำสั่งที่กำหนดเองที่มีอยู่ทั้งหมดของคุณ ดำเนินการต่อ?</string>
     <string name="backup_import_cancel">ยกเลิก</string>
     <string name="settings_check_updates">ตรวจสอบอัปเดต</string>
-    <string name="settings_made_by">สร้างด้วยความรักโดย Musheer Alam</string>
+    <string name="settings_made_by">สร้างด้วยความรักโดย JCVERSA</string>
     <string name="settings_sponsor">สนับสนุนบน GitHub</string>
     <string name="commands_collapse">ยุบ</string>
     <string name="commands_expand">ขยาย</string>

@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">Ez az összes meglévő egyéni parancsot lecseréli. Folytatja?</string>
     <string name="backup_import_cancel">Mégse</string>
     <string name="settings_check_updates">Frissítések keresése</string>
-    <string name="settings_made_by">Szeretettel készítette Musheer Alam</string>
+    <string name="settings_made_by">Szeretettel készítette JCVERSA</string>
     <string name="settings_sponsor">Támogatás a GitHubon</string>
     <string name="commands_collapse">Összecsuk</string>
     <string name="commands_expand">Kibont</string>

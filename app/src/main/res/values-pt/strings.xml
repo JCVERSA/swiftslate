@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">Isto irá substituir todos os seus comandos personalizados existentes. Continuar?</string>
     <string name="backup_import_cancel">Cancelar</string>
     <string name="settings_check_updates">Verificar atualizações</string>
-    <string name="settings_made_by">Feito com amor por Musheer Alam</string>
+    <string name="settings_made_by">Feito com amor por JCVERSA</string>
     <string name="settings_sponsor">Patrocine no GitHub</string>
     <string name="commands_collapse">Recolher</string>
     <string name="commands_expand">Expandir</string>

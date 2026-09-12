@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">این کار تمام دستورات سفارشی موجود شما را جایگزین می‌کند. ادامه می‌دهید؟</string>
     <string name="backup_import_cancel">لغو</string>
     <string name="settings_check_updates">بررسی به‌روزرسانی</string>
-    <string name="settings_made_by">ساخته شده با عشق توسط Musheer Alam</string>
+    <string name="settings_made_by">ساخته شده با عشق توسط JCVERSA</string>
     <string name="settings_sponsor">حمایت در GitHub</string>
     <string name="commands_collapse">جمع کردن</string>
     <string name="commands_expand">باز کردن</string>

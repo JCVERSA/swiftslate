@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">이 작업은 기존 사용자 지정 명령어를 모두 대체합니다. 계속하시겠습니까?</string>
     <string name="backup_import_cancel">취소</string>
     <string name="settings_check_updates">업데이트 확인</string>
-    <string name="settings_made_by">Musheer Alam이 사랑을 담아 제작</string>
+    <string name="settings_made_by">JCVERSA이 사랑을 담아 제작</string>
     <string name="settings_sponsor">GitHub에서 후원</string>
     <string name="commands_collapse">접기</string>
     <string name="commands_expand">펼치기</string>

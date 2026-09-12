@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">Thao tác này sẽ thay thế tất cả lệnh tùy chỉnh hiện có của bạn. Tiếp tục?</string>
     <string name="backup_import_cancel">Hủy</string>
     <string name="settings_check_updates">Kiểm tra cập nhật</string>
-    <string name="settings_made_by">Được tạo với tình yêu bởi Musheer Alam</string>
+    <string name="settings_made_by">Được tạo với tình yêu bởi JCVERSA</string>
     <string name="settings_sponsor">Tài trợ trên GitHub</string>
     <string name="commands_collapse">Thu gọn</string>
     <string name="commands_expand">Mở rộng</string>

@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">سيؤدي هذا إلى استبدال جميع أوامرك المخصصة الحالية. هل ترغب في المتابعة؟</string>
     <string name="backup_import_cancel">إلغاء</string>
     <string name="settings_check_updates">التحقق من التحديثات</string>
-    <string name="settings_made_by">صُنع بحب بواسطة Musheer Alam</string>
+    <string name="settings_made_by">صُنع بحب بواسطة JCVERSA</string>
     <string name="settings_sponsor">دعم على GitHub</string>
     <string name="commands_collapse">طي</string>
     <string name="commands_expand">توسيع</string>

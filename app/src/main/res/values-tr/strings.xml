@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">Bu, mevcut tüm özel komutlarınızı değiştirecektir. Devam etmek istiyor musunuz?</string>
     <string name="backup_import_cancel">İptal</string>
     <string name="settings_check_updates">Güncellemeleri kontrol et</string>
-    <string name="settings_made_by">Musheer Alam tarafından sevgiyle yapıldı</string>
+    <string name="settings_made_by">JCVERSA tarafından sevgiyle yapıldı</string>
     <string name="settings_sponsor">GitHub\'da destekle</string>
     <string name="commands_collapse">Daralt</string>
     <string name="commands_expand">Genişlet</string>

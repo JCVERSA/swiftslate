@@ -77,7 +77,7 @@
     <string name="backup_import_confirm">This will replace all your existing custom commands. Continue?</string>
     <string name="backup_import_cancel">Cancel</string>
     <string name="settings_check_updates">Check for updates</string>
-    <string name="settings_made_by">Made with love by Musheer Alam</string>
+    <string name="settings_made_by">Made with love by JCVERSA, based on SwiftSlate by Musheer Alam</string>
     <string name="settings_sponsor">Sponsor on GitHub</string>
     <string name="commands_collapse">Collapse</string>
     <string name="commands_expand">Expand</string>

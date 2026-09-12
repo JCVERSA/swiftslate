@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">Spowoduje to zastąpienie wszystkich istniejących poleceń niestandardowych. Kontynuować?</string>
     <string name="backup_import_cancel">Anuluj</string>
     <string name="settings_check_updates">Sprawdź aktualizacje</string>
-    <string name="settings_made_by">Wykonane z miłością przez Musheer Alam</string>
+    <string name="settings_made_by">Wykonane z miłością przez JCVERSA</string>
     <string name="settings_sponsor">Sponsoruj na GitHub</string>
     <string name="commands_collapse">Zwiń</string>
     <string name="commands_expand">Rozwiń</string>

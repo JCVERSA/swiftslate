@@ -78,7 +78,7 @@
     <string name="backup_import_confirm">这将替换您所有现有的自定义命令。是否继续？</string>
     <string name="backup_import_cancel">取消</string>
     <string name="settings_check_updates">检查更新</string>
-    <string name="settings_made_by">由 Musheer Alam 用心制作</string>
+    <string name="settings_made_by">由 JCVERSA 用心制作</string>
     <string name="settings_sponsor">在 GitHub 上赞助</string>
     <string name="commands_collapse">收起</string>
     <string name="commands_expand">展开</string>
