@@ -33,8 +33,9 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.verticalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -53,6 +54,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -132,7 +135,6 @@ fun OnboardingScreen(
     onComplete: () -> Unit
 ) {
     val context = LocalContext.current
-    val rhythm = LocalSlateRhythm.current
     val motion = LocalSlateMotion.current
     val scope = rememberCoroutineScope()
     val openAIClient = remember { OpenAICompatibleClient() }
@@ -440,7 +442,8 @@ private fun OnboardingHeader(step: Int, totalSteps: Int) {
                 .align(Alignment.Center)
                 .fillMaxWidth()
                 .widthIn(max = 760.dp)
-                .padding(horizontal = rhythm.screenPaddingH, top = 16.dp, bottom = 8.dp)
+                .padding(horizontal = rhythm.screenPaddingH)
+                .padding(top = 16.dp, bottom = 8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
