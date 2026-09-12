@@ -47,7 +47,7 @@
     <string name="commands_alias_add">Ajouter l’alias</string>
     <string name="commands_alias_remove">Supprimer l’alias</string>
     <string name="commands_aliases_heading">Alias</string>
-    <string name="commands_alias_error_prefix">L’alias doit commencer par '%1$s'</string>
+    <string name="commands_alias_error_prefix">L’alias doit commencer par \'%1$s\'</string>
     <string name="commands_alias_error_duplicate">Cet alias est déjà utilisé</string>
     <string name="commands_alias_error_limit">Vous pouvez ajouter jusqu’à cinq alias</string>
     <string name="commands_alias_error_invalid">Alias invalide ou trop long</string>
