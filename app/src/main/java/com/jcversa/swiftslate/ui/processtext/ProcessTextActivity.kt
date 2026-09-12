@@ -377,7 +377,7 @@ private fun QuickActions(commands: List<Command>, onPick: (Command) -> Unit) {
     val actions = quickDefinitions.mapNotNull { (name, label) ->
         commands.firstOrNull {
             it.type == com.jcversa.swiftslate.model.CommandType.AI &&
-                it.trigger.drop(1) == name
+                (it.trigger.drop(1) == name || it.aliases.any { alias -> alias.drop(1) == name })
         }?.let { command -> command to label }
     }
     if (actions.isEmpty()) return

@@ -9,6 +9,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -74,6 +76,8 @@ fun CommandsScreen(commandManager: CommandManager) {
     }
     var trigger by rememberSaveable { mutableStateOf("") }
     var prompt by rememberSaveable { mutableStateOf("") }
+    var aliasInput by remember { mutableStateOf("") }
+    var aliases by remember { mutableStateOf<List<String>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var selectedType by rememberSaveable { mutableStateOf(CommandType.AI) }
     var editingTrigger by rememberSaveable { mutableStateOf<String?>(null) }
@@ -88,11 +92,34 @@ fun CommandsScreen(commandManager: CommandManager) {
     val errorDuplicateMsg = stringResource(R.string.commands_error_duplicate)
     val errorConflictTemplate = stringResource(R.string.commands_error_conflict, "\u0000")
     val errorEmptyTrigger = stringResource(R.string.commands_error_empty_trigger)
+    val aliasPrefixError = stringResource(R.string.commands_alias_error_prefix, prefix)
+    val aliasDuplicateError = stringResource(R.string.commands_alias_error_duplicate)
+    val aliasLimitError = stringResource(R.string.commands_alias_error_limit)
+    val aliasInvalidError = stringResource(R.string.commands_alias_error_invalid)
     val collapseLabel = stringResource(R.string.commands_collapse)
     val expandLabel = stringResource(R.string.commands_expand)
     val previewDefaultInput = stringResource(R.string.commands_preview_default_input)
     val previewUnavailable = stringResource(R.string.commands_preview_unavailable)
     val previewTimeout = stringResource(R.string.commands_preview_timeout)
+
+    fun addAlias() {
+        val alias = aliasInput.trim()
+        when {
+            alias.isBlank() -> return
+            !alias.startsWith(prefix) || alias.length <= prefix.length -> errorMessage = aliasPrefixError
+            alias.length > CommandManager.MAX_ALIAS_LENGTH -> errorMessage = aliasInvalidError
+            aliases.size >= CommandManager.MAX_ALIASES -> errorMessage = aliasLimitError
+            alias == trigger.trim() || aliases.contains(alias) -> errorMessage = aliasDuplicateError
+            commands.any { command ->
+                command.trigger == alias || command.aliases.contains(alias)
+            } -> errorMessage = aliasDuplicateError
+            else -> {
+                aliases = aliases + alias
+                aliasInput = ""
+                errorMessage = null
+            }
+        }
+    }
 
     fun previewCommand() {
         val sample = previewInput.trim().ifBlank { previewDefaultInput }
@@ -147,7 +174,8 @@ fun CommandsScreen(commandManager: CommandManager) {
     val filteredCommands = remember(displayCommands, searchQuery, selectedFilterTab) {
         val baseList = displayCommands.filter {
             if (searchQuery.isBlank()) true
-            else it.trigger.contains(searchQuery, ignoreCase = true)
+            else it.trigger.contains(searchQuery, ignoreCase = true) ||
+                it.aliases.any { alias -> alias.contains(searchQuery, ignoreCase = true) }
         }
         when (selectedFilterTab) {
             1 -> baseList.filter { it.type == CommandType.AI }
@@ -416,6 +444,8 @@ fun CommandsScreen(commandManager: CommandManager) {
                                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                         trigger = cmd.trigger
                                                         prompt = cmd.prompt
+                                                        aliases = cmd.aliases
+                                                        aliasInput = ""
                                                         selectedType = cmd.type
                                                         editingTrigger = cmd.trigger
                                                         errorMessage = null
@@ -502,6 +532,23 @@ fun CommandsScreen(commandManager: CommandManager) {
                                                         color = MaterialTheme.colorScheme.onSurface
                                                     )
                                                 }
+                                            }
+                                            if (cmd.aliases.isNotEmpty()) {
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                Text(
+                                                    text = stringResource(R.string.commands_aliases_heading),
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    letterSpacing = 1.sp
+                                                )
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    text = cmd.aliases.joinToString("  "),
+                                                    fontSize = 12.sp,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
                                             }
                                         }
                                     }
@@ -628,6 +675,71 @@ fun CommandsScreen(commandManager: CommandManager) {
                         singleLine = true
                     )
                     Spacer(modifier = Modifier.height(rhythm.formGap))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SlateTextField(
+                            value = aliasInput,
+                            onValueChange = {
+                                aliasInput = it.take(CommandManager.MAX_ALIAS_LENGTH)
+                                errorMessage = null
+                            },
+                            label = { Text(stringResource(R.string.commands_alias_label)) },
+                            placeholder = { Text(stringResource(R.string.commands_alias_placeholder, prefix)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = { addAlias() },
+                            enabled = aliasInput.isNotBlank(),
+                            modifier = Modifier.padding(start = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.AddCircle,
+                                contentDescription = stringResource(R.string.commands_alias_add),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    if (aliases.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(top = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            aliases.forEach { alias ->
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = alias,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(start = 8.dp, top = 5.dp, bottom = 5.dp)
+                                        )
+                                        IconButton(
+                                            onClick = { aliases = aliases - alias },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Close,
+                                                contentDescription = stringResource(R.string.commands_alias_remove),
+                                                modifier = Modifier.size(14.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(rhythm.formGap))
                     SlateTextField(
                         value = prompt,
                         onValueChange = {
@@ -702,6 +814,8 @@ fun CommandsScreen(commandManager: CommandManager) {
                             onClick = {
                                 trigger = ""
                                 prompt = ""
+                                aliasInput = ""
+                                aliases = emptyList()
                                 errorMessage = null
                                 previewOutput = null
                                 previewError = null
@@ -739,19 +853,37 @@ fun CommandsScreen(commandManager: CommandManager) {
                                     errorMessage = errorConflictTemplate.replace("\u0000", conflicting.trigger)
                                     return@Button
                                 }
-                                if (!CommandManager.isValidCommand(trimmedTrigger, prompt.trim(), prefix)) {
-                                    errorMessage = errorEmptyTrigger
+                                val newTriggers = listOf(trimmedTrigger) + aliases
+                                val conflictingAlias = commands.firstOrNull { command ->
+                                    if (command.trigger == editingTrigger) return@firstOrNull false
+                                    val existingTriggers = listOf(command.trigger) + command.aliases
+                                    newTriggers.any { candidate ->
+                                        existingTriggers.any { existing ->
+                                            candidate == existing || candidate.startsWith(existing) || existing.startsWith(candidate)
+                                        }
+                                    }
+                                }
+                                if (conflictingAlias != null) {
+                                    errorMessage = errorDuplicateMsg
+                                    return@Button
+                                }
+                                if (!CommandManager.isValidCommand(trimmedTrigger, prompt.trim(), prefix) ||
+                                    !CommandManager.areValidAliases(aliases, trimmedTrigger, prefix)
+                                ) {
+                                    errorMessage = aliasInvalidError
                                     return@Button
                                 }
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 val saved = commandManager.saveCustomCommand(
-                                    command = Command(trimmedTrigger, prompt.trim(), false, selectedType),
+                                    command = Command(trimmedTrigger, prompt.trim(), false, selectedType, aliases),
                                     replacing = editingTrigger ?: trimmedTrigger
                                 )
                                 commands = commandManager.getCommands()
                                 if (!saved) return@Button
                                 trigger = ""
                                 prompt = ""
+                                aliasInput = ""
+                                aliases = emptyList()
                                 errorMessage = null
                                 previewOutput = null
                                 previewError = null

@@ -62,7 +62,9 @@ import com.jcversa.swiftslate.ui.components.bounceClick
 import com.jcversa.swiftslate.ui.CommandsScreen
 import com.jcversa.swiftslate.ui.DashboardScreen
 import com.jcversa.swiftslate.ui.KeysScreen
+import com.jcversa.swiftslate.ui.OnboardingScreen
 import com.jcversa.swiftslate.ui.SettingsScreen
+import com.jcversa.swiftslate.model.PrefKeys
 import com.jcversa.swiftslate.ui.components.LocalSlateRhythm
 import com.jcversa.swiftslate.ui.components.SlateRhythm
 import com.jcversa.swiftslate.ui.theme.SwiftSlateTheme
@@ -80,15 +82,43 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             var showSplash by rememberSaveable { mutableStateOf(true) }
+            val settingsPrefs = remember { getSharedPreferences("settings", Context.MODE_PRIVATE) }
+            var showOnboarding by rememberSaveable {
+                mutableStateOf(shouldShowFirstRunAssistant(this@MainActivity))
+            }
             SwiftSlateTheme {
                 if (showSplash) {
                     SwiftSlateSplashScreen(onDismiss = { showSplash = false })
+                } else if (showOnboarding) {
+                    OnboardingScreen(
+                        prefs = settingsPrefs,
+                        keyManager = (application as SwiftSlateApp).keyManager,
+                        onComplete = { showOnboarding = false }
+                    )
                 } else {
                     SwiftSlateMainScreen()
                 }
             }
         }
     }
+}
+
+/**
+ * Old installs should not be interrupted by the new first-run walkthrough. Their existing
+ * settings, command store, or encrypted key store are enough evidence that setup already ran.
+ */
+private fun shouldShowFirstRunAssistant(context: Context): Boolean {
+    val settings = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    if (settings.getBoolean(PrefKeys.ONBOARDING_COMPLETED, false)) return false
+
+    val hasExistingAppData = sequenceOf("commands", "secure_keys_prefs")
+        .map { context.getSharedPreferences(it, Context.MODE_PRIVATE) }
+        .any { it.all.isNotEmpty() } || settings.all.isNotEmpty()
+    if (hasExistingAppData) {
+        settings.edit().putBoolean(PrefKeys.ONBOARDING_COMPLETED, true).apply()
+        return false
+    }
+    return true
 }
 
 @Composable

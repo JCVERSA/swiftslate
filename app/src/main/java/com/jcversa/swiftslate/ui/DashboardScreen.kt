@@ -105,6 +105,12 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
     var isServiceEnabled by remember { mutableStateOf(checkServiceEnabled(context)) }
     var keyCount by remember { mutableIntStateOf(0) }
     var showKilledBanner by remember { mutableStateOf(false) }
+    var showOnboardingReminder by remember {
+        mutableStateOf(
+            context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                .getBoolean("onboarding_reminder", false)
+        )
+    }
 
     // Stats state
     var monthlyRequests by remember { mutableIntStateOf(statsManager.monthlyRequests) }
@@ -195,6 +201,43 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        }
+
+        if (showOnboardingReminder) {
+            AnimateEntrance(index = 1) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = rhythm.cardGap),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.dashboard_onboarding_reminder),
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(
+                            onClick = {
+                                showOnboardingReminder = false
+                                context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                                    .edit().putBoolean("onboarding_reminder", false).apply()
+                            }
+                        ) {
+                            Text(stringResource(R.string.dashboard_onboarding_dismiss), fontSize = 12.sp)
+                        }
+                    }
+                }
             }
         }
 

@@ -47,6 +47,16 @@
     <string name="commands_error_duplicate">A command with this trigger already exists</string>
     <string name="commands_error_conflict">Conflicts with existing command \'%1$s\' — one trigger is a prefix of the other</string>
     <string name="commands_error_empty_trigger">Trigger must have a name after the prefix</string>
+
+    <string name="commands_alias_label">Aliases (optional)</string>
+    <string name="commands_alias_placeholder">e.g. %1$scorrect</string>
+    <string name="commands_alias_add">Add alias</string>
+    <string name="commands_alias_remove">Remove alias</string>
+    <string name="commands_aliases_heading">Aliases</string>
+    <string name="commands_alias_error_prefix">Alias must start with '%1$s'</string>
+    <string name="commands_alias_error_duplicate">This alias is already used</string>
+    <string name="commands_alias_error_limit">You can add up to five aliases</string>
+    <string name="commands_alias_error_invalid">Alias is invalid or too long</string>
     <string name="commands_preview_input_label">Example text to test</string>
     <string name="commands_preview_default_input">This is an example sentence to transform.</string>
     <string name="commands_preview_button">Test command</string>
@@ -54,6 +64,32 @@
     <string name="commands_preview_output">Preview result</string>
     <string name="commands_preview_unavailable">The command could not be tested. Check that a valid API key is configured.</string>
     <string name="commands_preview_timeout">The test timed out. Try again.</string>
+
+
+    <string name="onboarding_title">Set up SwiftSlate</string>
+    <string name="onboarding_progress">Step %1$d of %2$d</string>
+    <string name="onboarding_provider_title">Choose your provider</string>
+    <string name="onboarding_provider_message">This provider will handle your AI commands. You can change it later in Settings.</string>
+    <string name="onboarding_key_title">Add your API key</string>
+    <string name="onboarding_key_message">Add a %1$s API key. It is stored securely on this device and never displayed after validation.</string>
+    <string name="onboarding_key_validate">Validate and save key</string>
+    <string name="onboarding_key_success">Key validated and saved securely.</string>
+    <string name="onboarding_key_failed">The key could not be validated. Check it and try again.</string>
+    <string name="onboarding_accessibility_title">Enable the assistant</string>
+    <string name="onboarding_accessibility_message">Android needs the SwiftSlate accessibility service to detect your command triggers and replace text.</string>
+    <string name="onboarding_open_accessibility">Open Android accessibility settings</string>
+    <string name="onboarding_accessibility_ready">SwiftSlate assistant is enabled.</string>
+    <string name="onboarding_accessibility_waiting">Enable SwiftSlate, then return here.</string>
+    <string name="onboarding_test_title">Test your setup</string>
+    <string name="onboarding_test_message">Run one safe example request to verify the provider, key, model and assistant setup.</string>
+    <string name="onboarding_test_button">Run setup test</string>
+    <string name="onboarding_test_failed">The setup test failed. Check your connection and configuration, then try again.</string>
+    <string name="onboarding_back">Back</string>
+    <string name="onboarding_next">Continue</string>
+    <string name="onboarding_finish">Finish setup</string>
+    <string name="onboarding_later">Continue without finishing</string>
+    <string name="dashboard_onboarding_reminder">Your setup is incomplete. You can finish it in Settings.</string>
+    <string name="dashboard_onboarding_dismiss">Dismiss</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>

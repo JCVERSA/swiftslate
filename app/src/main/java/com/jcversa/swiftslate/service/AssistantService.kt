@@ -136,7 +136,9 @@ class AssistantService : AccessibilityService() {
         cachedPrefix = commandManager.getTriggerPrefix()
         cachedTranslatePrefix = "${cachedPrefix}translate:"
         val cmds = commandManager.getCommands()
-        triggerLastChars = cmds.mapNotNull { it.trigger.lastOrNull() }.toSet()
+        triggerLastChars = cmds.flatMap { command ->
+            listOf(command.trigger) + command.aliases
+        }.mapNotNull { it.lastOrNull() }.toSet()
         lastTriggerRefresh = System.currentTimeMillis()
     }
 
@@ -250,14 +252,15 @@ class AssistantService : AccessibilityService() {
             }
         }
 
-        val command = commandManager.findCommand(text) ?: run {
+        val match = commandManager.findCommandMatch(text) ?: run {
             source.safeRecycle()
             return
         }
+        val command = match.command
 
         performHapticFeedback(HapticFeedbackConstants.GESTURE_START)
 
-        val precedingText = text.substring(0, text.length - command.trigger.length)
+        val precedingText = text.substring(0, text.length - match.matchedTrigger.length)
         val cleanText = precedingText.trim()
 
         if (command.trigger.endsWith("undo") && command.isBuiltIn) {
