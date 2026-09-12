@@ -2,7 +2,7 @@ name: Comment Preview APK
 
 on:
   workflow_run:
-    workflows: ["Build & Release"]
+    workflows: ["Build APK"]
     types: [completed]
   # Manual test: allows a maintainer to trigger the comment for a past run.
   # Kept after validation for future recovery (e.g. transient API failure).
@@ -53,14 +53,14 @@ jobs:
                 run = data;
                 core.info(`Manual dispatch: using run ${run.id} (${run.head_branch} ${run.head_sha.slice(0,7)})`);
               } else {
-                // No run_id supplied: pick latest successful Build & Release run that has a preview artifact
+                // No run_id supplied: pick latest successful Build APK run that has a preview artifact
                 const { data } = await github.request('GET /repos/{owner}/{repo}/actions/runs', {
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   per_page: 10,
                   // status success handled after fetch
                 });
-                // This endpoint without workflow_id lists runs for all workflows; filter to Build & Release
+                // This endpoint without workflow_id lists runs for all workflows; filter to Build APK
                 // Instead, list for the workflow id 239854478 if available
                 core.info('No run_id supplied for manual dispatch — please supply one');
                 core.setFailed('run_id required for manual dispatch without auto-resolve yet');

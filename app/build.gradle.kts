@@ -49,26 +49,13 @@ android {
         generateLocaleConfig = true
     }
 
-    signingConfigs {
-        val ksFile = System.getenv("KEYSTORE_FILE")
-        val ksPassword = System.getenv("KEYSTORE_PASSWORD")
-        val ksAlias = System.getenv("KEY_ALIAS")
-        val ksKeyPassword = System.getenv("KEY_PASSWORD")
-        if (ksFile != null && ksPassword != null && ksAlias != null && ksKeyPassword != null) {
-            create("release") {
-                storeFile = file(ksFile)
-                storePassword = ksPassword
-                keyAlias = ksAlias
-                keyPassword = ksKeyPassword
-            }
-        }
-    }
-
     buildTypes {
+        // Unsigned by design: release signing was removed (no keystore ceremony).
+        // Installable builds come from the preview type below (debug-signed) and
+        // assembleDebug; assembleRelease output is NOT installable as-is.
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.findByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         // Installable side by side with a stable release: a different applicationId means
@@ -76,8 +63,7 @@ android {
         // installed stable build, its API keys, its commands or its accessibility setting.
         //
         // Shrunk and non-debuggable like release (a debuggable accessibility service is not
-        // something to hand out), but signed with the local debug key so pull requests from
-        // forks can build it without access to the release signing secrets.
+        // something to hand out), but signed with the local debug key, so no signing setup is needed to build it.
         //
         // The label and icon are overridden in src/preview/res so the two are told apart on
         // the launcher and in Settings > Accessibility.

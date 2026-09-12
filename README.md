@@ -627,21 +627,8 @@ cd SwiftSlate
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
-<details>
-<summary>📦 <strong>Signed release build</strong></summary>
-
-<br>
-
-```bash
-export KEYSTORE_FILE=/path/to/your/keystore.jks
-export KEYSTORE_PASSWORD=your_keystore_password
-export KEY_ALIAS=your_key_alias
-export KEY_PASSWORD=your_key_password
-
-./gradlew assembleRelease
-```
-
-</details>
+> [!NOTE]
+> Every push to `main` and every pull request also produces an **installable preview APK** (separate app, debug-signed) — grab it from the run's **Artifacts** section, no signing setup needed.
 
 <br>
 
@@ -651,7 +638,7 @@ Every pull request builds a **preview APK** you can install side by side with a 
 
 It ships as a separate app — applicationId `com.jcversa.swiftslate.preview`, shown on your launcher as **SwiftSlate Preview** — so installing it never replaces your stable build and never touches its API keys, commands, stats or accessibility setting. Both appear as separate entries under Settings → Accessibility, and you can enable whichever you want to test.
 
-1. Open the pull request's **Checks** tab and pick the latest **Build & Release** run
+1. Open the pull request's **Checks** tab and pick the latest **Build APK** run
 2. Download the `SwiftSlate-preview-prNNN` artifact from the **Artifacts** section
 3. Unzip and install the APK, then enable **SwiftSlate Preview** in accessibility settings
 4. Uninstall it when you're done — your stable install is untouched throughout
