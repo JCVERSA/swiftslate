@@ -95,10 +95,11 @@ fun SlateMark(
     size: Dp = 44.dp
 ) {
     val markShape = MaterialTheme.shapes.medium
+    val colors = MaterialTheme.colorScheme
     Surface(
         modifier = modifier.size(size),
         shape = markShape,
-        color = MaterialTheme.colorScheme.primaryContainer,
+        color = colors.primaryContainer,
         tonalElevation = 1.dp
     ) {
         Canvas(modifier = Modifier.fillMaxSize().padding(size * 0.24f)) {
@@ -114,11 +115,11 @@ fun SlateMark(
                     lineTo(elbow, centerY)
                     lineTo(left, centerY + canvasHeight * 0.24f)
                 },
-                color = MaterialTheme.colorScheme.primary,
+                color = colors.primary,
                 style = Stroke(width = this.size.minDimension * 0.12f, cap = StrokeCap.Round)
             )
             drawLine(
-                color = MaterialTheme.colorScheme.primary,
+                color = colors.primary,
                 start = Offset(elbow + right * 0.28f, centerY + canvasHeight * 0.24f),
                 end = Offset(canvasWidth - right, centerY + canvasHeight * 0.24f),
                 strokeWidth = this.size.minDimension * 0.12f,
