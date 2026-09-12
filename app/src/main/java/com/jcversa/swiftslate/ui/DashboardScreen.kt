@@ -7,7 +7,6 @@ import android.content.Intent
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.compose.animation.core.*
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.PathEffect
@@ -29,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -166,27 +164,6 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
     val rhythm = LocalSlateRhythm.current
     val scrollState = rememberScrollState()
 
-    // Pulsing animation for status indicators
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.7f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = EaseOutQuad),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulse_scale"
-    )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 0.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = EaseOutQuad),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulse_alpha"
-    )
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -196,25 +173,37 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
         // Welcome Header
         // (No action button: the redesign's decorative one did nothing but vibrate.)
         AnimateEntrance(index = 0) {
-            Row(
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = rhythm.cardGap),
-                verticalAlignment = Alignment.CenterVertically
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.14f),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                )
             ) {
-                SlateMark()
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = stringResource(R.string.dashboard_title),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = stringResource(R.string.dashboard_subtitle),
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SlateMark()
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.dashboard_title),
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = stringResource(R.string.dashboard_subtitle),
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -338,7 +327,7 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.heightIn(min = 40.dp)
+                                modifier = Modifier.heightIn(min = 48.dp)
                             ) {
                                 Text(stringResource(R.string.service_enable), fontSize = 13.sp)
                             }
@@ -390,24 +379,33 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(32.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .graphicsLayer {
-                                    scaleX = pulseScale
-                                    scaleY = pulseScale
-                                    alpha = pulseAlpha
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isServiceEnabled) {
+                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f)
+                                } else {
+                                    MaterialTheme.colorScheme.error.copy(alpha = 0.16f)
                                 }
-                                .clip(CircleShape)
-                                .background(
-                                    if (isServiceEnabled) MaterialTheme.colorScheme.tertiary
-                                    else MaterialTheme.colorScheme.error
-                                )
-                        )
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isServiceEnabled) {
+                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.32f)
+                                } else {
+                                    MaterialTheme.colorScheme.error.copy(alpha = 0.32f)
+                                },
+                                shape = CircleShape
+                            )
+                    ) {
+                        // A stable indicator is intentional: service state is information,
+                        // not a loading animation, and the dashboard is viewed frequently.
                         Box(
                             modifier = Modifier
-                                .size(14.dp)
+                                .size(13.dp)
                                 .clip(CircleShape)
                                 .background(
                                     if (isServiceEnabled) MaterialTheme.colorScheme.tertiary
@@ -443,7 +441,7 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                             contentColor = Color.White
                         ),
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.heightIn(min = 40.dp)
+                        modifier = Modifier.heightIn(min = 48.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
@@ -899,7 +897,7 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                             enabled = !isSandboxProcessing,
                             modifier = Modifier
                                 .weight(1.3f)
-                                .heightIn(min = 44.dp)
+                                .heightIn(min = 48.dp)
                                 .bounceClick(),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary
@@ -928,7 +926,7 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                             enabled = !isSandboxProcessing,
                             modifier = Modifier
                                 .weight(1f)
-                                .heightIn(min = 44.dp)
+                                .heightIn(min = 48.dp)
                                 .bounceClick()
                         ) {
                             Text(stringResource(R.string.dashboard_sandbox_reset), fontWeight = FontWeight.Bold, fontSize = 13.sp)

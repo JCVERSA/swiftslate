@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -268,9 +269,12 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
                     AnimatedContentTransitionScope.SlideDirection.Left
                 else
                     AnimatedContentTransitionScope.SlideDirection.Right
-                val duration = 300
-                (slideIntoContainer(direction, tween(duration, easing = FastOutSlowInEasing)) + fadeIn(tween(duration))) togetherWith
-                    (slideOutOfContainer(direction, tween(duration, easing = FastOutSlowInEasing)) + fadeOut(tween(duration)))
+                // Strong ease-out: the destination becomes readable immediately, then
+                // settles quickly instead of making tab navigation feel like a carousel.
+                val duration = 220
+                val tabEase = CubicBezierEasing(0.23f, 1f, 0.32f, 1f)
+                (slideIntoContainer(direction, tween(duration, easing = tabEase)) + fadeIn(tween(duration))) togetherWith
+                    (slideOutOfContainer(direction, tween(duration, easing = tabEase)) + fadeOut(tween(duration)))
             },
             label = "tab_transition"
         ) { tab ->

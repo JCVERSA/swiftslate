@@ -34,20 +34,22 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Offset
 
 /**
- * A satisfy-by-touch physically animated click modifier.
- * Scales down slightly when pressed and springs back when released.
+ * A restrained press-feedback click modifier.
+ * Scales down slightly when pressed and returns immediately when released.
+ * The legacy name is kept so existing screens stay source-compatible.
  */
 @Composable
 fun Modifier.bounceClick(onClick: () -> Unit = {}): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.94f else 1f,
+        // A restrained 3% press confirms the tap without making the whole control jump.
+        targetValue = if (isPressed) 0.97f else 1f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium
         ),
-        label = "bounce"
+        label = "press_scale"
     )
     return this
         .graphicsLayer {
@@ -72,14 +74,15 @@ fun AnimateEntrance(
 ) {
     val visible = remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        delay(index * 60L) // cascading 60ms delay
+        // A small stagger adds spatial order without turning every tab change into a show.
+        delay(index * 45L)
         visible.value = true
     }
     AnimatedVisibility(
         visible = visible.value,
-        enter = fadeIn(animationSpec = tween(400, easing = EaseOutQuad)) +
-                slideInVertically(animationSpec = tween(400, easing = EaseOutQuad)) { it / 4 },
-        exit = fadeOut(animationSpec = tween(200))
+        enter = fadeIn(animationSpec = tween(220, easing = EaseOutQuad)) +
+                slideInVertically(animationSpec = tween(220, easing = EaseOutQuad)) { 12 },
+        exit = fadeOut(animationSpec = tween(120))
     ) {
         content()
     }
@@ -154,7 +157,8 @@ fun SlateCard(
             ),
         shape = cardShape,
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 2.dp,
+        // On AMOLED, tonal separation and a hairline are calmer than a grey shadow halo.
+        shadowElevation = 0.dp,
         tonalElevation = 1.dp
     ) {
         Column(
