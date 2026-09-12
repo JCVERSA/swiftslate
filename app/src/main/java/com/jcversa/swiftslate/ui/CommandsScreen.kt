@@ -232,8 +232,7 @@ fun CommandsScreen(commandManager: CommandManager) {
                 Column {
                     Text(
                         text = stringResource(R.string.commands_title),
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(

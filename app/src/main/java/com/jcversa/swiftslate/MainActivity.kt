@@ -32,7 +32,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
@@ -42,7 +41,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
-import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.Spring
@@ -177,52 +175,72 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
             Surface(
                 modifier = Modifier
                     .navigationBarsPadding()
-                    .padding(start = 24.dp, end = 24.dp, bottom = 12.dp)
+                    .padding(start = 20.dp, end = 20.dp, bottom = 12.dp)
                     .fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
                 border = androidx.compose.foundation.BorderStroke(
                     width = 1.dp,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
                 ),
-                tonalElevation = 4.dp
+                shadowElevation = 6.dp,
+                tonalElevation = 3.dp
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 10.dp, horizontal = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceAround,
+                        .padding(horizontal = 8.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Tab.entries.forEach { tab ->
                         val isSelected = selectedTab == tab
                         val backgroundAlpha by androidx.compose.animation.core.animateFloatAsState(
                             targetValue = if (isSelected) 1f else 0f,
-                            animationSpec = tween(250),
-                            label = "tab_bg_alpha"
+                            animationSpec = spring(
+                                dampingRatio = 0.9f,
+                                stiffness = Spring.StiffnessMediumLow
+                            ),
+                            label = "tab_background"
                         )
-                        val iconColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                        val containerColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+                        val iconColor = if (isSelected) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                        val containerColor = MaterialTheme.colorScheme.primaryContainer
 
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(containerColor.copy(alpha = if (isSelected) backgroundAlpha else 0f))
+                                .weight(1f)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(containerColor.copy(alpha = backgroundAlpha))
                                 .bounceClick {
                                     if (selectedTab != tab) {
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         selectedTab = tab
                                     }
                                 }
-                                .padding(horizontal = 20.dp, vertical = 10.dp),
+                                .padding(horizontal = 2.dp, vertical = 7.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = tab.icon,
-                                contentDescription = stringResource(tab.titleRes),
-                                tint = iconColor,
-                                modifier = Modifier.size(22.dp)
-                            )
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = tab.icon,
+                                    contentDescription = null,
+                                    tint = iconColor,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = stringResource(tab.titleRes),
+                                    color = iconColor,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }
@@ -272,6 +290,7 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
 
 @Composable
 fun SwiftSlateSplashScreen(onDismiss: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
     val scale = remember { androidx.compose.animation.core.Animatable(0.7f) }
     val pathProgress = remember { androidx.compose.animation.core.Animatable(0f) }
     val glowRadius = remember { androidx.compose.animation.core.Animatable(0f) }
@@ -315,7 +334,7 @@ fun SwiftSlateSplashScreen(onDismiss: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F172A)) // High-contrast deep slate background
+            .background(colors.background)
             .graphicsLayer {
                 alpha = dismissProgress.value
                 scaleX = 0.96f + (0.04f * dismissProgress.value)
@@ -341,7 +360,7 @@ fun SwiftSlateSplashScreen(onDismiss: () -> Unit) {
             // Draw glowing backdrop blur circles
             if (glowRadius.value > 0f) {
                 drawCircle(
-                    color = Color(0xFF6366F1).copy(alpha = 0.12f * (1f - glowRadius.value / 150f)),
+                    color = colors.primary.copy(alpha = 0.12f * (1f - glowRadius.value / 150f)),
                     radius = glowRadius.value * 2f,
                     center = androidx.compose.ui.geometry.Offset(centerX, centerY)
                 )
@@ -356,7 +375,7 @@ fun SwiftSlateSplashScreen(onDismiss: () -> Unit) {
 
             drawPath(
                 path = path,
-                color = Color(0xFF6366F1),
+                color = colors.primary,
                 style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
             )
 
@@ -366,7 +385,7 @@ fun SwiftSlateSplashScreen(onDismiss: () -> Unit) {
                 val blockStartX = centerX + 15f
                 val blockEndX = blockStartX + (35f * blockProgress)
                 drawLine(
-                    color = Color(0xFF818CF8),
+                    color = colors.primaryContainer,
                     start = androidx.compose.ui.geometry.Offset(blockStartX, centerY + 25f),
                     end = androidx.compose.ui.geometry.Offset(blockEndX, centerY + 25f),
                     strokeWidth = 6.dp.toPx(),
@@ -386,7 +405,7 @@ fun SwiftSlateSplashScreen(onDismiss: () -> Unit) {
                 text = "SWIFTSLATE",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = Color.White,
+                color = colors.onBackground,
                 letterSpacing = 6.sp,
                 modifier = Modifier.graphicsLayer { alpha = textAlpha.value }
             )
@@ -395,7 +414,7 @@ fun SwiftSlateSplashScreen(onDismiss: () -> Unit) {
                 text = "AI ACCESSIBILITY COMPANION",
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF64748B),
+                color = colors.onSurfaceVariant,
                 letterSpacing = 2.sp,
                 modifier = Modifier.graphicsLayer { alpha = textAlpha.value }
             )

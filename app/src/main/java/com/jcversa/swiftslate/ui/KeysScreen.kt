@@ -20,7 +20,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalContext
@@ -128,8 +127,7 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                 Column {
                     Text(
                         text = stringResource(R.string.keys_title),
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
@@ -441,7 +439,7 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                                     Box(
                                         modifier = Modifier
                                             .size(6.dp)
-                                            .background(Color(0xFF10B981), CircleShape)
+                                            .background(MaterialTheme.colorScheme.tertiary, CircleShape)
                                             .align(Alignment.TopEnd)
                                     )
                                 }

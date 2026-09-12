@@ -192,8 +192,7 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
             ) {
                 Text(
                     text = stringResource(R.string.dashboard_title),
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(

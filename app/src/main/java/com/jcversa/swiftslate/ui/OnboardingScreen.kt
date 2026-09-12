@@ -260,8 +260,7 @@ fun OnboardingScreen(
     ) {
         Text(
             text = stringResource(R.string.onboarding_title),
-            fontSize = 28.sp,
-            fontWeight = FontWeight.ExtraBold,
+            style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onBackground
         )
         Text(

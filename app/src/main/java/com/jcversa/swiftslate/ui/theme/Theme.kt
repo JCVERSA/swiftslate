@@ -1,60 +1,119 @@
 package com.jcversa.swiftslate.ui.theme
 
 import android.app.Activity
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.core.view.WindowCompat
 
+/**
+ * A quiet slate-and-mint fallback palette. Android 12+ devices use the user's
+ * dynamic palette by default; this remains the calm, on-brand fallback for older
+ * devices and for previews.
+ */
 private val DarkColorScheme = darkColorScheme(
-    // Pure-black backdrop (AMOLED): the one deliberate deviation from the redesign's
-    // navy background — keeps the OLED battery story and the README claim true.
-    background = Color(0xFF000000),
-    surface = Color(0xFF101323),
-    surfaceVariant = Color(0xFF1B1E32),
-    surfaceContainerHigh = Color(0xFF222741),
-    onBackground = Color(0xFFF3F4F6),
-    onSurface = Color(0xFFF3F4F6),
-    onSurfaceVariant = Color(0xFF9CA3AF),
-    outline = Color(0xFF2E3554),
-    primary = Color(0xFF6366F1),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFF252A4A),
-    onPrimaryContainer = Color(0xFFE0E7FF),
-    error = Color(0xFFEF4444),
-    tertiary = Color(0xFF10B981),
-    tertiaryContainer = Color(0xFF065F46)
+    background = Color(0xFF0C1217),
+    surface = Color(0xFF141D23),
+    surfaceVariant = Color(0xFF1B2830),
+    surfaceContainerHigh = Color(0xFF24343B),
+    onBackground = Color(0xFFF2F7F5),
+    onSurface = Color(0xFFF2F7F5),
+    onSurfaceVariant = Color(0xFFA7B6B3),
+    outline = Color(0xFF405158),
+    primary = Color(0xFF9ADBC6),
+    onPrimary = Color(0xFF07352D),
+    primaryContainer = Color(0xFF205146),
+    onPrimaryContainer = Color(0xFFC6F1E3),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6),
+    tertiary = Color(0xFFB7DDBA),
+    onTertiary = Color(0xFF203725),
+    tertiaryContainer = Color(0xFF364D38),
+    onTertiaryContainer = Color(0xFFD3F2D0)
 )
 
 private val LightColorScheme = lightColorScheme(
-    background = Color(0xFFF8FAFC),
+    background = Color(0xFFF7F9F6),
     surface = Color(0xFFFFFFFF),
-    surfaceVariant = Color(0xFFF1F5F9),
-    surfaceContainerHigh = Color(0xFFE2E8F0),
-    onBackground = Color(0xFF0F172A),
-    onSurface = Color(0xFF0F172A),
-    onSurfaceVariant = Color(0xFF64748B),
-    outline = Color(0xFFCBD5E1),
-    primary = Color(0xFF4F46E5),
+    surfaceVariant = Color(0xFFEDF3EF),
+    surfaceContainerHigh = Color(0xFFE0EBE5),
+    onBackground = Color(0xFF17211E),
+    onSurface = Color(0xFF17211E),
+    onSurfaceVariant = Color(0xFF5E706B),
+    outline = Color(0xFF9BAEA8),
+    primary = Color(0xFF176B59),
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFEEF2FF),
-    onPrimaryContainer = Color(0xFF312E81),
-    error = Color(0xFFEF4444),
-    tertiary = Color(0xFF10B981),
-    tertiaryContainer = Color(0xFFD1FAE5)
+    primaryContainer = Color(0xFFC5EBDD),
+    onPrimaryContainer = Color(0xFF073D31),
+    error = Color(0xFFBA1A1A),
+    onError = Color(0xFFFFFFFF),
+    errorContainer = Color(0xFFFFDAD6),
+    onErrorContainer = Color(0xFF410002),
+    tertiary = Color(0xFF39734A),
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFBCEFC0),
+    onTertiaryContainer = Color(0xFF0E3A1A)
+)
+
+private val SwiftSlateShapes = Shapes(
+    extraSmall = RoundedCornerShape(10.dp),
+    small = RoundedCornerShape(14.dp),
+    medium = RoundedCornerShape(18.dp),
+    large = RoundedCornerShape(24.dp),
+    extraLarge = RoundedCornerShape(30.dp)
+)
+
+private val BaseTypography = Typography()
+
+private val SwiftSlateTypography = BaseTypography.copy(
+    displaySmall = BaseTypography.displaySmall.copy(
+        fontWeight = FontWeight.ExtraBold,
+        letterSpacing = (-0.4).sp
+    ),
+    headlineMedium = BaseTypography.headlineMedium.copy(
+        fontWeight = FontWeight.ExtraBold,
+        letterSpacing = (-0.2).sp
+    ),
+    titleLarge = BaseTypography.titleLarge.copy(
+        fontWeight = FontWeight.Bold
+    ),
+    labelLarge = BaseTypography.labelLarge.copy(
+        fontWeight = FontWeight.SemiBold
+    )
 )
 
 @Composable
 fun SwiftSlateTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val context = LocalContext.current
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && darkTheme ->
+            dynamicDarkColorScheme(context)
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+            dynamicLightColorScheme(context)
+        darkTheme -> DarkColorScheme
+        else -> LightColorScheme
+    }
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
@@ -67,6 +126,8 @@ fun SwiftSlateTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
+        typography = SwiftSlateTypography,
+        shapes = SwiftSlateShapes,
         content = content
     )
 }

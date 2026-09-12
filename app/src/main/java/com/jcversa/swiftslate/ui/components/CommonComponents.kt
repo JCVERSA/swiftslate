@@ -11,7 +11,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -27,7 +26,6 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 
 import androidx.compose.foundation.border
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 /**
@@ -96,20 +94,19 @@ fun SlateCard(
     verticalArrangement: Arrangement.Vertical = Arrangement.Top,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val cardShape = RoundedCornerShape(16.dp)
-    val borderGradient = Brush.verticalGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.03f)
-        )
-    )
+    val cardShape = MaterialTheme.shapes.large
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .border(width = 1.dp, brush = borderGradient, shape = cardShape),
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.22f),
+                shape = cardShape
+            ),
         shape = cardShape,
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 0.dp
+        shadowElevation = 2.dp,
+        tonalElevation = 1.dp
     ) {
         Column(
             modifier = Modifier
@@ -161,13 +158,13 @@ fun SlateTextField(
         readOnly = readOnly,
         isError = isError,
         visualTransformation = visualTransformation,
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         modifier = modifier.fillMaxWidth(),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
-            unfocusedContainerColor = Color.Transparent,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
+            focusedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.06f),
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
             errorBorderColor = MaterialTheme.colorScheme.error,
             focusedLabelColor = MaterialTheme.colorScheme.primary,
             unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -189,19 +186,17 @@ fun SlateItemCard(
     contentPadding: Dp = LocalSlateRhythm.current.itemPadding,
     content: @Composable RowScope.() -> Unit
 ) {
-    val itemShape = RoundedCornerShape(12.dp)
-    val itemBorderGradient = Brush.horizontalGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.01f)
-        )
-    )
+    val itemShape = MaterialTheme.shapes.small
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .border(width = 0.75.dp, brush = itemBorderGradient, shape = itemShape),
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.16f),
+                shape = itemShape
+            ),
         shape = itemShape,
-        color = MaterialTheme.colorScheme.surfaceVariant
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
     ) {
         Row(
             modifier = Modifier.padding(contentPadding),

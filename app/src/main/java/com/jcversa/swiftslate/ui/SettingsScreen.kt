@@ -327,8 +327,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                 Column {
                     Text(
                         text = stringResource(R.string.settings_title),
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
