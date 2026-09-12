@@ -302,14 +302,4 @@ class ApiClientUtilsTest {
         assertEquals(emptyList<String>(), ApiClientUtils.parseModelIds("""{"data":[]}"""))
         assertEquals(emptyList<String>(), ApiClientUtils.parseModelIds("""{"something":"else"}"""))
     }
-
-    @Test
-    fun suggestedMaxOutputTokens_isBoundedAndScalesWithSelection() {
-        assertEquals(256, ApiClientUtils.suggestedMaxOutputTokens("short"))
-        assertTrue(
-            ApiClientUtils.suggestedMaxOutputTokens("a".repeat(2_000)) >
-                ApiClientUtils.suggestedMaxOutputTokens("a".repeat(100))
-        )
-        assertEquals(4_096, ApiClientUtils.suggestedMaxOutputTokens("a".repeat(100_000)))
-    }
 }

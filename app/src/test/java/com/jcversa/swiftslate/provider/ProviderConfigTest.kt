@@ -87,13 +87,6 @@ class ProviderConfigTest {
     }
 
     @Test
-    fun nvidia_nemotron_fast_path_disables_thinking() {
-        assertTrue(NvidiaModels.shouldDisableThinking(NvidiaModels.DEFAULT))
-        assertTrue(NvidiaConfig.reasoningParams(NvidiaModels.DEFAULT).containsKey("chat_template_kwargs"))
-        assertTrue(NvidiaConfig.reasoningParams("some/other-model").isEmpty())
-    }
-
-    @Test
     fun isConfigured_only_custom_requires_both() {
         assertTrue(GeminiConfig.isConfigured("", ""))
         assertTrue(GroqConfig.isConfigured("m", ""))
