@@ -139,6 +139,28 @@ class CommandManagerTest {
     }
 
     @Test
+    fun saveCustomCommand_aliasIsPersistedAndFindable() {
+        assertTrue(commandManager.saveCustomCommand(
+            Command("?greet", "Say hello", aliases = listOf("?hello", "?salut"))
+        ))
+        val result = commandManager.findCommand("hi?hello")
+        assertNotNull(result)
+        assertEquals("?greet", result!!.trigger)
+        assertEquals(listOf("?hello", "?salut"), result.aliases)
+    }
+
+    @Test
+    fun findCommandMatch_aliasReportsTheMatchedAlias() {
+        assertTrue(commandManager.saveCustomCommand(
+            Command("?greet", "Say hello", aliases = listOf("?hello"))
+        ))
+        val match = commandManager.findCommandMatch("hi?hello")
+        assertNotNull(match)
+        assertEquals("?greet", match!!.command.trigger)
+        assertEquals("?hello", match.matchedTrigger)
+    }
+
+    @Test
     fun removeCustomCommand_makesUnfindable() {
         commandManager.saveCustomCommand(Command("?greet", "Say hello"))
         commandManager.removeCustomCommand("?greet")
@@ -197,6 +219,15 @@ class CommandManagerTest {
         val commands = commandManager.getCommands()
         assertTrue(commands.any { it.trigger == "!myCmd" })
         assertFalse(commands.any { it.trigger == "?myCmd" })
+    }
+
+    @Test
+    fun setTriggerPrefix_migratesAliasesToo() {
+        commandManager.saveCustomCommand(Command("?myCmd", "do something", aliases = listOf("?alias")))
+        commandManager.setTriggerPrefix("!")
+        val command = commandManager.getCommands().first { it.trigger == "!myCmd" }
+        assertEquals(listOf("!alias"), command.aliases)
+        assertEquals("!myCmd", commandManager.findCommand("text!alias")!!.trigger)
     }
 
 
