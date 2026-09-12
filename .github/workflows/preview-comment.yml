@@ -2,7 +2,7 @@ name: Comment Preview APK
 
 on:
   workflow_run:
-    workflows: ["Build & Release"]
+    workflows: ["Build APK"]
     types: [completed]
   # Manual test: allows a maintainer to trigger the comment for a past run.
   # Kept after validation for future recovery (e.g. transient API failure).
