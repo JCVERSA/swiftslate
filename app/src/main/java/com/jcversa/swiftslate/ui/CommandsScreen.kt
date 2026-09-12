@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -306,31 +307,37 @@ fun CommandsScreen(commandManager: CommandManager) {
                         }
                     )
                     if (searchQuery.isNotEmpty()) {
-                        Icon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = stringResource(R.string.commands_search_close),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .size(18.dp)
-                                .clickable { searchQuery = "" }
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        IconButton(
+                            onClick = { searchQuery = "" },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = stringResource(R.string.commands_search_close),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(2.dp))
                     }
-                    Icon(
-                        imageVector = if (expandedIds.isEmpty()) Icons.Rounded.FormatListBulleted else Icons.Rounded.UnfoldLess,
-                        contentDescription = if (expandedIds.isEmpty()) expandLabel else collapseLabel,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                expandedIds = if (expandedIds.isEmpty()) {
-                                    filteredCommands.map { it.trigger }.toSet()
-                                } else {
-                                    emptySet()
-                                }
+                    IconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            expandedIds = if (expandedIds.isEmpty()) {
+                                filteredCommands.map { it.trigger }.toSet()
+                            } else {
+                                emptySet()
                             }
-                    )
+                        },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (expandedIds.isEmpty()) Icons.Rounded.FormatListBulleted else Icons.Rounded.UnfoldLess,
+                            contentDescription = if (expandedIds.isEmpty()) expandLabel else collapseLabel,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
@@ -362,7 +369,9 @@ fun CommandsScreen(commandManager: CommandManager) {
                             shape = RoundedCornerShape(12.dp),
                             color = bg,
                             border = if (!isSelected) androidx.compose.foundation.BorderStroke(1.dp, border) else null,
-                            modifier = Modifier.height(34.dp)
+                            modifier = Modifier
+                                .heightIn(min = 48.dp)
+                                .semantics { selected = isSelected }
                         ) {
                             Box(
                                 modifier = Modifier.padding(horizontal = 14.dp),
@@ -477,7 +486,7 @@ fun CommandsScreen(commandManager: CommandManager) {
                                                         previewError = null
                                                         isFormExpanded = true
                                                     },
-                                                    modifier = Modifier.size(32.dp)
+                                                    modifier = Modifier.size(48.dp)
                                                 ) {
                                                     Icon(
                                                         imageVector = Icons.Rounded.Edit,
@@ -491,7 +500,7 @@ fun CommandsScreen(commandManager: CommandManager) {
                                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                         commandToDelete = cmd.trigger
                                                     },
-                                                    modifier = Modifier.size(32.dp)
+                                                    modifier = Modifier.size(48.dp)
                                                 ) {
                                                     Icon(
                                                         imageVector = Icons.Rounded.Delete,
@@ -755,7 +764,7 @@ fun CommandsScreen(commandManager: CommandManager) {
                                                 editingAlias = alias
                                                 errorMessage = null
                                             },
-                                            modifier = Modifier.size(28.dp)
+                                            modifier = Modifier.size(48.dp)
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Rounded.Edit,
@@ -772,7 +781,7 @@ fun CommandsScreen(commandManager: CommandManager) {
                                                     aliasInput = ""
                                                 }
                                             },
-                                            modifier = Modifier.size(28.dp)
+                                            modifier = Modifier.size(48.dp)
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Rounded.Close,

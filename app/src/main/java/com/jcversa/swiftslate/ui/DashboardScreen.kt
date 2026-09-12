@@ -50,6 +50,7 @@ import com.jcversa.swiftslate.model.ProviderType
 import com.jcversa.swiftslate.ui.components.LocalSlateRhythm
 import com.jcversa.swiftslate.ui.components.AnimateEntrance
 import com.jcversa.swiftslate.ui.components.SlateTextField
+import com.jcversa.swiftslate.ui.components.SlateMark
 import com.jcversa.swiftslate.ui.components.bounceClick
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -159,7 +160,7 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1.0f,
-        targetValue = 2.4f,
+        targetValue = 1.7f,
         animationSpec = infiniteRepeatable(
             animation = tween(1800, easing = EaseOutQuad),
             repeatMode = RepeatMode.Restart
@@ -185,21 +186,26 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
         // Welcome Header
         // (No action button: the redesign's decorative one did nothing but vibrate.)
         AnimateEntrance(index = 0) {
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = rhythm.cardGap)
+                    .padding(bottom = rhythm.cardGap),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = stringResource(R.string.dashboard_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = stringResource(R.string.dashboard_subtitle),
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                SlateMark()
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = stringResource(R.string.dashboard_title),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = stringResource(R.string.dashboard_subtitle),
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 

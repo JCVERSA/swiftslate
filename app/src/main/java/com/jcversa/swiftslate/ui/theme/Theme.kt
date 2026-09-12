@@ -22,9 +22,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.core.view.WindowCompat
 
 /**
- * A quiet slate-and-mint fallback palette. Android 12+ devices use the user's
- * dynamic palette by default; this remains the calm, on-brand fallback for older
- * devices and for previews.
+ * A quiet slate-and-mint palette. Dynamic Material 3 color remains available as
+ * an opt-in for future adaptive themes; SwiftSlate currently keeps this calm,
+ * on-brand palette consistent across devices.
  */
 private val DarkColorScheme = darkColorScheme(
     background = Color(0xFF0C1217),

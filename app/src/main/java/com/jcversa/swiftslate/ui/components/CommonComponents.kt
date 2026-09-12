@@ -7,6 +7,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.EaseOutQuad
 import androidx.compose.animation.core.tween
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -27,6 +28,10 @@ import androidx.compose.ui.unit.dp
 
 import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
 
 /**
  * A satisfy-by-touch physically animated click modifier.
@@ -77,6 +82,49 @@ fun AnimateEntrance(
         exit = fadeOut(animationSpec = tween(200))
     ) {
         content()
+    }
+}
+
+/**
+ * The small terminal mark used as SwiftSlate's visual signature.
+ * It is intentionally drawn from theme roles so it stays calm in both modes.
+ */
+@Composable
+fun SlateMark(
+    modifier: Modifier = Modifier,
+    size: Dp = 44.dp
+) {
+    val markShape = MaterialTheme.shapes.medium
+    Surface(
+        modifier = modifier.size(size),
+        shape = markShape,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        tonalElevation = 1.dp
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize().padding(size * 0.24f)) {
+            val canvasWidth = this.size.width
+            val canvasHeight = this.size.height
+            val centerY = canvasHeight / 2f
+            val left = canvasWidth * 0.14f
+            val elbow = canvasWidth * 0.40f
+            val right = canvasWidth * 0.14f
+            drawPath(
+                path = Path().apply {
+                    moveTo(left, centerY - canvasHeight * 0.24f)
+                    lineTo(elbow, centerY)
+                    lineTo(left, centerY + canvasHeight * 0.24f)
+                },
+                color = MaterialTheme.colorScheme.primary,
+                style = Stroke(width = this.size.minDimension * 0.12f, cap = StrokeCap.Round)
+            )
+            drawLine(
+                color = MaterialTheme.colorScheme.primary,
+                start = Offset(elbow + right * 0.28f, centerY + canvasHeight * 0.24f),
+                end = Offset(canvasWidth - right, centerY + canvasHeight * 0.24f),
+                strokeWidth = this.size.minDimension * 0.12f,
+                cap = StrokeCap.Round
+            )
+        }
     }
 }
 

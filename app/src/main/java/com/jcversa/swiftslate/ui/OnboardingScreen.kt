@@ -73,6 +73,7 @@ import com.jcversa.swiftslate.api.GeminiClient
 import com.jcversa.swiftslate.ui.components.LocalSlateRhythm
 import com.jcversa.swiftslate.ui.components.SlateCard
 import com.jcversa.swiftslate.ui.components.SlateTextField
+import com.jcversa.swiftslate.ui.components.SlateMark
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -258,16 +259,22 @@ fun OnboardingScreen(
             .padding(horizontal = rhythm.screenPaddingH, vertical = rhythm.screenPaddingV),
         verticalArrangement = Arrangement.spacedBy(rhythm.cardGap)
     ) {
-        Text(
-            text = stringResource(R.string.onboarding_title),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = stringResource(R.string.onboarding_progress, step + 1, 5),
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SlateMark(size = 40.dp)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = stringResource(R.string.onboarding_title),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = stringResource(R.string.onboarding_progress, step + 1, 5),
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
         when (step) {
             0 -> {

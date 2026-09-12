@@ -84,7 +84,7 @@ class MainActivity : ComponentActivity() {
             var showOnboarding by rememberSaveable {
                 mutableStateOf(shouldShowFirstRunAssistant(this@MainActivity))
             }
-            SwiftSlateTheme {
+            SwiftSlateTheme(dynamicColor = false) {
                 if (showSplash) {
                     SwiftSlateSplashScreen(onDismiss = { showSplash = false })
                 } else if (showOnboarding) {

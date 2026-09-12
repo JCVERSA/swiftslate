@@ -465,7 +465,7 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     keyToDelete = key
                                 },
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.DeleteOutline,
