@@ -198,4 +198,19 @@
     <string name="settings_about_title" tools:ignore="MissingTranslation">About SwiftSlate</string>
     <string name="settings_build_version" tools:ignore="MissingTranslation">Build v%1$s</string>
     <string name="settings_sponsor_hint" tools:ignore="MissingTranslation">Support future development</string>
+    <!-- Dashboard: productivity odometer + sandbox (same TODO-translate terms as above) -->
+    <string name="dashboard_odometer_title" tools:ignore="MissingTranslation">Estimated Time Saved</string>
+    <string name="dashboard_odometer_hours" tools:ignore="MissingTranslation">%1$.1f Hrs</string>
+    <string name="dashboard_odometer_minutes" tools:ignore="MissingTranslation">%1$.0f Mins</string>
+    <string name="dashboard_odometer_basis" tools:ignore="MissingTranslation">Calculated on %1$d historical command runs</string>
+    <string name="dashboard_sandbox_title" tools:ignore="MissingTranslation">Interactive Playground</string>
+    <string name="dashboard_sandbox_badge" tools:ignore="MissingTranslation">SANDBOX</string>
+    <string name="dashboard_sandbox_desc" tools:ignore="MissingTranslation">Experience inline AI replacement. Tap the action button below to trigger typewriter expansion simulation instantly.</string>
+    <string name="dashboard_sandbox_editor" tools:ignore="MissingTranslation">LIVE EDITOR</string>
+    <string name="dashboard_sandbox_replacing" tools:ignore="MissingTranslation">Replacing…</string>
+    <string name="dashboard_sandbox_replaced" tools:ignore="MissingTranslation">Replaced</string>
+    <string name="dashboard_sandbox_demo_input" tools:ignore="MissingTranslation">/.formal Hey, can we meet tomorrow?</string>
+    <string name="dashboard_sandbox_demo_output" tools:ignore="MissingTranslation">I wanted to inquire if you might be available for a brief discussion tomorrow?</string>
+    <string name="dashboard_sandbox_expand" tools:ignore="MissingTranslation">Expand with AI</string>
+    <string name="dashboard_sandbox_reset" tools:ignore="MissingTranslation">Reset Demo</string>
 </resources>

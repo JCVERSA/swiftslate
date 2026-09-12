@@ -255,6 +255,8 @@ class AssistantService : AccessibilityService() {
             return
         }
 
+        performHapticFeedback(HapticFeedbackConstants.GESTURE_START)
+
         val precedingText = text.substring(0, text.length - command.trigger.length)
         val cleanText = precedingText.trim()
 
@@ -1018,6 +1020,8 @@ class AssistantService : AccessibilityService() {
                             vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
                         HapticFeedbackConstants.REJECT ->
                             vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK))
+                        HapticFeedbackConstants.GESTURE_START ->
+                            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
                     }
                 } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     @Suppress("DEPRECATION")
@@ -1027,11 +1031,18 @@ class AssistantService : AccessibilityService() {
                             vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
                         HapticFeedbackConstants.REJECT ->
                             vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK))
+                        HapticFeedbackConstants.GESTURE_START ->
+                            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
                     }
                 } else {
                     @Suppress("DEPRECATION")
                     val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-                    vibrator.vibrate(50)
+                    when (feedbackType) {
+                        HapticFeedbackConstants.CONFIRM -> vibrator.vibrate(20)
+                        HapticFeedbackConstants.REJECT -> vibrator.vibrate(80)
+                        HapticFeedbackConstants.GESTURE_START -> vibrator.vibrate(15)
+                        else -> vibrator.vibrate(30)
+                    }
                 }
             } catch (_: Exception) {}
         }

@@ -11,8 +11,11 @@ import androidx.compose.animation.core.*
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -44,7 +47,10 @@ import com.musheer360.swiftslate.manager.KeyManager
 import com.musheer360.swiftslate.manager.StatsManager
 import com.musheer360.swiftslate.ui.components.LocalSlateRhythm
 import com.musheer360.swiftslate.ui.components.AnimateEntrance
+import com.musheer360.swiftslate.ui.components.SlateTextField
+import com.musheer360.swiftslate.ui.components.bounceClick
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -539,8 +545,302 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
             }
         }
 
-        // Usage Analytics Panel
+        // Productivity Odometer
+        val totalReqs = statsManager.totalRequests
+        // Rough estimate, honestly labeled as such below: ~2.5 min of typing saved per run.
+        val minutesSaved = totalReqs * 2.5f
+        val hoursSaved = minutesSaved / 60f
+        val formattedTime = if (hoursSaved >= 1f) {
+            stringResource(R.string.dashboard_odometer_hours, hoursSaved)
+        } else {
+            stringResource(R.string.dashboard_odometer_minutes, minutesSaved)
+        }
+
+        AnimateEntrance(index = 4) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = rhythm.cardGap),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                ),
+                tonalElevation = 1.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Hoisted: drawBehind's DrawScope cannot read composition locals, and the
+                    // arc must follow the theme (not a hardcoded indigo) in both modes.
+                    val arcTrack = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                    val arcColor = MaterialTheme.colorScheme.primary
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .drawBehind {
+                                drawArc(
+                                    color = arcTrack,
+                                    startAngle = 0f,
+                                    sweepAngle = 360f,
+                                    useCenter = false,
+                                    style = Stroke(width = 5.dp.toPx())
+                                )
+                                drawArc(
+                                    color = arcColor,
+                                    startAngle = -90f,
+                                    sweepAngle = if (totalReqs > 0) 240f else 40f,
+                                    useCenter = false,
+                                    style = Stroke(
+                                        width = 5.dp.toPx(),
+                                        cap = StrokeCap.Round
+                                    )
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.HourglassEmpty,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.dashboard_odometer_title),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = formattedTime,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.dashboard_odometer_basis, totalReqs),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Interactive Sandbox Playground (simulated demo — no network, no AI call).
+        val sandboxDemoInput = stringResource(R.string.dashboard_sandbox_demo_input)
+        val sandboxDemoOutput = stringResource(R.string.dashboard_sandbox_demo_output)
+        var sandboxText by remember(sandboxDemoInput) { mutableStateOf(sandboxDemoInput) }
+        var isSandboxProcessing by remember { mutableStateOf(false) }
+        var sandboxSuccess by remember { mutableStateOf(false) }
+
+        LaunchedEffect(isSandboxProcessing) {
+            if (isSandboxProcessing) {
+                sandboxSuccess = false
+                delay(1600L) // simulated "thinking" pause
+                sandboxText = ""
+                for (i in 1..sandboxDemoOutput.length) {
+                    delay(30L)
+                    sandboxText = sandboxDemoOutput.substring(0, i)
+                }
+                isSandboxProcessing = false
+                sandboxSuccess = true
+            }
+        }
+
         AnimateEntrance(index = 5) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = rhythm.cardGap),
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                ),
+                tonalElevation = 1.dp
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Rounded.AutoAwesome,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.dashboard_sandbox_title),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.dashboard_sandbox_badge),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = stringResource(R.string.dashboard_sandbox_desc),
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                RoundedCornerShape(14.dp)
+                            )
+                            .border(
+                                1.dp,
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                                RoundedCornerShape(14.dp)
+                            )
+                            .padding(14.dp)
+                    ) {
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.dashboard_sandbox_editor),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                                if (isSandboxProcessing) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(10.dp),
+                                            strokeWidth = 1.5.dp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = stringResource(R.string.dashboard_sandbox_replacing),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                } else if (sandboxSuccess) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.CheckCircle,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.tertiary,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = stringResource(R.string.dashboard_sandbox_replaced),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.tertiary
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            SlateTextField(
+                                value = sandboxText,
+                                onValueChange = { if (!isSandboxProcessing) sandboxText = it },
+                                singleLine = false,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                if (!isSandboxProcessing) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    isSandboxProcessing = true
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !isSandboxProcessing,
+                            modifier = Modifier
+                                .weight(1.3f)
+                                .heightIn(min = 44.dp)
+                                .bounceClick(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Rounded.FlashOn,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(stringResource(R.string.dashboard_sandbox_expand), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                if (!isSandboxProcessing) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    sandboxText = sandboxDemoInput
+                                    sandboxSuccess = false
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !isSandboxProcessing,
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 44.dp)
+                                .bounceClick()
+                        ) {
+                            Text(stringResource(R.string.dashboard_sandbox_reset), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Usage Analytics Panel
+        AnimateEntrance(index = 6) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
