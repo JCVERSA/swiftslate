@@ -40,12 +40,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.jcversa.swiftslate.R
 import com.jcversa.swiftslate.SwiftSlateApp
-import com.jcversa.swiftslate.api.GeminiClient
-import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.CommandManager
 import com.jcversa.swiftslate.service.BackgroundReliability
-import com.jcversa.swiftslate.service.CommandOutcome
-import com.jcversa.swiftslate.service.runTextCommand
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.manager.StatsManager
 import com.jcversa.swiftslate.model.PrefKeys
@@ -60,9 +56,7 @@ import com.jcversa.swiftslate.ui.components.SlateMark
 import com.jcversa.swiftslate.ui.components.bounceClick
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -107,21 +101,11 @@ private fun clearCrashMarker(context: Context) {
     }
 }
 
-private sealed interface DiagnosticState {
-    data object Success : DiagnosticState
-    data class Failure(val message: String) : DiagnosticState
-}
-
 @Composable
 fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, statsManager: StatsManager) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    val diagnosticScope = rememberCoroutineScope()
-    val diagnosticGeminiClient = remember { GeminiClient() }
-    val diagnosticOpenAIClient = remember { OpenAICompatibleClient() }
     var isServiceEnabled by remember { mutableStateOf(checkServiceEnabled(context)) }
-    var diagnosticRunning by remember { mutableStateOf(false) }
-    var diagnosticResult by remember { mutableStateOf<DiagnosticState?>(null) }
     var keyCount by remember { mutableIntStateOf(0) }
     var showKilledBanner by remember { mutableStateOf(false) }
     var privacyMode by remember {
@@ -557,14 +541,6 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        if (diagnosticResult is DiagnosticState.Success) {
-                            Icon(
-                                imageVector = Icons.Rounded.CheckCircle,
-                                contentDescription = stringResource(R.string.dashboard_diagnostic_success),
-                                tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
                     }
                     Spacer(modifier = Modifier.height(14.dp))
                     Surface(
@@ -632,76 +608,6 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                                 )
                             }
                         }
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            if (!diagnosticRunning) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                diagnosticRunning = true
-                                diagnosticResult = null
-                                diagnosticScope.launch {
-                                    val outcome = try {
-                                        withContext(Dispatchers.IO) {
-                                            withTimeout(90_000L) {
-                                                runTextCommand(
-                                                    context.applicationContext,
-                                                    keyManager,
-                                                    diagnosticGeminiClient,
-                                                    diagnosticOpenAIClient,
-                                                    context.getString(R.string.dashboard_diagnostic_prompt),
-                                                    context.getString(R.string.dashboard_diagnostic_input)
-                                                )
-                                            }
-                                        }
-                                    } catch (_: Exception) {
-                                        CommandOutcome.Failure(context.getString(R.string.dashboard_diagnostic_failed))
-                                    }
-                                    diagnosticRunning = false
-                                    diagnosticResult = when (outcome) {
-                                        is CommandOutcome.Success -> DiagnosticState.Success
-                                        is CommandOutcome.Refusal -> DiagnosticState.Failure(context.getString(R.string.dashboard_diagnostic_refused))
-                                        is CommandOutcome.Unavailable -> DiagnosticState.Failure(outcome.message)
-                                        is CommandOutcome.Failure -> DiagnosticState.Failure(outcome.message)
-                                    }
-                                }
-                            }
-                        },
-                        enabled = !diagnosticRunning,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        if (diagnosticRunning) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.dashboard_diagnostic_running))
-                        } else {
-                            Icon(Icons.Rounded.NetworkCheck, null, modifier = Modifier.size(17.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.dashboard_diagnostic_button))
-                        }
-                    }
-                    when (val result = diagnosticResult) {
-                        is DiagnosticState.Success -> Text(
-                            text = stringResource(R.string.dashboard_diagnostic_success),
-                            color = MaterialTheme.colorScheme.tertiary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                        is DiagnosticState.Failure -> Text(
-                            text = result.message,
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                        null -> Unit
                     }
                 }
             }
