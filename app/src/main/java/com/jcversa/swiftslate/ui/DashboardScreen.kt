@@ -41,8 +41,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.jcversa.swiftslate.R
 import com.jcversa.swiftslate.SwiftSlateApp
+import com.jcversa.swiftslate.api.GeminiClient
+import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.CommandManager
 import com.jcversa.swiftslate.service.BackgroundReliability
+import com.jcversa.swiftslate.service.CommandOutcome
+import com.jcversa.swiftslate.service.runTextCommand
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.manager.StatsManager
 import com.jcversa.swiftslate.model.PrefKeys
@@ -57,7 +61,9 @@ import com.jcversa.swiftslate.ui.components.SlateMark
 import com.jcversa.swiftslate.ui.components.bounceClick
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -111,6 +117,9 @@ private sealed interface DiagnosticState {
 fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, statsManager: StatsManager) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val diagnosticScope = rememberCoroutineScope()
+    val diagnosticGeminiClient = remember { GeminiClient() }
+    val diagnosticOpenAIClient = remember { OpenAICompatibleClient() }
     var diagnosticRunning by rememberSaveable { mutableStateOf(false) }
     var diagnosticResult by remember { mutableStateOf<DiagnosticState?>(null) }
     var isServiceEnabled by remember { mutableStateOf(checkServiceEnabled(context)) }
@@ -628,10 +637,36 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
                         onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            diagnosticRunning = true
-                            diagnosticResult = DiagnosticState.Success
-                            diagnosticRunning = false
+                            if (!diagnosticRunning) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                diagnosticRunning = true
+                                diagnosticResult = null
+                                diagnosticScope.launch {
+                                    val outcome = try {
+                                        withContext(Dispatchers.IO) {
+                                            withTimeout(90_000L) {
+                                                runTextCommand(
+                                                    context.applicationContext,
+                                                    keyManager,
+                                                    diagnosticGeminiClient,
+                                                    diagnosticOpenAIClient,
+                                                    context.getString(R.string.dashboard_diagnostic_prompt),
+                                                    context.getString(R.string.dashboard_diagnostic_input)
+                                                )
+                                            }
+                                        }
+                                    } catch (_: Exception) {
+                                        CommandOutcome.Failure(context.getString(R.string.dashboard_diagnostic_failed))
+                                    }
+                                    diagnosticRunning = false
+                                    diagnosticResult = when (outcome) {
+                                        is CommandOutcome.Success -> DiagnosticState.Success
+                                        is CommandOutcome.Refusal -> DiagnosticState.Failure(context.getString(R.string.dashboard_diagnostic_refused))
+                                        is CommandOutcome.Unavailable -> DiagnosticState.Failure(outcome.message)
+                                        is CommandOutcome.Failure -> DiagnosticState.Failure(outcome.message)
+                                    }
+                                }
+                            }
                         },
                         enabled = !diagnosticRunning,
                         modifier = Modifier
