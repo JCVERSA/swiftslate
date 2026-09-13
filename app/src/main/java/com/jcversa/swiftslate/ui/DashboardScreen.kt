@@ -41,8 +41,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.jcversa.swiftslate.R
 import com.jcversa.swiftslate.SwiftSlateApp
+import com.jcversa.swiftslate.api.GeminiClient
+import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.CommandManager
 import com.jcversa.swiftslate.service.BackgroundReliability
+import com.jcversa.swiftslate.service.CommandOutcome
+import com.jcversa.swiftslate.service.runTextCommand
 import com.jcversa.swiftslate.service.runTextCommand
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.manager.StatsManager
@@ -60,6 +64,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -109,11 +114,45 @@ private sealed interface DiagnosticState {
     data class Failure(val message: String) : DiagnosticState
 }
 
+private suspend fun runDashboardDiagnostic(
+    context: Context,
+    keyManager: KeyManager,
+    geminiClient: GeminiClient,
+    openAIClient: OpenAICompatibleClient
+): DiagnosticState {
+    return try {
+        val outcome = withContext(Dispatchers.IO) {
+            withTimeout(90_000L) {
+                runTextCommand(
+                    context.applicationContext,
+                    keyManager,
+                    geminiClient,
+                    openAIClient,
+                    context.getString(R.string.dashboard_diagnostic_prompt),
+                    context.getString(R.string.dashboard_diagnostic_input)
+                )
+            }
+        }
+        when (outcome) {
+            is CommandOutcome.Success -> DiagnosticState.Success
+            is CommandOutcome.Refusal -> DiagnosticState.Failure(
+                context.getString(R.string.dashboard_diagnostic_refused)
+            )
+            is CommandOutcome.Unavailable -> DiagnosticState.Failure(outcome.message)
+            is CommandOutcome.Failure -> DiagnosticState.Failure(outcome.message)
+        }
+    } catch (_: Exception) {
+        DiagnosticState.Failure(context.getString(R.string.dashboard_diagnostic_failed))
+    }
+}
+
 @Composable
 fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, statsManager: StatsManager) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val diagnosticScope = rememberCoroutineScope()
+    val diagnosticGeminiClient = remember { GeminiClient() }
+    val diagnosticOpenAIClient = remember { OpenAICompatibleClient() }
     var diagnosticRunning by rememberSaveable { mutableStateOf(false) }
     var diagnosticResult by remember { mutableStateOf<DiagnosticState?>(null) }
     var isServiceEnabled by remember { mutableStateOf(checkServiceEnabled(context)) }
@@ -636,9 +675,13 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                                 diagnosticRunning = true
                                 diagnosticResult = null
                                 diagnosticScope.launch {
-                                    delay(1)
+                                    diagnosticResult = runDashboardDiagnostic(
+                                        context,
+                                        keyManager,
+                                        diagnosticGeminiClient,
+                                        diagnosticOpenAIClient
+                                    )
                                     diagnosticRunning = false
-                                    diagnosticResult = DiagnosticState.Success
                                 }
                             }
                         },
