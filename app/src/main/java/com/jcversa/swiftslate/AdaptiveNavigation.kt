@@ -3,6 +3,7 @@ package com.jcversa.swiftslate
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -187,52 +189,57 @@ private fun SlateNavigationItem(
 
     Surface(
         modifier = modifier
-            .heightIn(min = if (compact) 52.dp else 56.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .heightIn(min = 56.dp)
             .bounceClick(onClick)
-            .background(background)
             .semantics {
                 this.selected = selected
                 this.role = Role.Tab
+                if (compact) this.contentDescription = label
             }
             .animateContentSize(animationSpec = motion.sizeTransitionSpec(180)),
-        color = background,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0f),
         shape = RoundedCornerShape(18.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal = if (expanded || compact) 12.dp else 8.dp,
-                    vertical = if (compact) 5.dp else 8.dp
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = if (expanded) Arrangement.Start else Arrangement.Center
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = tab.icon,
-                contentDescription = if (expanded || compact) null else label,
-                tint = contentColor,
-                modifier = Modifier.size(if (compact) 21.dp else 23.dp)
-            )
-            if (compact) {
-                Text(
-                    text = label,
-                    color = contentColor,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    maxLines = 1,
-                    modifier = Modifier.padding(start = 4.dp)
+            Row(
+                modifier = if (compact) {
+                    Modifier
+                        .size(48.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(background)
+                        .padding(12.dp)
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(background)
+                        .padding(
+                            horizontal = if (expanded) 12.dp else 8.dp,
+                            vertical = 8.dp
+                        )
+                },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = if (expanded) Arrangement.Start else Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = tab.icon,
+                    contentDescription = if (compact || expanded) null else label,
+                    tint = contentColor,
+                    modifier = Modifier.size(if (compact) 24.dp else 23.dp)
                 )
-            } else if (expanded) {
-                Text(
-                    text = label,
-                    color = contentColor,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    maxLines = 1,
-                    modifier = Modifier.padding(start = 12.dp)
-                )
+                if (expanded) {
+                    Text(
+                        text = label,
+                        color = contentColor,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1,
+                        modifier = Modifier.padding(start = 12.dp)
+                    )
+                }
             }
         }
     }
