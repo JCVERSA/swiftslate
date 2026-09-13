@@ -252,6 +252,8 @@
     <string name="dashboard_diagnostic_success" tools:ignore="MissingTranslation">Configuration test passed.</string>
     <string name="dashboard_diagnostic_failed" tools:ignore="MissingTranslation">Configuration test failed.</string>
     <string name="dashboard_diagnostic_refused" tools:ignore="MissingTranslation">The provider refused the diagnostic request.</string>
+    <string name="dashboard_diagnostic_prompt" tools:ignore="MissingTranslation">Reply with the single word OK.</string>
+    <string name="dashboard_diagnostic_input" tools:ignore="MissingTranslation">SwiftSlate configuration diagnostic</string>
     <string name="dashboard_chart_title" tools:ignore="MissingTranslation">Daily Usage Frequency</string>
     <string name="dashboard_cd_chart" tools:ignore="MissingTranslation">Stats</string>
     <!-- Keys -->

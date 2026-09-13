@@ -255,4 +255,6 @@
     <string name="dashboard_diagnostic_success">Test de configuration réussi.</string>
     <string name="dashboard_diagnostic_failed">Échec du test de configuration.</string>
     <string name="dashboard_diagnostic_refused">Le fournisseur a refusé la requête de diagnostic.</string>
+    <string name="dashboard_diagnostic_prompt">Répondez avec le seul mot OK.</string>
+    <string name="dashboard_diagnostic_input">Diagnostic de configuration SwiftSlate</string>
 </resources>
