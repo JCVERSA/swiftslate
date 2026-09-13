@@ -41,11 +41,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.jcversa.swiftslate.R
 import com.jcversa.swiftslate.SwiftSlateApp
-import com.jcversa.swiftslate.api.GeminiClient
-import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.CommandManager
 import com.jcversa.swiftslate.service.BackgroundReliability
-import com.jcversa.swiftslate.service.CommandOutcome
 import com.jcversa.swiftslate.service.runTextCommand
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.manager.StatsManager
@@ -63,7 +60,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -118,8 +114,6 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val diagnosticScope = rememberCoroutineScope()
-    val diagnosticGeminiClient = remember { GeminiClient() }
-    val diagnosticOpenAIClient = remember { OpenAICompatibleClient() }
     var diagnosticRunning by rememberSaveable { mutableStateOf(false) }
     var diagnosticResult by remember { mutableStateOf<DiagnosticState?>(null) }
     var isServiceEnabled by remember { mutableStateOf(checkServiceEnabled(context)) }
@@ -642,23 +636,9 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                                 diagnosticRunning = true
                                 diagnosticResult = null
                                 diagnosticScope.launch {
-                                    val outcome = try {
-                                        withContext(Dispatchers.IO) {
-                                            withTimeout(90_000L) {
-                                                delay(1)
-                                                CommandOutcome.Success("")
-                                            }
-                                        }
-                                    } catch (_: Exception) {
-                                        CommandOutcome.Failure(context.getString(R.string.dashboard_diagnostic_failed))
-                                    }
+                                    delay(1)
                                     diagnosticRunning = false
-                                    diagnosticResult = when (outcome) {
-                                        is CommandOutcome.Success -> DiagnosticState.Success
-                                        is CommandOutcome.Refusal -> DiagnosticState.Failure(context.getString(R.string.dashboard_diagnostic_refused))
-                                        is CommandOutcome.Unavailable -> DiagnosticState.Failure(outcome.message)
-                                        is CommandOutcome.Failure -> DiagnosticState.Failure(outcome.message)
-                                    }
+                                    diagnosticResult = DiagnosticState.Success
                                 }
                             }
                         },
