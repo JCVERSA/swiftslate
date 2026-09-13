@@ -240,20 +240,6 @@
     <string name="dashboard_metric_integrations" tools:ignore="MissingTranslation">Integrations</string>
     <string name="dashboard_metric_keys" tools:ignore="MissingTranslation">Configured Keys</string>
     <string name="dashboard_cd_key_missing" tools:ignore="MissingTranslation">Key missing</string>
-    <string name="dashboard_configuration_title" tools:ignore="MissingTranslation">Configuration status</string>
-    <string name="dashboard_configuration_desc" tools:ignore="MissingTranslation">Review locally, then test only when you choose.</string>
-    <string name="dashboard_configuration_provider" tools:ignore="MissingTranslation">Provider</string>
-    <string name="dashboard_configuration_model" tools:ignore="MissingTranslation">Model</string>
-    <string name="dashboard_configuration_keys" tools:ignore="MissingTranslation">API keys</string>
-    <string name="dashboard_configuration_key_count" tools:ignore="MissingTranslation">%1$d configured</string>
-    <string name="dashboard_configuration_not_set" tools:ignore="MissingTranslation">Not configured</string>
-    <string name="dashboard_diagnostic_button" tools:ignore="MissingTranslation">Run configuration test</string>
-    <string name="dashboard_diagnostic_running" tools:ignore="MissingTranslation">Testing configuration…</string>
-    <string name="dashboard_diagnostic_success" tools:ignore="MissingTranslation">Configuration test passed.</string>
-    <string name="dashboard_diagnostic_failed" tools:ignore="MissingTranslation">Configuration test failed.</string>
-    <string name="dashboard_diagnostic_refused" tools:ignore="MissingTranslation">The provider refused the diagnostic request.</string>
-    <string name="dashboard_diagnostic_prompt" tools:ignore="MissingTranslation">Reply with the single word OK.</string>
-    <string name="dashboard_diagnostic_input" tools:ignore="MissingTranslation">SwiftSlate configuration diagnostic</string>
     <string name="dashboard_chart_title" tools:ignore="MissingTranslation">Daily Usage Frequency</string>
     <string name="dashboard_cd_chart" tools:ignore="MissingTranslation">Stats</string>
     <!-- Keys -->
