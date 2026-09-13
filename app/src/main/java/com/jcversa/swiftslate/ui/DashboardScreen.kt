@@ -40,12 +40,17 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.jcversa.swiftslate.R
 import com.jcversa.swiftslate.SwiftSlateApp
+import com.jcversa.swiftslate.api.GeminiClient
+import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.CommandManager
 import com.jcversa.swiftslate.service.BackgroundReliability
+import com.jcversa.swiftslate.service.CommandOutcome
+import com.jcversa.swiftslate.service.runTextCommand
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.manager.StatsManager
 import com.jcversa.swiftslate.model.PrefKeys
 import com.jcversa.swiftslate.model.ProviderType
+import com.jcversa.swiftslate.provider.Providers
 import com.jcversa.swiftslate.ui.components.LocalSlateRhythm
 import com.jcversa.swiftslate.ui.components.AnimateEntrance
 import com.jcversa.swiftslate.ui.components.SlateMorphIcon
@@ -55,7 +60,9 @@ import com.jcversa.swiftslate.ui.components.SlateMark
 import com.jcversa.swiftslate.ui.components.bounceClick
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -100,11 +107,21 @@ private fun clearCrashMarker(context: Context) {
     }
 }
 
+private sealed interface DiagnosticState {
+    data object Success : DiagnosticState
+    data class Failure(val message: String) : DiagnosticState
+}
+
 @Composable
 fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, statsManager: StatsManager) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val diagnosticScope = rememberCoroutineScope()
+    val diagnosticGeminiClient = remember { GeminiClient() }
+    val diagnosticOpenAIClient = remember { OpenAICompatibleClient() }
     var isServiceEnabled by remember { mutableStateOf(checkServiceEnabled(context)) }
+    var diagnosticRunning by remember { mutableStateOf(false) }
+    var diagnosticResult by remember { mutableStateOf<DiagnosticState?>(null) }
     var keyCount by remember { mutableIntStateOf(0) }
     var showKilledBanner by remember { mutableStateOf(false) }
     var privacyMode by remember {
@@ -165,6 +182,21 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
     val noData = stringResource(R.string.dashboard_no_data)
     val rhythm = LocalSlateRhythm.current
     val scrollState = rememberScrollState()
+    val activeProviderType = ProviderType.sanitize(
+        context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+            .getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI)
+    )
+    val activeProvider = Providers.forType(activeProviderType)
+    val activeModel = activeProvider.sanitizeModel(
+        context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+            .getString(activeProvider.modelPrefKey, activeProvider.defaultModel)
+    )
+    val activeModelLabel = if (activeModel.isBlank()) {
+        stringResource(R.string.dashboard_configuration_not_set)
+    } else {
+        activeModel
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -485,6 +517,195 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
             }
         }
     }
+
+        // Configuration Control Center: status is local until the user explicitly runs a test.
+        AnimateEntrance(index = 3) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = rhythm.cardGap),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                ),
+                tonalElevation = 1.dp
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Tune,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.dashboard_configuration_title),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(R.string.dashboard_configuration_desc),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (diagnosticResult is DiagnosticState.Success) {
+                            Icon(
+                                imageVector = Icons.Rounded.CheckCircle,
+                                contentDescription = stringResource(R.string.dashboard_diagnostic_success),
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.dashboard_configuration_provider),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = when (activeProviderType) {
+                                        ProviderType.GROQ -> stringResource(R.string.settings_provider_groq)
+                                        ProviderType.NVIDIA -> stringResource(R.string.settings_provider_nvidia)
+                                        ProviderType.OPENROUTER -> stringResource(R.string.settings_provider_openrouter)
+                                        ProviderType.DEEPSEEK -> stringResource(R.string.settings_provider_deepseek)
+                                        ProviderType.CUSTOM -> stringResource(R.string.settings_provider_custom)
+                                        else -> stringResource(R.string.settings_provider_gemini)
+                                    },
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.dashboard_configuration_model),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = activeModelLabel,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    modifier = Modifier.widthIn(max = 220.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.dashboard_configuration_keys),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = stringResource(R.string.dashboard_configuration_key_count, keyCount),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (keyCount > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            if (!diagnosticRunning) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                diagnosticRunning = true
+                                diagnosticResult = null
+                                diagnosticScope.launch {
+                                    val outcome = try {
+                                        withContext(Dispatchers.IO) {
+                                            withTimeout(90_000L) {
+                                                runTextCommand(
+                                                    context.applicationContext,
+                                                    keyManager,
+                                                    diagnosticGeminiClient,
+                                                    diagnosticOpenAIClient,
+                                                    context.getString(R.string.dashboard_diagnostic_prompt),
+                                                    context.getString(R.string.dashboard_diagnostic_input)
+                                                )
+                                            }
+                                        }
+                                    } catch (_: Exception) {
+                                        CommandOutcome.Failure(context.getString(R.string.dashboard_diagnostic_failed))
+                                    }
+                                    diagnosticRunning = false
+                                    diagnosticResult = when (outcome) {
+                                        is CommandOutcome.Success -> DiagnosticState.Success
+                                        is CommandOutcome.Refusal -> DiagnosticState.Failure(context.getString(R.string.dashboard_diagnostic_refused))
+                                        is CommandOutcome.Unavailable -> DiagnosticState.Failure(outcome.message)
+                                        is CommandOutcome.Failure -> DiagnosticState.Failure(outcome.message)
+                                    }
+                                }
+                            }
+                        },
+                        enabled = !diagnosticRunning,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        if (diagnosticRunning) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.dashboard_diagnostic_running))
+                        } else {
+                            Icon(Icons.Rounded.NetworkCheck, null, modifier = Modifier.size(17.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.dashboard_diagnostic_button))
+                        }
+                    }
+                    when (val result = diagnosticResult) {
+                        is DiagnosticState.Success -> Text(
+                            text = stringResource(R.string.dashboard_diagnostic_success),
+                            color = MaterialTheme.colorScheme.tertiary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                        is DiagnosticState.Failure -> Text(
+                            text = result.message,
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                        null -> Unit
+                    }
+                }
+            }
+        }
 
         // Dual Side-by-Side Statistics Metrics Cards
         AnimateEntrance(index = 4) {
