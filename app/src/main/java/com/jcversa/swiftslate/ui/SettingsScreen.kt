@@ -38,8 +38,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import org.json.JSONArray
+import org.json.JSONObject
 import com.jcversa.swiftslate.manager.CommandManager
 import com.jcversa.swiftslate.manager.HistoryManager
 import com.jcversa.swiftslate.manager.KeyManager
@@ -1171,7 +1171,10 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                                             historyRetentionDays = days
                                             historyManager.setRetentionDays(days)
                                         },
-                                        shape = SegmentedButtonDefaults.itemShape(index, retentionOptions.size),
+                                        shape = SegmentedButtonDefaults.itemShape(
+                                            index = index,
+                                            count = retentionOptions.size
+                                        ),
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Text(stringResource(R.string.settings_history_days, days), fontSize = 11.sp)
