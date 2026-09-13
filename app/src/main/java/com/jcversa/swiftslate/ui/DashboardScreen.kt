@@ -101,10 +101,17 @@ private fun clearCrashMarker(context: Context) {
     }
 }
 
+private sealed interface DiagnosticState {
+    data object Success : DiagnosticState
+    data class Failure(val message: String) : DiagnosticState
+}
+
 @Composable
 fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, statsManager: StatsManager) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    var diagnosticRunning by rememberSaveable { mutableStateOf(false) }
+    var diagnosticResult by remember { mutableStateOf<DiagnosticState?>(null) }
     var isServiceEnabled by remember { mutableStateOf(checkServiceEnabled(context)) }
     var keyCount by remember { mutableIntStateOf(0) }
     var showKilledBanner by remember { mutableStateOf(false) }
@@ -541,6 +548,14 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                        if (diagnosticResult is DiagnosticState.Success) {
+                            Icon(
+                                imageVector = Icons.Rounded.CheckCircle,
+                                contentDescription = stringResource(R.string.dashboard_diagnostic_success),
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(14.dp))
                     Surface(
@@ -608,6 +623,50 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                                 )
                             }
                         }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            diagnosticRunning = true
+                            diagnosticResult = DiagnosticState.Success
+                            diagnosticRunning = false
+                        },
+                        enabled = !diagnosticRunning,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        if (diagnosticRunning) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.dashboard_diagnostic_running))
+                        } else {
+                            Icon(Icons.Rounded.NetworkCheck, null, modifier = Modifier.size(17.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.dashboard_diagnostic_button))
+                        }
+                    }
+                    when (val result = diagnosticResult) {
+                        is DiagnosticState.Success -> Text(
+                            text = stringResource(R.string.dashboard_diagnostic_success),
+                            color = MaterialTheme.colorScheme.tertiary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                        is DiagnosticState.Failure -> Text(
+                            text = result.message,
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                        null -> Unit
                     }
                 }
             }
