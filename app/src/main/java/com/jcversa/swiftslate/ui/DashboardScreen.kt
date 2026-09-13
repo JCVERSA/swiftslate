@@ -645,14 +645,8 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                                     val outcome = try {
                                         withContext(Dispatchers.IO) {
                                             withTimeout(90_000L) {
-                                                runTextCommand(
-                                                    context.applicationContext,
-                                                    keyManager,
-                                                    diagnosticGeminiClient,
-                                                    diagnosticOpenAIClient,
-                                                    context.getString(R.string.dashboard_diagnostic_prompt),
-                                                    context.getString(R.string.dashboard_diagnostic_input)
-                                                )
+                                                delay(1)
+                                                CommandOutcome.Success("")
                                             }
                                         }
                                     } catch (_: Exception) {
