@@ -38,7 +38,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import org.json.JSONArray
 import com.jcversa.swiftslate.manager.CommandManager
+import com.jcversa.swiftslate.manager.HistoryManager
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.manager.ProviderModelsCache
 import com.jcversa.swiftslate.model.GroqModels
@@ -53,6 +56,70 @@ import com.jcversa.swiftslate.ui.components.SlateCard
 import com.jcversa.swiftslate.ui.components.SlateDivider
 import com.jcversa.swiftslate.ui.components.SlateTextField
 import com.jcversa.swiftslate.ui.components.AnimateEntrance
+
+private const val SAFE_BACKUP_VERSION = 2
+
+/** Exports configuration without API keys, history contents, or endpoint credentials. */
+private fun buildSafeBackup(commandManager: CommandManager, prefs: SharedPreferences): String {
+    val settings = JSONObject().apply {
+        put(PrefKeys.PROVIDER_TYPE, ProviderType.sanitize(prefs.getString(PrefKeys.PROVIDER_TYPE, null)))
+        put(PrefKeys.GEMINI_MODEL, prefs.getString(PrefKeys.GEMINI_MODEL, "").orEmpty())
+        put(PrefKeys.GROQ_MODEL, prefs.getString(PrefKeys.GROQ_MODEL, "").orEmpty())
+        put(PrefKeys.NVIDIA_MODEL, prefs.getString(PrefKeys.NVIDIA_MODEL, "").orEmpty())
+        put(PrefKeys.OPENROUTER_MODEL, prefs.getString(PrefKeys.OPENROUTER_MODEL, "").orEmpty())
+        put(PrefKeys.DEEPSEEK_MODEL, prefs.getString(PrefKeys.DEEPSEEK_MODEL, "").orEmpty())
+        put(PrefKeys.CUSTOM_MODEL, prefs.getString(PrefKeys.CUSTOM_MODEL, "").orEmpty())
+        put(PrefKeys.TEMPERATURE, prefs.getFloat(PrefKeys.TEMPERATURE, 0.5f).toDouble())
+        put(PrefKeys.PRIVACY_MODE, prefs.getBoolean(PrefKeys.PRIVACY_MODE, false))
+        put("trigger_prefix", prefs.getString(CommandManager.PREF_TRIGGER_PREFIX, CommandManager.DEFAULT_PREFIX))
+    }
+    return JSONObject().apply {
+        put("format", "swiftslate-safe-backup")
+        put("version", SAFE_BACKUP_VERSION)
+        put("commands", JSONArray(commandManager.exportCommands()))
+        put("settings", settings)
+    }.toString(2)
+}
+
+/** Accepts the current safe envelope and older command-only JSON backups. */
+private fun importSafeBackup(json: String, commandManager: CommandManager, prefs: SharedPreferences): Boolean {
+    return try {
+        val root = JSONObject(json)
+        val settings = root.optJSONObject("settings")
+        settings?.optString("trigger_prefix")?.takeIf { it.isNotBlank() }?.let { prefix ->
+            commandManager.setTriggerPrefix(prefix)
+        }
+        val commands = root.optJSONArray("commands") ?: return false
+        if (!commandManager.importCommands(commands.toString())) return false
+        if (settings != null) {
+            val editor = prefs.edit()
+            settings.optString(PrefKeys.PROVIDER_TYPE).takeIf { it.isNotBlank() }?.let {
+                editor.putString(PrefKeys.PROVIDER_TYPE, ProviderType.sanitize(it))
+            }
+            listOf(
+                PrefKeys.GEMINI_MODEL,
+                PrefKeys.GROQ_MODEL,
+                PrefKeys.NVIDIA_MODEL,
+                PrefKeys.OPENROUTER_MODEL,
+                PrefKeys.DEEPSEEK_MODEL,
+                PrefKeys.CUSTOM_MODEL
+            ).forEach { key ->
+                if (settings.has(key)) editor.putString(key, settings.optString(key))
+            }
+            if (settings.has(PrefKeys.TEMPERATURE)) {
+                editor.putFloat(PrefKeys.TEMPERATURE, settings.optDouble(PrefKeys.TEMPERATURE, 0.5).toFloat())
+            }
+            if (settings.has(PrefKeys.PRIVACY_MODE)) {
+                editor.putBoolean(PrefKeys.PRIVACY_MODE, settings.optBoolean(PrefKeys.PRIVACY_MODE, false))
+            }
+            editor.apply()
+        }
+        true
+    } catch (_: Exception) {
+        // Keep support for pre-envelope backups that contained only a JSON array of commands.
+        commandManager.importCommands(json)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,6 +137,10 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     var privacyMode by remember {
         mutableStateOf(prefs.getBoolean(PrefKeys.PRIVACY_MODE, false))
     }
+    val historyManager = remember { HistoryManager(context) }
+    var historyEnabled by remember { mutableStateOf(historyManager.isEnabled) }
+    var historyRetentionDays by remember { mutableIntStateOf(historyManager.retentionDays) }
+    var showClearHistoryConfirm by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -294,7 +365,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                 try {
                     withContext(Dispatchers.IO) {
                         context.contentResolver.openOutputStream(it)?.use { os ->
-                            os.write(commandManager.exportCommands().toByteArray())
+                            os.write(buildSafeBackup(commandManager, prefs).toByteArray())
                         }
                     }
                     backupMessage = exportSuccessMsg
@@ -317,7 +388,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                             if (text.length > 1_000_000) null else text
                         } ?: ""
                     }
-                    if (commandManager.importCommands(json)) {
+                    if (importSafeBackup(json, commandManager, prefs)) {
                         backupMessage = importSuccessMsg
                         backupSuccess = true
                     } else {
@@ -1043,8 +1114,90 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
 
         Spacer(modifier = Modifier.height(rhythm.cardGap))
 
-        // Card 5: Backup Vault
+        // Optional local history: disabled by default and always removable in one action.
         AnimateEntrance(index = 5) {
+            SlateCard {
+                Column(modifier = Modifier.padding(2.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.History,
+                            contentDescription = null,
+                            tint = if (historyEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.settings_history_title),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(R.string.settings_history_desc),
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = historyEnabled,
+                            onCheckedChange = { enabled ->
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                historyEnabled = enabled
+                                historyManager.setEnabled(enabled)
+                            }
+                        )
+                    }
+                    AnimatedVisibility(visible = historyEnabled) {
+                        Column {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = stringResource(R.string.settings_history_retention),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            val retentionOptions = listOf(7, 30, 90)
+                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                retentionOptions.forEachIndexed { index, days ->
+                                    SegmentedButton(
+                                        selected = historyRetentionDays == days,
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            historyRetentionDays = days
+                                            historyManager.setRetentionDays(days)
+                                        },
+                                        shape = SegmentedButtonDefaults.itemShape(index, retentionOptions.size),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text(stringResource(R.string.settings_history_days, days), fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            TextButton(
+                                onClick = { showClearHistoryConfirm = true },
+                                modifier = Modifier.align(Alignment.End)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.settings_history_clear),
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(rhythm.cardGap))
+
+        // Card 6: Backup Vault
+        AnimateEntrance(index = 6) {
             SlateCard {
                 Column(modifier = Modifier.padding(2.dp)) {
                 Row(
@@ -1273,6 +1426,28 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
             }
         }
     }
+    }
+
+    if (showClearHistoryConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearHistoryConfirm = false },
+            title = { Text(stringResource(R.string.settings_history_clear_title)) },
+            text = { Text(stringResource(R.string.settings_history_clear_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    historyManager.clear()
+                    showClearHistoryConfirm = false
+                }) {
+                    Text(stringResource(R.string.settings_history_clear), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearHistoryConfirm = false }) {
+                    Text(stringResource(R.string.commands_cancel))
+                }
+            }
+        )
     }
 
     if (showImportConfirm) {

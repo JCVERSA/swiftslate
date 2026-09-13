@@ -40,8 +40,10 @@ import com.jcversa.swiftslate.SwiftSlateApp
 import com.jcversa.swiftslate.api.GeminiClient
 import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.CommandManager
+import com.jcversa.swiftslate.manager.HistoryManager
 import com.jcversa.swiftslate.model.Command
 import com.jcversa.swiftslate.model.CommandType
+import com.jcversa.swiftslate.model.HistoryEntry
 import com.jcversa.swiftslate.service.CommandOutcome
 import com.jcversa.swiftslate.service.runTextCommand
 import com.jcversa.swiftslate.ui.components.AnimateEntrance
@@ -55,6 +57,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +69,7 @@ fun CommandsScreen(commandManager: CommandManager) {
     val scope = rememberCoroutineScope()
     val geminiClient = remember { GeminiClient() }
     val openAIClient = remember { OpenAICompatibleClient() }
+    val historyManager = remember { HistoryManager(context) }
     val rhythm = LocalSlateRhythm.current
 
     var commands by remember { mutableStateOf(commandManager.getCommands()) }
@@ -87,11 +93,20 @@ fun CommandsScreen(commandManager: CommandManager) {
     var editingAlias by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var commandToDelete by remember { mutableStateOf<String?>(null) }
+    var showHistory by rememberSaveable { mutableStateOf(false) }
+    var historyEntries by remember { mutableStateOf<List<HistoryEntry>>(emptyList()) }
 
     var previewInput by rememberSaveable { mutableStateOf("") }
     var previewOutput by remember { mutableStateOf<String?>(null) }
     var previewError by remember { mutableStateOf<String?>(null) }
     var isPreviewing by remember { mutableStateOf(false) }
+
+    fun openHistory() {
+        showHistory = true
+        scope.launch {
+            historyEntries = withContext(Dispatchers.IO) { historyManager.getEntries() }
+        }
+    }
 
     val prefix = commandManager.getTriggerPrefix()
     val errorPrefix = stringResource(R.string.commands_error_prefix, prefix)
@@ -337,18 +352,33 @@ fun CommandsScreen(commandManager: CommandManager) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Surface(
-                    onClick = { startNewCommand() },
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Add,
-                        contentDescription = stringResource(R.string.commands_add_custom_title),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(12.dp)
-                    )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Surface(
+                        onClick = { openHistory() },
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.History,
+                            contentDescription = stringResource(R.string.commands_history_title),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                    Surface(
+                        onClick = { startNewCommand() },
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Add,
+                            contentDescription = stringResource(R.string.commands_add_custom_title),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
                 }
             }
         }
@@ -981,6 +1011,142 @@ fun CommandsScreen(commandManager: CommandManager) {
                                     stringResource(R.string.commands_save_command)
                                 }
                             )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showHistory) {
+        ModalBottomSheet(
+            onDismissRequest = { showHistory = false },
+            containerColor = MaterialTheme.colorScheme.background,
+            dragHandle = {
+                BottomSheetDefaults.DragHandle(
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                )
+            }
+        ) {
+            val dateFormatter = remember { SimpleDateFormat("d MMM, HH:mm", Locale.getDefault()) }
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = rhythm.screenPaddingH),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.commands_history_title),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = if (historyManager.isEnabled) {
+                                stringResource(R.string.commands_history_desc)
+                            } else {
+                                stringResource(R.string.commands_history_disabled)
+                            },
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (historyEntries.isNotEmpty()) {
+                        TextButton(onClick = {
+                            historyManager.clear()
+                            historyEntries = emptyList()
+                        }) {
+                            Text(
+                                text = stringResource(R.string.commands_history_clear),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                if (historyEntries.isEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = rhythm.screenPaddingH, vertical = 44.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.History,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                            modifier = Modifier.size(40.dp)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = stringResource(R.string.commands_history_empty),
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(
+                            start = rhythm.screenPaddingH,
+                            end = rhythm.screenPaddingH,
+                            bottom = 32.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(historyEntries, key = { it.id }) { entry ->
+                            SlateItemCard {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = entry.command,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Text(
+                                            text = dateFormatter.format(Date(entry.createdAt)),
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = entry.output,
+                                        maxLines = 5,
+                                        overflow = TextOverflow.Ellipsis,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    if (entry.provider.isNotBlank()) {
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = entry.provider,
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                IconButton(
+                                    onClick = {
+                                        historyManager.delete(entry.id)
+                                        historyEntries = historyEntries.filterNot { it.id == entry.id }
+                                    },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.DeleteOutline,
+                                        contentDescription = stringResource(R.string.commands_history_delete),
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
                         }
                     }
                 }

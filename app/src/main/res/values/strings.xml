@@ -123,14 +123,14 @@
     <string name="settings_endpoint_cleartext_warning" tools:ignore="MissingTranslation">HTTP is unencrypted. Use this endpoint only on a trusted private network.</string>
 
     <!-- Backup -->
-    <string name="backup_desc">Export or import your commands as a JSON file.</string>
+    <string name="backup_desc">Export commands and safe preferences as JSON. API keys, endpoints, and local history are never included.</string>
     <string name="backup_export">Export</string>
     <string name="backup_import">Import</string>
     <string name="backup_export_success">Commands exported successfully</string>
     <string name="backup_export_error">Export failed</string>
     <string name="backup_import_success">Commands imported successfully</string>
     <string name="backup_import_error">Invalid backup file</string>
-    <string name="backup_import_confirm">This will replace all your existing custom commands. Continue?</string>
+    <string name="backup_import_confirm">This will replace your custom commands and update safe preferences. API keys and local history will not be imported. Continue?</string>
     <string name="backup_import_cancel">Cancel</string>
     <string name="settings_check_updates">Check for updates</string>
     <string name="settings_made_by">Made with love by JCVERSA, based on SwiftSlate by Musheer Alam</string>
@@ -140,6 +140,12 @@
     <string name="commands_search_hint">Search commands…</string>
     <string name="commands_search_close">Close search</string>
     <string name="commands_search_empty">No commands found</string>
+    <string name="commands_history_title" tools:ignore="MissingTranslation">Command history</string>
+    <string name="commands_history_desc" tools:ignore="MissingTranslation">Saved locally on this device</string>
+    <string name="commands_history_disabled" tools:ignore="MissingTranslation">Enable local history in Settings to save results</string>
+    <string name="commands_history_empty" tools:ignore="MissingTranslation">No saved results yet. Successful commands will appear here when local history is enabled.</string>
+    <string name="commands_history_clear" tools:ignore="MissingTranslation">Clear all</string>
+    <string name="commands_history_delete" tools:ignore="MissingTranslation">Delete history entry</string>
 
     <!-- Delete confirmation -->
     <string name="delete_confirm_command_title">Delete this command?</string>
@@ -234,6 +240,18 @@
     <string name="dashboard_metric_integrations" tools:ignore="MissingTranslation">Integrations</string>
     <string name="dashboard_metric_keys" tools:ignore="MissingTranslation">Configured Keys</string>
     <string name="dashboard_cd_key_missing" tools:ignore="MissingTranslation">Key missing</string>
+    <string name="dashboard_configuration_title" tools:ignore="MissingTranslation">Configuration status</string>
+    <string name="dashboard_configuration_desc" tools:ignore="MissingTranslation">Review locally, then test only when you choose.</string>
+    <string name="dashboard_configuration_provider" tools:ignore="MissingTranslation">Provider</string>
+    <string name="dashboard_configuration_model" tools:ignore="MissingTranslation">Model</string>
+    <string name="dashboard_configuration_keys" tools:ignore="MissingTranslation">API keys</string>
+    <string name="dashboard_configuration_key_count" tools:ignore="MissingTranslation">%1$d configured</string>
+    <string name="dashboard_configuration_not_set" tools:ignore="MissingTranslation">Not configured</string>
+    <string name="dashboard_diagnostic_button" tools:ignore="MissingTranslation">Run configuration test</string>
+    <string name="dashboard_diagnostic_running" tools:ignore="MissingTranslation">Testing configuration…</string>
+    <string name="dashboard_diagnostic_success" tools:ignore="MissingTranslation">Configuration test passed.</string>
+    <string name="dashboard_diagnostic_failed" tools:ignore="MissingTranslation">Configuration test failed.</string>
+    <string name="dashboard_diagnostic_refused" tools:ignore="MissingTranslation">The provider refused the diagnostic request.</string>
     <string name="dashboard_chart_title" tools:ignore="MissingTranslation">Daily Usage Frequency</string>
     <string name="dashboard_cd_chart" tools:ignore="MissingTranslation">Stats</string>
     <!-- Keys -->
@@ -268,6 +286,13 @@
     <string name="settings_privacy_desc" tools:ignore="MissingTranslation">Disable every AI network request. Local text replacers continue to work.</string>
     <string name="settings_privacy_enabled" tools:ignore="MissingTranslation">Private: no text is sent to an AI provider.</string>
     <string name="settings_privacy_disabled" tools:ignore="MissingTranslation">AI commands may use your configured provider.</string>
+    <string name="settings_history_title" tools:ignore="MissingTranslation">Optional local history</string>
+    <string name="settings_history_desc" tools:ignore="MissingTranslation">Keep successful command results on this device. Disabled by default.</string>
+    <string name="settings_history_retention" tools:ignore="MissingTranslation">Keep results for</string>
+    <string name="settings_history_days" tools:ignore="MissingTranslation">%1$d days</string>
+    <string name="settings_history_clear" tools:ignore="MissingTranslation">Clear history</string>
+    <string name="settings_history_clear_title" tools:ignore="MissingTranslation">Clear local history?</string>
+    <string name="settings_history_clear_message" tools:ignore="MissingTranslation">All saved command inputs and results will be removed from this device.</string>
     <string name="privacy_mode_blocked" tools:ignore="MissingTranslation">Privacy mode is enabled. AI commands are blocked; local replacements still work.</string>
     <string name="service_reliability_channel_name" tools:ignore="MissingTranslation">Service reliability</string>
     <string name="service_reliability_channel_desc" tools:ignore="MissingTranslation">Alerts when SwiftSlate needs a system setting to stay available.</string>

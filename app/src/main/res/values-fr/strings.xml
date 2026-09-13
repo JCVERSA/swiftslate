@@ -115,14 +115,14 @@
     <string name="settings_endpoint_error_spaces">L\'URL ne peut pas contenir d\'espaces</string>
 
     <!-- Backup -->
-    <string name="backup_desc">Exportez ou importez vos commandes personnalisées sous forme de fichier JSON.</string>
+    <string name="backup_desc">Exportez les commandes et les préférences sûres en JSON. Les clés API, les endpoints et l’historique local ne sont jamais inclus.</string>
     <string name="backup_export">Exporter</string>
     <string name="backup_import">Importer</string>
     <string name="backup_export_success">Commandes exportées avec succès</string>
     <string name="backup_import_success">Commandes importées avec succès</string>
     <string name="backup_import_error">Fichier de sauvegarde invalide</string>
     <string name="keys_keystore_error">Le stockage sécurisé des clés n\'est pas disponible sur cet appareil. Les clés ne peuvent pas être enregistrées.</string>
-    <string name="backup_import_confirm">Cela remplacera toutes vos commandes personnalisées existantes. Continuer ?</string>
+    <string name="backup_import_confirm">Vos commandes personnalisées et vos préférences sûres seront remplacées. Les clés API et l’historique local ne seront pas importés. Continuer ?</string>
     <string name="backup_import_cancel">Annuler</string>
     <string name="settings_check_updates">Vérifier les mises à jour</string>
     <string name="commands_collapse">Réduire</string>
@@ -137,6 +137,12 @@
     <string name="commands_search_hint">Rechercher des commandes…</string>
     <string name="commands_search_close">Fermer la recherche</string>
     <string name="commands_search_empty">Aucune commande trouvée</string>
+    <string name="commands_history_title">Historique des commandes</string>
+    <string name="commands_history_desc">Enregistré localement sur cet appareil</string>
+    <string name="commands_history_disabled">Activez l’historique local dans les Paramètres pour enregistrer les résultats</string>
+    <string name="commands_history_empty">Aucun résultat enregistré. Les commandes réussies apparaîtront ici lorsque l’historique local sera activé.</string>
+    <string name="commands_history_clear">Tout effacer</string>
+    <string name="commands_history_delete">Supprimer cette entrée de l’historique</string>
     <string name="keys_empty">Aucune clé API ajoutée</string>
     <string name="dashboard_monthly_requests">Ce mois-ci</string>
     <string name="dashboard_favorite_command">Commande principale</string>
@@ -218,6 +224,13 @@
     <string name="settings_privacy_desc">Désactive toutes les requêtes IA. Les remplacements locaux continuent de fonctionner.</string>
     <string name="settings_privacy_enabled">Privé : aucun texte n\'est envoyé à un fournisseur IA.</string>
     <string name="settings_privacy_disabled">Les commandes IA peuvent utiliser votre fournisseur configuré.</string>
+    <string name="settings_history_title">Historique local facultatif</string>
+    <string name="settings_history_desc">Conservez les résultats de commandes sur cet appareil. Désactivé par défaut.</string>
+    <string name="settings_history_retention">Conserver pendant</string>
+    <string name="settings_history_days">%1$d jours</string>
+    <string name="settings_history_clear">Effacer l’historique</string>
+    <string name="settings_history_clear_title">Effacer l’historique local ?</string>
+    <string name="settings_history_clear_message">Toutes les entrées et tous les résultats enregistrés seront supprimés de cet appareil.</string>
     <string name="privacy_mode_blocked">Le mode confidentialité est activé. Les commandes IA sont bloquées, mais les remplacements locaux fonctionnent toujours.</string>
     <string name="service_reliability_channel_name">Fiabilité du service</string>
     <string name="service_reliability_channel_desc">Avertit lorsqu\'un réglage système est nécessaire pour garder SwiftSlate disponible.</string>
@@ -230,4 +243,16 @@
     <string name="dashboard_service_killed_title">SwiftSlate a été interrompu</string>
     <string name="dashboard_service_killed_message">Le service en arrière-plan s\'est arrêté de manière inattendue. Réactivez-le dans les paramètres d\'accessibilité pour continuer à utiliser les commandes.</string>
     <string name="dashboard_service_killed_dismiss">Ignorer</string>
+    <string name="dashboard_configuration_title">État de la configuration</string>
+    <string name="dashboard_configuration_desc">Vérifiez localement, puis testez uniquement lorsque vous le souhaitez.</string>
+    <string name="dashboard_configuration_provider">Fournisseur</string>
+    <string name="dashboard_configuration_model">Modèle</string>
+    <string name="dashboard_configuration_keys">Clés API</string>
+    <string name="dashboard_configuration_key_count">%1$d configurée(s)</string>
+    <string name="dashboard_configuration_not_set">Non configuré</string>
+    <string name="dashboard_diagnostic_button">Tester la configuration</string>
+    <string name="dashboard_diagnostic_running">Test de la configuration…</string>
+    <string name="dashboard_diagnostic_success">Test de configuration réussi.</string>
+    <string name="dashboard_diagnostic_failed">Échec du test de configuration.</string>
+    <string name="dashboard_diagnostic_refused">Le fournisseur a refusé la requête de diagnostic.</string>
 </resources>

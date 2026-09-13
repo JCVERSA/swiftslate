@@ -20,9 +20,12 @@ import com.jcversa.swiftslate.api.GeminiClient
 import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.CommandManager
 import com.jcversa.swiftslate.manager.KeyManager
+import com.jcversa.swiftslate.manager.HistoryManager
 import com.jcversa.swiftslate.manager.StatsManager
 import com.jcversa.swiftslate.model.Command
 import com.jcversa.swiftslate.model.CommandType
+import com.jcversa.swiftslate.model.PrefKeys
+import com.jcversa.swiftslate.provider.Providers
 import com.jcversa.swiftslate.ui.processtext.ProcessTextEdit
 import com.jcversa.swiftslate.ui.processtext.ProcessTextReplacementBridge
 import com.jcversa.swiftslate.ui.processtext.resolveProcessTextEdit
@@ -50,6 +53,7 @@ class AssistantService : AccessibilityService() {
     private lateinit var keyManager: KeyManager
     private lateinit var commandManager: CommandManager
     private lateinit var statsManager: StatsManager
+    private lateinit var historyManager: HistoryManager
     private val client = GeminiClient()
     private val openAIClient = OpenAICompatibleClient()
     private val serviceJob = SupervisorJob()
@@ -122,6 +126,7 @@ class AssistantService : AccessibilityService() {
             keyManager = (applicationContext as SwiftSlateApp).keyManager
             commandManager = CommandManager(applicationContext)
             statsManager = StatsManager(applicationContext)
+            historyManager = HistoryManager(applicationContext)
             updateTriggers()
             BackgroundReliability.refreshRecoveryNotification(applicationContext)
         } catch (e: Exception) {
@@ -313,6 +318,7 @@ class AssistantService : AccessibilityService() {
                                 lastUndoSourceId = sourceId(source)
                                 performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                                 statsManager.recordUsage(command.trigger)
+                                recordHistory(command.trigger, precedingText, precedingText + command.prompt)
                             }
                         }
                     } catch (e: CancellationException) {
@@ -518,6 +524,7 @@ class AssistantService : AccessibilityService() {
                             lastUndoSourceId = sourceId(source)
                             performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                             statsManager.recordUsage(command.trigger)
+                            recordHistory(command.trigger, originalText, outcome.text)
                         }
                     }
                     is CommandOutcome.Refusal -> {
@@ -1004,6 +1011,17 @@ class AssistantService : AccessibilityService() {
         val pending = pendingClipRestore ?: return
         pendingClipRestore = null
         restoreClipboard(pending.first, pending.second, pending.third)
+    }
+
+    private fun recordHistory(command: String, input: String, output: String) {
+        if (!::historyManager.isInitialized) return
+        try {
+            val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+            val provider = Providers.forType(prefs.getString(PrefKeys.PROVIDER_TYPE, null)).type
+            historyManager.record(command, input, output, provider)
+        } catch (_: Exception) {
+            // History is optional and must never make a successful replacement fail.
+        }
     }
 
     private fun mapErrorMessage(raw: String): String = getString(ErrorMessages.map(raw))

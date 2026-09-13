@@ -43,6 +43,12 @@ object PrefKeys {
     /** Whether AI requests are disabled while local text replacers remain available. */
     const val PRIVACY_MODE = "privacy_mode"
 
+    /** Whether the optional local command history is enabled. */
+    const val HISTORY_ENABLED = "history_enabled"
+
+    /** Number of days to keep optional local history entries. */
+    const val HISTORY_RETENTION_DAYS = "history_retention_days"
+
     /** Whether the first-run setup assistant has been completed or dismissed. */
     const val ONBOARDING_COMPLETED = "onboarding_completed"
 }
