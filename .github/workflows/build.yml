@@ -1,18 +1,12 @@
 name: Build APK
 
-# Simple installable builds with zero signing setup: every push to main, every
-# pull request and every manual dispatch produces a preview APK (shrunk like
-# release, signed with the runner's ephemeral debug key) as a run artifact.
-# Lint and unit tests live in ci.yml — this workflow only builds.
-#
-# Tradeoff, stated plainly: the debug key is generated fresh on each runner, so
-# APKs from two different runs carry different signatures and cannot upgrade
-# each other in place — uninstall first. Fine for personal testing; if signed,
-# updatable releases are ever wanted again, that is a deliberate re-add, not a
-# tweak (see git history of this file).
+# Builds an installable preview APK without release-signing secrets.
+# The preview app is separate from the stable app and is signed with
+# the runner's temporary debug key.
 
 on:
   workflow_dispatch:
+
   push:
     branches: [main]
     paths:
@@ -21,6 +15,8 @@ on:
       - 'settings.gradle.kts'
       - 'gradle/**'
       - 'gradle.properties'
+      - '.github/workflows/**'
+
   pull_request:
     branches: [main]
     paths:
@@ -46,6 +42,7 @@ jobs:
     name: Build installable APK
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -59,7 +56,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
-          cache-cleanup: true
+          cache-cleanup: on-success
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Build preview APK
@@ -67,31 +64,36 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # run_number is monotonic, so reinstalling a later artifact keeps working
-          # within one install lineage (across runs the debug key changes anyway —
-          # see header note).
           if [ -n "$PR_NUMBER" ]; then
             LABEL="preview-pr${PR_NUMBER}"
           else
-            LABEL="${GITHUB_REF_NAME}"
+            LABEL="manual"
           fi
-          ./gradlew assemblePreview --parallel --build-cache --no-daemon \
+
+          ./gradlew assemblePreview \
+            --parallel \
+            --build-cache \
+            --no-daemon \
             --configuration-cache-problems=warn \
             -PversionCode="${GITHUB_RUN_NUMBER}" \
             -PversionName="${LABEL}-${GITHUB_SHA:0:7}"
+
           echo "APK_LABEL=$LABEL" >> "$GITHUB_ENV"
+
+      - name: Verify APK exists
+        shell: bash
+        run: |
+          test -f app/build/outputs/apk/preview/app-preview.apk
 
       - name: Rename APK
         shell: bash
         run: |
           mv app/build/outputs/apk/preview/app-preview.apk \
-             "app/build/outputs/apk/preview/SwiftSlate-${APK_LABEL}-${GITHUB_SHA:0:7}.apk"
+            "app/build/outputs/apk/preview/SwiftSlate-${APK_LABEL}-${GITHUB_SHA:0:7}.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          # PR builds keep the historical SwiftSlate-preview-prNNN name so the
-          # preview-comment workflow keeps finding them.
           name: SwiftSlate-${{ env.APK_LABEL }}
           path: app/build/outputs/apk/preview/SwiftSlate-*.apk
           retention-days: 14
@@ -102,10 +104,12 @@ jobs:
           {
             echo "### Installable APK ready"
             echo
-            echo "Installs as a **separate app** (\`com.jcversa.swiftslate.preview\`, shown as"
-            echo "**SwiftSlate Preview**), so it will not touch your stable install, its API keys,"
-            echo "its commands or its accessibility setting."
+            echo "The APK installs as a separate app:"
+            echo "\`com.jcversa.swiftslate.preview\`"
             echo
-            echo "Download it from the **Artifacts** section of this run, then enable it under"
-            echo "Settings > Accessibility as a second entry. Uninstall it when you are done."
+            echo "It will not touch the stable app, its API keys, its commands,"
+            echo "or its accessibility-service setting."
+            echo
+            echo "Download it from the Artifacts section of this run."
+            echo "Then enable SwiftSlate Preview under Android Accessibility settings."
           } >> "$GITHUB_STEP_SUMMARY"

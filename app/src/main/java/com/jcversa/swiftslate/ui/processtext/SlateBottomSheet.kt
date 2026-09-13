@@ -2,13 +2,13 @@ package com.jcversa.swiftslate.ui.processtext
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.jcversa.swiftslate.ui.components.LocalSlateMotion
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -71,6 +72,7 @@ fun SlateBottomSheet(
     var shown by remember { mutableStateOf(false) }
     var closing by remember { mutableStateOf(false) }
     val visible = shown && !closing
+    val motion = LocalSlateMotion.current
 
     // Enter on the first frame so the transition actually animates instead of the sheet simply
     // being present on composition.
@@ -84,7 +86,7 @@ fun SlateBottomSheet(
 
     val scrimAlpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(if (visible) FADE_IN_MS else FADE_OUT_MS),
+        animationSpec = motion.transitionSpec(if (visible) FADE_IN_MS else FADE_OUT_MS),
         label = "scrim"
     )
 
@@ -101,8 +103,16 @@ fun SlateBottomSheet(
         AnimatedVisibility(
             visible = visible,
             modifier = Modifier.align(Alignment.BottomCenter),
-            enter = slideInVertically(tween(ANIM_MS)) { it } + fadeIn(tween(FADE_IN_MS)),
-            exit = slideOutVertically(tween(ANIM_MS)) { it } + fadeOut(tween(FADE_OUT_MS))
+            enter = if (motion.reduceMotion) {
+                fadeIn(motion.transitionSpec(0))
+            } else {
+                slideInVertically(tween(ANIM_MS)) { it } + fadeIn(tween(FADE_IN_MS))
+            },
+            exit = if (motion.reduceMotion) {
+                fadeOut(motion.transitionSpec(0))
+            } else {
+                slideOutVertically(tween(ANIM_MS)) { it } + fadeOut(tween(FADE_OUT_MS))
+            }
         ) {
             SheetSurface(onDismissRequest = close, content = content)
         }
@@ -116,6 +126,7 @@ private fun SheetSurface(
 ) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
+    val motion = LocalSlateMotion.current
     val dragOffset = remember { Animatable(0f) }
     val dismissThresholdPx = remember(density) { with(density) { DISMISS_THRESHOLD_DP.dp.toPx() } }
 
@@ -156,7 +167,7 @@ private fun SheetSurface(
                     if (dragOffset.value >= dismissThresholdPx || velocity >= DISMISS_VELOCITY) {
                         onDismissRequest()
                     } else {
-                        dragOffset.animateTo(0f, tween(ANIM_MS))
+                        dragOffset.animateTo(0f, motion.transitionSpec(ANIM_MS))
                     }
                 }
             )

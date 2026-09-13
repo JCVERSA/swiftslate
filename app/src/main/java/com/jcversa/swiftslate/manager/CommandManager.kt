@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.jcversa.swiftslate.model.Command
 import com.jcversa.swiftslate.model.CommandType
+import com.jcversa.swiftslate.model.CommandMatch
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -45,6 +46,8 @@ class CommandManager(context: Context) {
         /** Limits enforced on every write path — see [isValidCommand] / [importCommands]. */
         const val MAX_TRIGGER_LENGTH = 50
         const val MAX_PROMPT_LENGTH = 5_000
+        const val MAX_ALIAS_LENGTH = 50
+        const val MAX_ALIASES = 5
         const val MAX_CUSTOM_COMMANDS = 100
 
         /**
@@ -56,6 +59,31 @@ class CommandManager(context: Context) {
             trigger.isNotBlank() && prompt.isNotBlank() &&
                 trigger.length <= MAX_TRIGGER_LENGTH && prompt.length <= MAX_PROMPT_LENGTH &&
                 trigger.startsWith(prefix) && trigger.length > prefix.length
+
+        fun isValidAlias(alias: String, trigger: String, prefix: String): Boolean =
+            alias.isNotBlank() && alias != trigger &&
+                alias.length <= MAX_ALIAS_LENGTH &&
+                alias.startsWith(prefix) && alias.length > prefix.length
+
+        fun areValidAliases(aliases: List<String>, trigger: String, prefix: String): Boolean {
+            if (aliases.size > MAX_ALIASES || aliases.distinct().size != aliases.size) return false
+            if (aliases.any { !isValidAlias(it, trigger, prefix) }) return false
+
+            // A trigger is also a prefix in the matching grammar. Treating `?foo` and
+            // `?foobar` as two independent names would make the result depend on which
+            // command happened to be iterated first. Validate the complete command locally,
+            // not just exact duplicates.
+            val names = listOf(trigger) + aliases
+            return names.indices.all { index ->
+                ((index + 1) until names.size).none { other ->
+                    isTriggerConflict(names[index], names[other])
+                }
+            }
+        }
+
+        /** Two names collide when either can be a prefix of the other in [findCommandMatch]. */
+        private fun isTriggerConflict(first: String, second: String): Boolean =
+            first == second || first.startsWith(second) || second.startsWith(first)
     }
 
     // System commands — local operations that cannot be edited or deleted
@@ -81,6 +109,22 @@ class CommandManager(context: Context) {
         "reply" to "Generate a contextual reply to this message."
     )
 
+    /**
+     * Built-ins include the dynamic translate command. A custom name beginning with
+     * `prefix + translate` would otherwise shadow every language variant accepted below.
+     */
+    private fun conflictsWithBuiltIn(name: String, prefix: String): Boolean {
+        val builtIns = systemDefinitions.map { (trigger, _) -> prefix + trigger }
+        return builtIns.any { isTriggerConflict(name, it) } ||
+            isTriggerConflict(name, prefix + "translate")
+    }
+
+    private fun conflictsWithExisting(name: String, existingNames: Collection<String>, prefix: String): Boolean =
+        conflictsWithBuiltIn(name, prefix) || existingNames.any { isTriggerConflict(name, it) }
+
+    private fun commandNames(command: Command): List<String> =
+        listOf(command.trigger) + command.aliases
+
     /** Drops the cache and its validity key so the next [getCommands] rebuilds from prefs. */
     private fun invalidateCache() {
         cachedCommands = null
@@ -96,6 +140,28 @@ class CommandManager(context: Context) {
         }
     }
 
+    private fun migrateTrigger(value: String, newPrefix: String): String {
+        val trimmed = value.trim()
+        if (trimmed.startsWith(newPrefix)) return trimmed.take(MAX_ALIAS_LENGTH)
+        val stripped = if (trimmed.isNotEmpty() && !trimmed.first().isLetterOrDigit()) {
+            trimmed.substring(1)
+        } else {
+            trimmed
+        }
+        return (newPrefix + stripped).take(MAX_ALIAS_LENGTH)
+    }
+
+    private fun readAliases(obj: JSONObject): List<String> {
+        val arr = obj.optJSONArray("aliases") ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { index ->
+            arr.optString(index, "").trim().takeIf { it.isNotBlank() }
+        }
+    }
+
+    private fun putAliases(obj: JSONObject, aliases: List<String>) {
+        if (aliases.isNotEmpty()) obj.put("aliases", JSONArray(aliases))
+    }
+
     @Synchronized fun setTriggerPrefix(newPrefix: String): Boolean {
         if (newPrefix.length != 1 || newPrefix[0].isLetterOrDigit() || newPrefix[0].isWhitespace()) return false
         // Write prefix first so crash between writes is self-healing on retry
@@ -108,21 +174,39 @@ class CommandManager(context: Context) {
             return true
         }
         val newArr = JSONArray()
+        val acceptedNames = mutableListOf<String>()
         for (i in 0 until arr.length()) {
             val obj = arr.optJSONObject(i) ?: continue
             val oldTrigger = obj.optString("trigger", "")
-            val prompt = obj.optString("prompt", "")
+            val prompt = obj.optString("prompt", "").trim().take(MAX_PROMPT_LENGTH)
             if (oldTrigger.isEmpty() || prompt.isEmpty()) continue
-            val migrated = if (!oldTrigger.startsWith(newPrefix)) {
-                // Strip any single-char non-alphanumeric prefix, then apply new prefix
-                val stripped = if (!oldTrigger[0].isLetterOrDigit()) oldTrigger.substring(1) else oldTrigger
-                newPrefix + stripped
-            } else oldTrigger
+            val migrated = migrateTrigger(oldTrigger, newPrefix)
+            if (!isValidCommand(migrated, prompt, newPrefix) ||
+                conflictsWithExisting(migrated, acceptedNames, newPrefix)
+            ) continue
+
+            val aliases = readAliases(obj)
+                .map { migrateTrigger(it, newPrefix) }
+                .filter { alias ->
+                    isValidAlias(alias, migrated, newPrefix) &&
+                        !conflictsWithExisting(alias, acceptedNames + migrated, newPrefix)
+                }
+                .distinct()
+                .take(MAX_ALIASES)
+                .let { candidate ->
+                    candidate.filter { alias ->
+                        val names = listOf(migrated) + candidate.takeWhile { it != alias }
+                        names.none { isTriggerConflict(alias, it) }
+                    }
+                }
             val newObj = JSONObject()
             newObj.put("trigger", migrated)
             newObj.put("prompt", prompt)
             newObj.put("type", obj.optString("type", CommandType.AI.name))
+            putAliases(newObj, aliases)
             newArr.put(newObj)
+            acceptedNames += migrated
+            acceptedNames += aliases
         }
         prefs.edit().putString("custom_commands", newArr.toString()).apply()
         invalidateCache()
@@ -138,18 +222,23 @@ class CommandManager(context: Context) {
         val prefix = getTriggerPrefix()
         val customStr = prefs.getString("custom_commands", "[]") ?: "[]"
         val arr = try { JSONArray(customStr) } catch (_: Exception) { JSONArray() }
-        val existingTriggers = (0 until arr.length())
-            .mapNotNull { arr.optJSONObject(it)?.optString("trigger")?.takeIf { t -> t.isNotEmpty() } }
-            .toSet()
+        val existingNames = mutableListOf<String>()
+        for (i in 0 until arr.length()) {
+            val obj = arr.optJSONObject(i) ?: continue
+            val trigger = obj.optString("trigger", "")
+            if (trigger.isNotEmpty()) existingNames += trigger
+            existingNames += readAliases(obj)
+        }
         var added = false
         for ((name, prompt) in defaultAiDefinitions) {
             val trigger = "$prefix$name"
-            if (trigger !in existingTriggers) {
+            if (!conflictsWithExisting(trigger, existingNames, prefix)) {
                 val obj = JSONObject()
                 obj.put("trigger", trigger)
                 obj.put("prompt", prompt)
                 obj.put("type", CommandType.AI.name)
                 arr.put(obj)
+                existingNames += trigger
                 added = true
             }
         }
@@ -185,15 +274,41 @@ class CommandManager(context: Context) {
             JSONArray()
         }
         val customCommands = mutableListOf<Command>()
+        val acceptedNames = mutableListOf<String>()
         var needsMigration = false
         for (i in 0 until arr.length()) {
             val obj = arr.optJSONObject(i) ?: continue
-            val trigger = obj.optString("trigger", "")
-            val prompt = obj.optString("prompt", "")
-            if (trigger.isEmpty() || prompt.isEmpty()) continue
-            if (!trigger.startsWith(prefix)) needsMigration = true
+            val rawTrigger = obj.optString("trigger", "").trim()
+            val prompt = obj.optString("prompt", "").trim().take(MAX_PROMPT_LENGTH)
+            if (rawTrigger.isEmpty() || prompt.isEmpty()) continue
+            val trigger = migrateTrigger(rawTrigger, prefix)
+            if (trigger != rawTrigger || prompt != obj.optString("prompt", "")) needsMigration = true
+            if (!isValidCommand(trigger, prompt, prefix) ||
+                conflictsWithExisting(trigger, acceptedNames, prefix)
+            ) {
+                needsMigration = true
+                continue
+            }
+
+            val aliases = mutableListOf<String>()
+            for (rawAlias in readAliases(obj)) {
+                val alias = migrateTrigger(rawAlias, prefix)
+                if (alias != rawAlias) needsMigration = true
+                if (isValidAlias(alias, trigger, prefix) &&
+                    !conflictsWithExisting(alias, acceptedNames + trigger + aliases, prefix) &&
+                    aliases.none { isTriggerConflict(alias, it) }
+                ) {
+                    aliases += alias
+                } else {
+                    needsMigration = true
+                }
+                if (aliases.size == MAX_ALIASES) break
+            }
             customCommands.add(Command(trigger, prompt, false,
-                try { CommandType.valueOf(obj.optString("type", CommandType.AI.name)) } catch (_: Exception) { CommandType.AI }))
+                try { CommandType.valueOf(obj.optString("type", CommandType.AI.name)) } catch (_: Exception) { CommandType.AI },
+                aliases))
+            acceptedNames += trigger
+            acceptedNames += aliases
         }
         // Self-heal prefix mismatch (e.g. crash between two apply() calls in setTriggerPrefix)
         if (needsMigration && !migrating) {
@@ -205,7 +320,9 @@ class CommandManager(context: Context) {
                 migrating = false
             }
         }
-        val result = (getBuiltInCommands() + customCommands).sortedByDescending { it.trigger.length }
+        val result = (getBuiltInCommands() + customCommands).sortedByDescending {
+            (listOf(it.trigger) + it.aliases).maxOf { trigger -> trigger.length }
+        }
         cachedCommands = result
         cachedCommandsJson = customStr
         cachedPrefix = prefix
@@ -224,21 +341,39 @@ class CommandManager(context: Context) {
      * Returns false if the command is not storable, in which case nothing is written.
      */
     @Synchronized fun saveCustomCommand(command: Command, replacing: String = command.trigger): Boolean {
-        if (!isValidCommand(command.trigger, command.prompt, getTriggerPrefix())) return false
+        val prefix = getTriggerPrefix()
+        if (!isValidCommand(command.trigger, command.prompt, prefix) ||
+            !areValidAliases(command.aliases, command.trigger, prefix)
+        ) return false
+
         val customStr = prefs.getString("custom_commands", "[]") ?: "[]"
         val arr = try { JSONArray(customStr) } catch (_: Exception) { JSONArray() }
         val newArr = JSONArray()
+        val existingNames = mutableListOf<String>()
+        var replacedExisting = false
         for (i in 0 until arr.length()) {
             val obj = arr.optJSONObject(i) ?: continue
             val trigger = obj.optString("trigger")
-            if (trigger != replacing && trigger != command.trigger) {
-                newArr.put(obj)
+            if (trigger == replacing || trigger == command.trigger) {
+                replacedExisting = true
+                continue
             }
+            newArr.put(obj)
+            if (trigger.isNotBlank()) existingNames += trigger
+            existingNames += readAliases(obj)
         }
+
+        // This is the manager's public write boundary, so callers other than the Compose
+        // screen (imports, tests, or a future integration) get the same global guarantee:
+        // aliases cannot shadow built-ins or another command's trigger/alias.
+        if (commandNames(command).any { conflictsWithExisting(it, existingNames, prefix) }) return false
+        if (!replacedExisting && newArr.length() >= MAX_CUSTOM_COMMANDS) return false
+
         val newObj = JSONObject()
         newObj.put("trigger", command.trigger)
-        newObj.put("prompt", command.prompt)
+        newObj.put("prompt", command.prompt.trim())
         newObj.put("type", command.type.name)
+        putAliases(newObj, command.aliases)
         newArr.put(newObj)
         prefs.edit().putString("custom_commands", newArr.toString()).apply()
         invalidateCache()
@@ -278,6 +413,10 @@ class CommandManager(context: Context) {
             val arr = JSONArray(json)
             val prefix = getTriggerPrefix()
             val cleaned = JSONArray()
+            fun cleanedNames(): List<String> = (0 until cleaned.length()).flatMap { index ->
+                val existing = cleaned.optJSONObject(index) ?: return@flatMap emptyList()
+                listOf(existing.optString("trigger")) + readAliases(existing)
+            }
             for (i in 0 until arr.length()) {
                 if (cleaned.length() >= MAX_CUSTOM_COMMANDS) break
                 val obj = arr.optJSONObject(i) ?: continue
@@ -293,11 +432,24 @@ class CommandManager(context: Context) {
                 trigger = trigger.take(MAX_TRIGGER_LENGTH)
                 if (trigger.length <= prefix.length) continue
                 val type = obj.optString("type", CommandType.AI.name)
+                if (conflictsWithExisting(trigger, cleanedNames(), prefix)) continue
+
+                val aliases = mutableListOf<String>()
+                for (rawAlias in readAliases(obj)) {
+                    val alias = migrateTrigger(rawAlias, prefix)
+                    if (!isValidAlias(alias, trigger, prefix) ||
+                        conflictsWithExisting(alias, cleanedNames() + trigger + aliases, prefix) ||
+                        aliases.any { isTriggerConflict(alias, it) }
+                    ) continue
+                    aliases += alias
+                    if (aliases.size == MAX_ALIASES) break
+                }
                 val out = JSONObject()
                 out.put("trigger", trigger)
                 out.put("prompt", prompt)
                 out.put("type",
                     if (type == CommandType.TEXT_REPLACER.name) CommandType.TEXT_REPLACER.name else CommandType.AI.name)
+                putAliases(out, aliases)
                 cleaned.put(out)
             }
             if (arr.length() > 0 && cleaned.length() == 0) return false
@@ -309,26 +461,31 @@ class CommandManager(context: Context) {
         }
     }
 
-    fun findCommand(text: String): Command? {
+    fun findCommand(text: String): Command? = findCommandMatch(text)?.command
+
+    /** Returns the command and the exact trigger or alias that matched the text suffix. */
+    fun findCommandMatch(text: String): CommandMatch? {
         val commands = getCommands()
-        for (cmd in commands) {  // Already sorted by trigger length in getCommands()
+        for (cmd in commands) {
             if (cmd.trigger.endsWith("translate:xx")) continue
-            if (text.endsWith(cmd.trigger)) {
-                return cmd
-            }
+            val candidates = sequenceOf(cmd.trigger).plus(cmd.aliases.asSequence())
+            val matched = candidates
+                .filter { text.endsWith(it) }
+                .maxByOrNull { it.length }
+            if (matched != null) return CommandMatch(cmd, matched)
         }
         val prefix = getTriggerPrefix()
-        // Translate trigger — intentionally accepts any 2-5 char alphanumeric language code
-        // (e.g. "en", "fr", "zh", "pt-BR" without hyphen). Open-ended to support ISO 639 codes
-        // without maintaining a hardcoded list. The AI model handles invalid codes gracefully.
+        // Translate trigger — intentionally accepts any 2-5 char alphanumeric language code.
         val translatePrefix = "${prefix}translate:"
         val translateIdx = text.lastIndexOf(translatePrefix)
         if (translateIdx >= 0) {
             val langPart = text.substring(translateIdx + translatePrefix.length)
             if (langPart.length in 2..5 && langPart.all { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' }) {
-                return Command("${translatePrefix}$langPart", "Translate to language code '$langPart'.", true)
+                val command = Command("${translatePrefix}$langPart", "Translate to language code '$langPart'.", true)
+                return CommandMatch(command, command.trigger)
             }
         }
         return null
     }
+
 }

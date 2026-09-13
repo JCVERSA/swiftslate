@@ -9,6 +9,7 @@ import com.jcversa.swiftslate.api.GeminiClient
 import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.model.PrefKeys
+import com.jcversa.swiftslate.model.ProviderType
 import com.jcversa.swiftslate.provider.Providers
 import com.jcversa.swiftslate.provider.Transport
 import java.util.Locale
@@ -91,7 +92,15 @@ suspend fun runTextCommand(
     }
 
     val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    if (prefs.getBoolean(PrefKeys.PRIVACY_MODE, false)) {
+        // Text replacer commands never enter this function, so privacy mode keeps all local
+        // commands available while making the no-network guarantee explicit for every AI entry
+        // point (typed trigger, text-selection action, and command preview).
+        return CommandOutcome.Unavailable(context.getString(R.string.privacy_mode_blocked))
+    }
+
     val provider = Providers.forType(prefs.getString(PrefKeys.PROVIDER_TYPE, null))
+    val providerType = provider.type
     val model = provider.sanitizeModel(prefs.getString(provider.modelPrefKey, provider.defaultModel))
     val endpoint = provider.resolveEndpoint(prefs.getString(PrefKeys.CUSTOM_ENDPOINT, "") ?: "")
     if (!provider.isConfigured(model, endpoint)) {
@@ -110,9 +119,9 @@ suspend fun runTextCommand(
 
     // One attempt per configured key; getNextKey skips the ones already tried, plus any that are
     // benched for rate limiting or known-invalid.
-    val maxAttempts = keyManager.getKeys().size.coerceAtLeast(1)
+    val maxAttempts = keyManager.getKeys(providerType).size.coerceAtLeast(1)
     while (tried.size < maxAttempts) {
-        val key = keyManager.getNextKey(tried) ?: break
+        val key = keyManager.getNextKey(tried, providerType) ?: break
         tried.add(key)
         if (!started) {
             started = true
@@ -123,7 +132,12 @@ suspend fun runTextCommand(
             Transport.OPENAI_COMPAT -> openAIClient.generate(
                 prompt, text, key, model, temperature, endpoint,
                 useJsonObjectMode = provider.useJsonObjectMode(useStructuredOutput),
-                extraParams = provider.reasoningParams(model))
+                extraParams = provider.reasoningParams(model),
+                maxOutputTokens = if (providerType == ProviderType.NVIDIA) {
+                    ApiClientUtils.suggestedMaxOutputTokens(text)
+                } else {
+                    null
+                })
             Transport.GEMINI_NATIVE -> geminiClient.generate(
                 prompt, text, key, model, temperature, useStructuredOutput,
                 thinkingLevel = provider.thinkingLevel(model))
@@ -152,7 +166,7 @@ suspend fun runTextCommand(
         when (val apiError = (error as? ApiException)?.apiError) {
             is ApiError.RateLimit -> {
                 lastErrorWasRateLimit = true
-                keyManager.reportRateLimit(key, apiError.retryAfterSeconds?.toLong() ?: 60)
+                keyManager.reportRateLimit(key, apiError.retryAfterSeconds?.toLong() ?: 60, providerType)
             }
             is ApiError.InvalidKey -> {
                 lastErrorWasRateLimit = false
@@ -172,8 +186,8 @@ suspend fun runTextCommand(
                     // Never bench the last remaining key: with no fallback to rotate to, the
                     // 15-minute invalid mark just turned every later trigger into "all keys
                     // invalid" with no recovery path until a process restart.
-                    if (keyManager.getKeys().size > 1) {
-                        keyManager.markInvalid(key)
+                    if (keyManager.getKeys(providerType).size > 1) {
+                        keyManager.markInvalid(key, providerType)
                     }
                 }
             }
@@ -189,7 +203,7 @@ suspend fun runTextCommand(
         }
     }
 
-    val waitMs = keyManager.getShortestWaitTimeMs()
+    val waitMs = keyManager.getShortestWaitTimeMs(providerType)
     val failedKey = lastFailedKey
     val raw = lastErrorMsg
     return CommandOutcome.Failure(
@@ -205,13 +219,13 @@ suspend fun runTextCommand(
             lastErrorWasPermission -> context.getString(R.string.error_no_model_access)
             raw != null -> {
                 val mapped = ErrorMessages.map(raw)
-                if (mapped == R.string.error_invalid_key && failedKey != null && keyManager.getKeys().size > 1) {
+                if (mapped == R.string.error_invalid_key && failedKey != null && keyManager.getKeys(providerType).size > 1) {
                     context.getString(R.string.error_invalid_key_with_hint, "••••" + failedKey.takeLast(4))
                 } else {
                     context.getString(mapped)
                 }
             }
-            keyManager.getKeys().isEmpty() -> context.getString(R.string.toast_no_keys)
+            keyManager.getKeys(providerType).isEmpty() -> context.getString(R.string.toast_no_keys)
             else -> context.getString(R.string.toast_all_keys_invalid)
         }
     )

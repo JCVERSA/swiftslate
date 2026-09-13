@@ -239,6 +239,7 @@ class GeminiClient {
 
                 put("generationConfig", JSONObject().apply {
                     put("temperature", temperature)
+                    put("maxOutputTokens", ApiClientUtils.suggestedMaxOutputTokens(text))
                     // Spec-driven thinking control (mirrors Groq reasoning params).
                     // "minimal" keeps latency low; null => send no thinkingConfig.
                     if (thinkingLevel != null) {

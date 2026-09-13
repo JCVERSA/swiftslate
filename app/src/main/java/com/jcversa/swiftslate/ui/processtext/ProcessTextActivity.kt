@@ -10,8 +10,8 @@ import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,8 +26,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,7 +54,10 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.jcversa.swiftslate.R
 import com.jcversa.swiftslate.model.Command
 import com.jcversa.swiftslate.ui.components.SlateCard
+import com.jcversa.swiftslate.ui.components.LocalSlateMotion
 import com.jcversa.swiftslate.ui.components.SlateItemCard
+import com.jcversa.swiftslate.ui.components.SlateMorphIcon
+import com.jcversa.swiftslate.ui.components.SlateMorphIconType
 import com.jcversa.swiftslate.ui.components.SlateToast
 import com.jcversa.swiftslate.ui.components.SlateToastTokens
 import com.jcversa.swiftslate.ui.theme.SwiftSlateTheme
@@ -186,6 +190,7 @@ private fun ProcessTextSheet(
     onDismiss: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
+    val motion = LocalSlateMotion.current
 
     // Built before the sheet so the command list is known at first composition; opening at the
     // height of an empty list and growing afterwards is what made the entrance stutter.
@@ -200,7 +205,7 @@ private fun ProcessTextSheet(
                 .padding(bottom = 24.dp)
                 // Picker -> loading -> result are different heights; animate between them with
                 // the same 250ms the rest of the app uses instead of snapping.
-                .animateContentSize(tween(ANIM_MS))
+                .animateContentSize(motion.sizeTransitionSpec(ANIM_MS))
         ) {
             Text(
                 text = stringResource(R.string.process_text_title),
@@ -217,10 +222,19 @@ private fun ProcessTextSheet(
 
             when (val s = state) {
                 null, is UiState.Initializing -> Unit
-                is UiState.CommandList -> CommandRows(s.commands) { viewModel.run(it) }
+                is UiState.CommandList -> {
+                    QuickActions(s.commands) { viewModel.run(it) }
+                    CommandRows(s.commands) { viewModel.run(it) }
+                }
                 is UiState.Loading -> SlateCard {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        SlateMorphIcon(
+                            type = SlateMorphIconType.LoadingSuccess,
+                            toggled = false,
+                            tint = MaterialTheme.colorScheme.primary,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
                         Spacer(Modifier.width(12.dp))
                         Text(
                             text = s.command.trigger,
@@ -355,6 +369,52 @@ private fun ResultCard(result: String) {
                 .heightIn(max = 240.dp)
                 .verticalScroll(rememberScrollState())
         )
+    }
+}
+
+@Composable
+private fun QuickActions(commands: List<Command>, onPick: (Command) -> Unit) {
+    val quickDefinitions = listOf(
+        "fix" to R.string.process_quick_fix,
+        "improve" to R.string.process_quick_improve,
+        "shorten" to R.string.process_quick_shorten,
+        "formal" to R.string.process_quick_formal,
+        "casual" to R.string.process_quick_casual,
+        "reply" to R.string.process_quick_reply
+    )
+    val actions = quickDefinitions.mapNotNull { (name, label) ->
+        commands.firstOrNull {
+            it.type == com.jcversa.swiftslate.model.CommandType.AI &&
+                (it.trigger.drop(1) == name || it.aliases.any { alias -> alias.drop(1) == name })
+        }?.let { command -> command to label }
+    }
+    if (actions.isEmpty()) return
+
+    Column(modifier = Modifier.padding(bottom = 12.dp)) {
+        Text(
+            text = stringResource(R.string.process_quick_actions),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 6.dp)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            actions.forEach { (command, label) ->
+                AssistChip(
+                    onClick = { onPick(command) },
+                    label = { Text(stringResource(label)) },
+                    colors = AssistChipDefaults.assistChipColors(
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                        labelColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+            }
+        }
     }
 }
 

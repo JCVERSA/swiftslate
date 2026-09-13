@@ -25,6 +25,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.jcversa.swiftslate.BuildConfig
 import com.jcversa.swiftslate.R
 import com.jcversa.swiftslate.api.ApiClientUtils
@@ -35,20 +38,88 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import com.jcversa.swiftslate.manager.CommandManager
+import com.jcversa.swiftslate.manager.HistoryManager
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.manager.ProviderModelsCache
-import com.jcversa.swiftslate.model.GeminiModels
 import com.jcversa.swiftslate.model.GroqModels
+import com.jcversa.swiftslate.model.OpenAIModels
 import com.jcversa.swiftslate.model.PrefKeys
 import com.jcversa.swiftslate.model.ProviderType
 import com.jcversa.swiftslate.provider.EndpointValidator
-import com.jcversa.swiftslate.provider.GroqConfig
+import com.jcversa.swiftslate.provider.Providers
+import com.jcversa.swiftslate.service.BackgroundReliability
 import com.jcversa.swiftslate.ui.components.LocalSlateRhythm
 import com.jcversa.swiftslate.ui.components.SlateCard
 import com.jcversa.swiftslate.ui.components.SlateDivider
 import com.jcversa.swiftslate.ui.components.SlateTextField
 import com.jcversa.swiftslate.ui.components.AnimateEntrance
+
+private const val SAFE_BACKUP_VERSION = 2
+
+/** Exports configuration without API keys, history contents, or endpoint credentials. */
+private fun buildSafeBackup(commandManager: CommandManager, prefs: SharedPreferences): String {
+    val settings = JSONObject().apply {
+        put(PrefKeys.PROVIDER_TYPE, ProviderType.sanitize(prefs.getString(PrefKeys.PROVIDER_TYPE, null)))
+        put(PrefKeys.GEMINI_MODEL, prefs.getString(PrefKeys.GEMINI_MODEL, "").orEmpty())
+        put(PrefKeys.GROQ_MODEL, prefs.getString(PrefKeys.GROQ_MODEL, "").orEmpty())
+        put(PrefKeys.NVIDIA_MODEL, prefs.getString(PrefKeys.NVIDIA_MODEL, "").orEmpty())
+        put(PrefKeys.OPENROUTER_MODEL, prefs.getString(PrefKeys.OPENROUTER_MODEL, "").orEmpty())
+        put(PrefKeys.DEEPSEEK_MODEL, prefs.getString(PrefKeys.DEEPSEEK_MODEL, "").orEmpty())
+        put(PrefKeys.CUSTOM_MODEL, prefs.getString(PrefKeys.CUSTOM_MODEL, "").orEmpty())
+        put(PrefKeys.TEMPERATURE, prefs.getFloat(PrefKeys.TEMPERATURE, 0.5f).toDouble())
+        put(PrefKeys.PRIVACY_MODE, prefs.getBoolean(PrefKeys.PRIVACY_MODE, false))
+        put("trigger_prefix", prefs.getString(CommandManager.PREF_TRIGGER_PREFIX, CommandManager.DEFAULT_PREFIX))
+    }
+    return JSONObject().apply {
+        put("format", "swiftslate-safe-backup")
+        put("version", SAFE_BACKUP_VERSION)
+        put("commands", JSONArray(commandManager.exportCommands()))
+        put("settings", settings)
+    }.toString(2)
+}
+
+/** Accepts the current safe envelope and older command-only JSON backups. */
+private fun importSafeBackup(json: String, commandManager: CommandManager, prefs: SharedPreferences): Boolean {
+    return try {
+        val root = JSONObject(json)
+        val settings = root.optJSONObject("settings")
+        settings?.optString("trigger_prefix")?.takeIf { it.isNotBlank() }?.let { prefix ->
+            commandManager.setTriggerPrefix(prefix)
+        }
+        val commands = root.optJSONArray("commands") ?: return false
+        if (!commandManager.importCommands(commands.toString())) return false
+        if (settings != null) {
+            val editor = prefs.edit()
+            settings.optString(PrefKeys.PROVIDER_TYPE).takeIf { it.isNotBlank() }?.let {
+                editor.putString(PrefKeys.PROVIDER_TYPE, ProviderType.sanitize(it))
+            }
+            listOf(
+                PrefKeys.GEMINI_MODEL,
+                PrefKeys.GROQ_MODEL,
+                PrefKeys.NVIDIA_MODEL,
+                PrefKeys.OPENROUTER_MODEL,
+                PrefKeys.DEEPSEEK_MODEL,
+                PrefKeys.CUSTOM_MODEL
+            ).forEach { key ->
+                if (settings.has(key)) editor.putString(key, settings.optString(key))
+            }
+            if (settings.has(PrefKeys.TEMPERATURE)) {
+                editor.putFloat(PrefKeys.TEMPERATURE, settings.optDouble(PrefKeys.TEMPERATURE, 0.5).toFloat())
+            }
+            if (settings.has(PrefKeys.PRIVACY_MODE)) {
+                editor.putBoolean(PrefKeys.PRIVACY_MODE, settings.optBoolean(PrefKeys.PRIVACY_MODE, false))
+            }
+            editor.apply()
+        }
+        true
+    } catch (_: Exception) {
+        // Keep support for pre-envelope backups that contained only a JSON array of commands.
+        commandManager.importCommands(json)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,12 +127,38 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val uriHandler = LocalUriHandler.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var accessibilityEnabled by remember {
+        mutableStateOf(BackgroundReliability.isAccessibilityServiceEnabled(context))
+    }
+    var batteryOptimizationExempt by remember {
+        mutableStateOf(BackgroundReliability.isBatteryOptimizationExempt(context))
+    }
+    var privacyMode by remember {
+        mutableStateOf(prefs.getBoolean(PrefKeys.PRIVACY_MODE, false))
+    }
+    val historyManager = remember { HistoryManager(context) }
+    var historyEnabled by remember { mutableStateOf(historyManager.isEnabled) }
+    var historyRetentionDays by remember { mutableIntStateOf(historyManager.retentionDays) }
+    var showClearHistoryConfirm by remember { mutableStateOf(false) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                accessibilityEnabled = BackgroundReliability.isAccessibilityServiceEnabled(context)
+                batteryOptimizationExempt = BackgroundReliability.isBatteryOptimizationExempt(context)
+                BackgroundReliability.refreshRecoveryNotification(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     val scope = rememberCoroutineScope()
     var saveEndpointJob by remember { mutableStateOf<Job?>(null) }
     var saveModelJob by remember { mutableStateOf<Job?>(null) }
 
-    var providerType by remember { mutableStateOf(prefs.getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI) ?: ProviderType.GEMINI) }
+    var providerType by remember { mutableStateOf(ProviderType.sanitize(prefs.getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI))) }
     var providerExpanded by remember { mutableStateOf(false) }
 
     var selectedModel by remember { mutableStateOf(prefs.getString(PrefKeys.GEMINI_MODEL, "") ?: "") }
@@ -71,6 +168,12 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     var groqModel by remember { mutableStateOf(prefs.getString(PrefKeys.GROQ_MODEL, "") ?: "") }
     var groqModelExpanded by remember { mutableStateOf(false) }
     var groqModelList by remember { mutableStateOf(ProviderModelsCache.get(ProviderType.GROQ)?.models ?: emptyList()) }
+    // The three fixed OpenAI-compatible providers share one dropdown state; the
+    // selected value is restored from that provider's own preference on switch.
+    var managedModel by remember { mutableStateOf("") }
+    var managedModelExpanded by remember { mutableStateOf(false) }
+    var managedModelList by remember { mutableStateOf<List<String>>(emptyList()) }
+    var isFetchingManagedModels by remember { mutableStateOf(false) }
 
     var customEndpoint by rememberSaveable { mutableStateOf(prefs.getString(PrefKeys.CUSTOM_ENDPOINT, "") ?: "") }
     var customModel by rememberSaveable { mutableStateOf(prefs.getString(PrefKeys.CUSTOM_MODEL, "") ?: "") }
@@ -97,6 +200,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     val prefixErrorAlphanumeric = stringResource(R.string.settings_prefix_error_alphanumeric)
     val endpointErrorScheme = stringResource(R.string.settings_endpoint_error_scheme)
     val endpointErrorSpaces = stringResource(R.string.settings_endpoint_error_spaces)
+    val endpointCleartextWarning = stringResource(R.string.settings_endpoint_cleartext_warning)
     val fetchModelsMsg = stringResource(R.string.settings_fetch_models)
     val fetchingModelsMsg = stringResource(R.string.settings_fetch_models_loading)
     val modelsLoadedMsg = stringResource(R.string.settings_fetch_models_success)
@@ -107,8 +211,8 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     // Registered keys are decrypted through the Keystore — load off the main thread, as
     // KeysScreen does. The first key is sent as Bearer when fetching models; keyless local
     // servers get no header at all.
-    LaunchedEffect(Unit) {
-        apiKeys = withContext(Dispatchers.IO) { keyManager.getKeys() }
+    LaunchedEffect(providerType) {
+        apiKeys = withContext(Dispatchers.IO) { keyManager.getKeys(providerType) }
     }
 
     // Fetches one provider's live model list (issue #148). Groq rides the existing
@@ -117,63 +221,113 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     // dropdown renders without refetching on every visit.
     fun startModelFetch(type: String) {
         val isGemini = type == ProviderType.GEMINI
-        if (!isGemini && type != ProviderType.GROQ) return
+        val isGroq = type == ProviderType.GROQ
+        val isManaged = type == ProviderType.NVIDIA ||
+            type == ProviderType.OPENROUTER || type == ProviderType.DEEPSEEK
+        if (!isGemini && !isGroq && !isManaged) return
         if (isGemini && isFetchingGeminiModels) return
-        if (!isGemini && isFetchingGroqModels) return
+        if (isGroq && isFetchingGroqModels) return
+        if (isManaged && isFetchingManagedModels) return
 
         val key = apiKeys.firstOrNull() ?: return
+        val config = Providers.forType(type)
+        if (isGemini) isFetchingGeminiModels = true
+        else if (isGroq) isFetchingGroqModels = true
+        else isFetchingManagedModels = true
 
-        if (isGemini) isFetchingGeminiModels = true else isFetchingGroqModels = true
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                if (isGemini) {
-                    geminiClient.fetchModels(key)
-                } else {
-                    openAIClient.fetchModels(key, GroqConfig.ENDPOINT).map { ids ->
-                        ids.filter { GroqModels.isChatCandidate(it) }
+                when {
+                    isGemini -> geminiClient.fetchModels(key)
+                    else -> openAIClient.fetchModels(key, config.resolveEndpoint("")).map { ids ->
+                        val chatIds = ids.filter { id ->
+                            if (isGroq) GroqModels.isChatCandidate(id)
+                            else OpenAIModels.isChatCandidate(id)
+                        }
+                        // openrouter/free is a router target, not a regular catalog
+                        // entry, so keep it selectable even when /models omits it.
+                        if (type == ProviderType.OPENROUTER && config.defaultModel !in chatIds) {
+                            listOf(config.defaultModel) + chatIds
+                        } else {
+                            chatIds
+                        }
                     }
                 }
             }
             val models = result.getOrNull().orEmpty()
             val success = result.isSuccess && models.isNotEmpty()
-            val currentModels = if (isGemini) geminiModelList else groqModelList
+            val currentModels = when {
+                isGemini -> geminiModelList
+                isGroq -> groqModelList
+                else -> managedModelList
+            }
             val toCache = if (success) models else (ProviderModelsCache.get(type)?.models ?: currentModels)
             ProviderModelsCache.put(type, ProviderModelsCache.Entry(toCache, attempted = true))
-            if (isGemini) {
-                isFetchingGeminiModels = false
-                if (success) {
-                    geminiModelList = models
-                    if (selectedModel.isBlank() && models.isNotEmpty()) {
-                        val pick = preferredModel(models, GeminiModels.DEFAULT)
-                        selectedModel = pick
-                        prefs.edit().putString(PrefKeys.GEMINI_MODEL, pick).apply()
+
+            when {
+                isGemini -> {
+                    isFetchingGeminiModels = false
+                    if (success) {
+                        geminiModelList = models
+                        if (selectedModel.isBlank()) {
+                            val pick = preferredModel(models, config.defaultModel)
+                            selectedModel = pick
+                            prefs.edit().putString(config.modelPrefKey, pick).apply()
+                        }
                     }
                 }
-            } else {
-                isFetchingGroqModels = false
-                if (success) {
-                    groqModelList = models
-                    if (groqModel.isBlank() && models.isNotEmpty()) {
-                        val pick = preferredModel(models, GroqModels.DEFAULT)
-                        groqModel = pick
-                        prefs.edit().putString(PrefKeys.GROQ_MODEL, pick).apply()
+                isGroq -> {
+                    isFetchingGroqModels = false
+                    if (success) {
+                        groqModelList = models
+                        if (groqModel.isBlank()) {
+                            val pick = preferredModel(models, config.defaultModel)
+                            groqModel = pick
+                            prefs.edit().putString(config.modelPrefKey, pick).apply()
+                        }
+                    }
+                }
+                else -> {
+                    isFetchingManagedModels = false
+                    if (success) {
+                        managedModelList = models
+                        if (managedModel.isBlank()) {
+                            val pick = preferredModel(models, config.defaultModel)
+                            managedModel = pick
+                            prefs.edit().putString(config.modelPrefKey, pick).apply()
+                        }
                     }
                 }
             }
         }
     }
 
-    // Auto-fetch once per session per provider (issue #148): fires when Settings shows
-    // a Gemini/Groq provider whose list has never been fetched this process — including
-    // the no-key case, so it runs automatically once a first key is added.
+    // Auto-fetch once per session per provider when a user-owned key exists.
     LaunchedEffect(providerType, apiKeys) {
-        if (providerType == ProviderType.GEMINI || providerType == ProviderType.GROQ) {
+        val managed = providerType == ProviderType.GEMINI || providerType == ProviderType.GROQ ||
+            providerType == ProviderType.NVIDIA || providerType == ProviderType.OPENROUTER ||
+            providerType == ProviderType.DEEPSEEK
+        if (managed) {
             val cached = ProviderModelsCache.get(providerType)
             if (apiKeys.isNotEmpty() && (cached == null || !cached.attempted)) {
                 startModelFetch(providerType)
             }
         }
     }
+
+    // Restore the independent model choice when moving between NVIDIA, OpenRouter
+    // and DeepSeek. Their lists remain session-only and are kept in the cache above.
+    LaunchedEffect(providerType) {
+        val managed = providerType == ProviderType.NVIDIA ||
+            providerType == ProviderType.OPENROUTER || providerType == ProviderType.DEEPSEEK
+        if (managed) {
+            val config = Providers.forType(providerType)
+            managedModel = prefs.getString(config.modelPrefKey, "").orEmpty()
+            managedModelList = ProviderModelsCache.get(providerType)?.models ?: emptyList()
+            managedModelExpanded = false
+        }
+    }
+
 
     var backupMessage by remember { mutableStateOf<String?>(null) }
     var backupSuccess by remember { mutableStateOf(false) }
@@ -211,7 +365,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                 try {
                     withContext(Dispatchers.IO) {
                         context.contentResolver.openOutputStream(it)?.use { os ->
-                            os.write(commandManager.exportCommands().toByteArray())
+                            os.write(buildSafeBackup(commandManager, prefs).toByteArray())
                         }
                     }
                     backupMessage = exportSuccessMsg
@@ -234,7 +388,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                             if (text.length > 1_000_000) null else text
                         } ?: ""
                     }
-                    if (commandManager.importCommands(json)) {
+                    if (importSafeBackup(json, commandManager, prefs)) {
                         backupMessage = importSuccessMsg
                         backupSuccess = true
                     } else {
@@ -270,8 +424,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                 Column {
                     Text(
                         text = stringResource(R.string.settings_title),
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
@@ -323,6 +476,9 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                         value = when (providerType) {
                             ProviderType.GEMINI -> stringResource(R.string.settings_provider_gemini)
                             ProviderType.GROQ -> stringResource(R.string.settings_provider_groq)
+                            ProviderType.NVIDIA -> stringResource(R.string.settings_provider_nvidia)
+                            ProviderType.OPENROUTER -> stringResource(R.string.settings_provider_openrouter)
+                            ProviderType.DEEPSEEK -> stringResource(R.string.settings_provider_deepseek)
                             else -> stringResource(R.string.settings_provider_custom)
                         },
                         onValueChange = {},
@@ -350,6 +506,33 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 providerType = ProviderType.GROQ
                                 prefs.edit().putString(PrefKeys.PROVIDER_TYPE, ProviderType.GROQ).remove(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT).apply()
+                                providerExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.settings_provider_nvidia)) },
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                providerType = ProviderType.NVIDIA
+                                prefs.edit().putString(PrefKeys.PROVIDER_TYPE, ProviderType.NVIDIA).remove(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT).apply()
+                                providerExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.settings_provider_openrouter)) },
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                providerType = ProviderType.OPENROUTER
+                                prefs.edit().putString(PrefKeys.PROVIDER_TYPE, ProviderType.OPENROUTER).remove(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT).apply()
+                                providerExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.settings_provider_deepseek)) },
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                providerType = ProviderType.DEEPSEEK
+                                prefs.edit().putString(PrefKeys.PROVIDER_TYPE, ProviderType.DEEPSEEK).remove(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT).apply()
                                 providerExpanded = false
                             }
                         )
@@ -427,7 +610,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                         isFetching = isFetchingGroqModels,
                         fetchingText = fetchingModelsMsg
                     )
-                } else {
+                } else if (providerType == ProviderType.CUSTOM) {
                     Text(
                         text = stringResource(R.string.settings_endpoint_title),
                         fontSize = 11.sp,
@@ -463,6 +646,14 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                         Text(
                             text = msg,
                             color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    if (endpointError == null && customEndpoint.trim().startsWith("http://", ignoreCase = true)) {
+                        Text(
+                            text = endpointCleartextWarning,
+                            color = MaterialTheme.colorScheme.tertiary,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(top = 4.dp)
                         )
@@ -580,6 +771,38 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                             modifier = Modifier.padding(top = 4.dp)
                         )
                     }
+                } else {
+                    val managedConfig = Providers.forType(providerType)
+                    Text(
+                        text = stringResource(R.string.settings_model_title),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    DynamicModelDropdown(
+                        selectedModel = if (apiKeys.isEmpty() || managedModel.isBlank()) "" else managedModel,
+                        enabled = apiKeys.isNotEmpty(),
+                        expanded = managedModelExpanded,
+                        onExpandedChange = { isOpening ->
+                            managedModelExpanded = isOpening
+                            if (isOpening && apiKeys.isNotEmpty() && !isFetchingManagedModels) {
+                                startModelFetch(providerType)
+                            }
+                        },
+                        models = managedModelList,
+                        onSelect = { id ->
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            managedModel = id
+                            prefs.edit().putString(managedConfig.modelPrefKey, id)
+                                .remove(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT).apply()
+                            managedModelExpanded = false
+                        },
+                        onDismiss = { managedModelExpanded = false },
+                        isFetching = isFetchingManagedModels,
+                        fetchingText = fetchingModelsMsg
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -712,8 +935,272 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
 
         Spacer(modifier = Modifier.height(rhythm.cardGap))
 
-        // Card 3: Backup Vault
+        // Card 3: Background reliability
         AnimateEntrance(index = 3) {
+            SlateCard {
+                Column(modifier = Modifier.padding(2.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Security,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.settings_reliability_title),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.settings_reliability_desc),
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (accessibilityEnabled && batteryOptimizationExempt) {
+                            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.28f)
+                        } else {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.34f)
+                        },
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (accessibilityEnabled && batteryOptimizationExempt) {
+                                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f)
+                            } else {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                            }
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = when {
+                                    !accessibilityEnabled -> Icons.Rounded.PowerSettingsNew
+                                    batteryOptimizationExempt -> Icons.Rounded.CheckCircle
+                                    else -> Icons.Rounded.BatteryAlert
+                                },
+                                contentDescription = null,
+                                tint = if (accessibilityEnabled && batteryOptimizationExempt) {
+                                    MaterialTheme.colorScheme.tertiary
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = when {
+                                    !accessibilityEnabled -> stringResource(R.string.settings_reliability_accessibility_needed)
+                                    batteryOptimizationExempt -> stringResource(R.string.settings_reliability_ready)
+                                    else -> stringResource(R.string.settings_reliability_battery_needed)
+                                },
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (!accessibilityEnabled) {
+                                BackgroundReliability.openAccessibilitySettings(context)
+                            } else {
+                                BackgroundReliability.openBatterySettings(context)
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.BatteryChargingFull,
+                            contentDescription = null,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            stringResource(
+                                if (!accessibilityEnabled) {
+                                    R.string.settings_reliability_open_accessibility
+                                } else {
+                                    R.string.settings_reliability_open_battery
+                                }
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(rhythm.cardGap))
+
+        // Card 4: Privacy mode
+        AnimateEntrance(index = 4) {
+            SlateCard {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Lock,
+                        contentDescription = null,
+                        tint = if (privacyMode) {
+                            MaterialTheme.colorScheme.tertiary
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.settings_privacy_title),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = stringResource(R.string.settings_privacy_desc),
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = privacyMode,
+                        onCheckedChange = { enabled ->
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            privacyMode = enabled
+                            prefs.edit().putBoolean(PrefKeys.PRIVACY_MODE, enabled).apply()
+                        }
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(
+                        if (privacyMode) {
+                            R.string.settings_privacy_enabled
+                        } else {
+                            R.string.settings_privacy_disabled
+                        }
+                    ),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (privacyMode) {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.padding(horizontal = 2.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(rhythm.cardGap))
+
+        // Optional local history: disabled by default and always removable in one action.
+        AnimateEntrance(index = 5) {
+            SlateCard {
+                Column(modifier = Modifier.padding(2.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.History,
+                            contentDescription = null,
+                            tint = if (historyEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.settings_history_title),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(R.string.settings_history_desc),
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = historyEnabled,
+                            onCheckedChange = { enabled ->
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                historyEnabled = enabled
+                                historyManager.setEnabled(enabled)
+                            }
+                        )
+                    }
+                    AnimatedVisibility(visible = historyEnabled) {
+                        Column {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = stringResource(R.string.settings_history_retention),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            val retentionOptions = listOf(7, 30, 90)
+                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                retentionOptions.forEachIndexed { index, days ->
+                                    SegmentedButton(
+                                        selected = historyRetentionDays == days,
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            historyRetentionDays = days
+                                            historyManager.setRetentionDays(days)
+                                        },
+                                        shape = SegmentedButtonDefaults.itemShape(
+                                            index = index,
+                                            count = retentionOptions.size
+                                        ),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text(stringResource(R.string.settings_history_days, days), fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            TextButton(
+                                onClick = { showClearHistoryConfirm = true },
+                                modifier = Modifier.align(Alignment.End)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.settings_history_clear),
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(rhythm.cardGap))
+
+        // Card 6: Backup Vault
+        AnimateEntrance(index = 6) {
             SlateCard {
                 Column(modifier = Modifier.padding(2.dp)) {
                 Row(
@@ -942,6 +1429,28 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
             }
         }
     }
+    }
+
+    if (showClearHistoryConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearHistoryConfirm = false },
+            title = { Text(stringResource(R.string.settings_history_clear_title)) },
+            text = { Text(stringResource(R.string.settings_history_clear_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    historyManager.clear()
+                    showClearHistoryConfirm = false
+                }) {
+                    Text(stringResource(R.string.settings_history_clear), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearHistoryConfirm = false }) {
+                    Text(stringResource(R.string.commands_cancel))
+                }
+            }
+        )
     }
 
     if (showImportConfirm) {

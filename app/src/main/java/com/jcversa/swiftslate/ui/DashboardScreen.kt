@@ -7,7 +7,6 @@ import android.content.Intent
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.compose.animation.core.*
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.PathEffect
@@ -25,11 +24,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -42,16 +41,30 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.jcversa.swiftslate.R
 import com.jcversa.swiftslate.SwiftSlateApp
+import com.jcversa.swiftslate.api.GeminiClient
+import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.CommandManager
+import com.jcversa.swiftslate.service.BackgroundReliability
+import com.jcversa.swiftslate.service.CommandOutcome
+import com.jcversa.swiftslate.service.runTextCommand
+import com.jcversa.swiftslate.service.runTextCommand
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.manager.StatsManager
+import com.jcversa.swiftslate.model.PrefKeys
+import com.jcversa.swiftslate.model.ProviderType
+import com.jcversa.swiftslate.provider.Providers
 import com.jcversa.swiftslate.ui.components.LocalSlateRhythm
 import com.jcversa.swiftslate.ui.components.AnimateEntrance
+import com.jcversa.swiftslate.ui.components.SlateMorphIcon
+import com.jcversa.swiftslate.ui.components.SlateMorphIconType
 import com.jcversa.swiftslate.ui.components.SlateTextField
+import com.jcversa.swiftslate.ui.components.SlateMark
 import com.jcversa.swiftslate.ui.components.bounceClick
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -96,13 +109,67 @@ private fun clearCrashMarker(context: Context) {
     }
 }
 
+private sealed interface DiagnosticState {
+    data object Success : DiagnosticState
+    data class Failure(val message: String) : DiagnosticState
+}
+
+private suspend fun runDashboardDiagnostic(
+    context: Context,
+    keyManager: KeyManager,
+    geminiClient: GeminiClient,
+    openAIClient: OpenAICompatibleClient
+): DiagnosticState {
+    return try {
+        val outcome = withContext(Dispatchers.IO) {
+            withTimeout(90_000L) {
+                runTextCommand(
+                    context.applicationContext,
+                    keyManager,
+                    geminiClient,
+                    openAIClient,
+                    context.getString(R.string.dashboard_diagnostic_prompt),
+                    context.getString(R.string.dashboard_diagnostic_input)
+                )
+            }
+        }
+        when (outcome) {
+            is CommandOutcome.Success -> DiagnosticState.Success
+            is CommandOutcome.Refusal -> DiagnosticState.Failure(
+                context.getString(R.string.dashboard_diagnostic_refused)
+            )
+            is CommandOutcome.Unavailable -> DiagnosticState.Failure(outcome.message)
+            is CommandOutcome.Failure -> DiagnosticState.Failure(outcome.message)
+        }
+    } catch (_: Exception) {
+        DiagnosticState.Failure(context.getString(R.string.dashboard_diagnostic_failed))
+    }
+}
+
 @Composable
 fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, statsManager: StatsManager) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val diagnosticScope = rememberCoroutineScope()
+    val diagnosticGeminiClient = remember { GeminiClient() }
+    val diagnosticOpenAIClient = remember { OpenAICompatibleClient() }
+    var diagnosticRunning by rememberSaveable { mutableStateOf(false) }
+    var diagnosticResult by remember { mutableStateOf<DiagnosticState?>(null) }
     var isServiceEnabled by remember { mutableStateOf(checkServiceEnabled(context)) }
     var keyCount by remember { mutableIntStateOf(0) }
     var showKilledBanner by remember { mutableStateOf(false) }
+    var privacyMode by remember {
+        mutableStateOf(
+            context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                .getBoolean(PrefKeys.PRIVACY_MODE, false)
+        )
+    }
+    var showOnboardingReminder by remember {
+        mutableStateOf(
+            context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                .getBoolean("onboarding_reminder", false)
+        )
+    }
 
     // Stats state
     var monthlyRequests by remember { mutableIntStateOf(statsManager.monthlyRequests) }
@@ -124,9 +191,13 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
         val lifecycle = lifecycleOwner.lifecycle
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             val (newEnabled, newKeyCount, killed) = withContext(Dispatchers.IO) {
+                val providerType = ProviderType.sanitize(
+                    context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                        .getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI)
+                )
                 Triple(
                     checkServiceEnabled(context),
-                    keyManager.getKeys().size,
+                    keyManager.getKeys(providerType).size,
                     readCrashMarker(context) > 0L || isServiceCrashed(context)
                 )
             }
@@ -136,33 +207,29 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
             favoriteCommand = statsManager.favoriteCommand
             dailyCounts = statsManager.dailyCounts()
             showKilledBanner = killed
+            privacyMode = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                .getBoolean(PrefKeys.PRIVACY_MODE, false)
+            BackgroundReliability.refreshRecoveryNotification(context)
         }
     }
 
     val noData = stringResource(R.string.dashboard_no_data)
     val rhythm = LocalSlateRhythm.current
     val scrollState = rememberScrollState()
-
-    // Pulsing animation for status indicators
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 2.4f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = EaseOutQuad),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulse_scale"
+    val activeProviderType = ProviderType.sanitize(
+        context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+            .getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI)
     )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 0.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = EaseOutQuad),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "pulse_alpha"
+    val activeProvider = Providers.forType(activeProviderType)
+    val activeModel = activeProvider.sanitizeModel(
+        context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+            .getString(activeProvider.modelPrefKey, activeProvider.defaultModel)
     )
+    val activeModelLabel = if (activeModel.isBlank()) {
+        stringResource(R.string.dashboard_configuration_not_set)
+    } else {
+        activeModel
+    }
 
     Column(
         modifier = Modifier
@@ -173,22 +240,110 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
         // Welcome Header
         // (No action button: the redesign's decorative one did nothing but vibrate.)
         AnimateEntrance(index = 0) {
-            Column(
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = rhythm.cardGap)
+                    .padding(bottom = rhythm.cardGap),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.14f),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                )
             ) {
-                Text(
-                    text = stringResource(R.string.dashboard_title),
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = stringResource(R.string.dashboard_subtitle),
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SlateMark()
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.dashboard_title),
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = stringResource(R.string.dashboard_subtitle),
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
+        if (privacyMode) {
+            AnimateEntrance(index = 1) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = rhythm.cardGap),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.22f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.35f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Lock,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(9.dp))
+                        Text(
+                            text = stringResource(R.string.settings_privacy_enabled),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
+
+        if (showOnboardingReminder) {
+            AnimateEntrance(index = 1) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = rhythm.cardGap),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.dashboard_onboarding_reminder),
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(
+                            onClick = {
+                                showOnboardingReminder = false
+                                context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                                    .edit().putBoolean("onboarding_reminder", false).apply()
+                            }
+                        ) {
+                            Text(stringResource(R.string.dashboard_onboarding_dismiss), fontSize = 12.sp)
+                        }
+                    }
+                }
             }
         }
 
@@ -239,7 +394,7 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.heightIn(min = 40.dp)
+                                modifier = Modifier.heightIn(min = 48.dp)
                             ) {
                                 Text(stringResource(R.string.service_enable), fontSize = 13.sp)
                             }
@@ -291,29 +446,41 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(32.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .graphicsLayer {
-                                    scaleX = pulseScale
-                                    scaleY = pulseScale
-                                    alpha = pulseAlpha
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isServiceEnabled) {
+                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f)
+                                } else {
+                                    MaterialTheme.colorScheme.error.copy(alpha = 0.16f)
                                 }
-                                .clip(CircleShape)
-                                .background(
-                                    if (isServiceEnabled) MaterialTheme.colorScheme.tertiary
-                                    else MaterialTheme.colorScheme.error
-                                )
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(14.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isServiceEnabled) MaterialTheme.colorScheme.tertiary
-                                    else MaterialTheme.colorScheme.error
-                                )
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isServiceEnabled) {
+                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.32f)
+                                } else {
+                                    MaterialTheme.colorScheme.error.copy(alpha = 0.32f)
+                                },
+                                shape = CircleShape
+                            )
+                    ) {
+                        // The state change is meaningful feedback, but it is not a continuous
+                        // pulse: the morph only runs when Android reports a different service
+                        // state and settles immediately in reduced-motion mode.
+                        SlateMorphIcon(
+                            type = SlateMorphIconType.LoadingSuccess,
+                            toggled = isServiceEnabled,
+                            tint = if (isServiceEnabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                            contentDescription = if (isServiceEnabled) {
+                                stringResource(R.string.service_status_active)
+                            } else {
+                                stringResource(R.string.service_status_inactive)
+                            },
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
@@ -344,7 +511,7 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                             contentColor = Color.White
                         ),
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.heightIn(min = 40.dp)
+                        modifier = Modifier.heightIn(min = 48.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
@@ -385,8 +552,181 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
         }
     }
 
-        // Dual Side-by-Side Statistics Metrics Cards
+        // Configuration Control Center: status is local until the user explicitly runs a test.
         AnimateEntrance(index = 3) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = rhythm.cardGap),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                ),
+                tonalElevation = 1.dp
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Tune,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.dashboard_configuration_title),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(R.string.dashboard_configuration_desc),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (diagnosticResult is DiagnosticState.Success) {
+                            Icon(
+                                imageVector = Icons.Rounded.CheckCircle,
+                                contentDescription = stringResource(R.string.dashboard_diagnostic_success),
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.dashboard_configuration_provider),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = when (activeProviderType) {
+                                        ProviderType.GROQ -> stringResource(R.string.settings_provider_groq)
+                                        ProviderType.NVIDIA -> stringResource(R.string.settings_provider_nvidia)
+                                        ProviderType.OPENROUTER -> stringResource(R.string.settings_provider_openrouter)
+                                        ProviderType.DEEPSEEK -> stringResource(R.string.settings_provider_deepseek)
+                                        ProviderType.CUSTOM -> stringResource(R.string.settings_provider_custom)
+                                        else -> stringResource(R.string.settings_provider_gemini)
+                                    },
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.dashboard_configuration_model),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = activeModelLabel,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    modifier = Modifier.widthIn(max = 220.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.dashboard_configuration_keys),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = stringResource(R.string.dashboard_configuration_key_count, keyCount),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (keyCount > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            if (!diagnosticRunning) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                diagnosticRunning = true
+                                diagnosticResult = null
+                                diagnosticScope.launch {
+                                    diagnosticResult = runDashboardDiagnostic(
+                                        context,
+                                        keyManager,
+                                        diagnosticGeminiClient,
+                                        diagnosticOpenAIClient
+                                    )
+                                    diagnosticRunning = false
+                                }
+                            }
+                        },
+                        enabled = !diagnosticRunning,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        if (diagnosticRunning) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.dashboard_diagnostic_running))
+                        } else {
+                            Icon(Icons.Rounded.NetworkCheck, null, modifier = Modifier.size(17.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.dashboard_diagnostic_button))
+                        }
+                    }
+                    when (val result = diagnosticResult) {
+                        is DiagnosticState.Success -> Text(
+                            text = stringResource(R.string.dashboard_diagnostic_success),
+                            color = MaterialTheme.colorScheme.tertiary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                        is DiagnosticState.Failure -> Text(
+                            text = result.message,
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                        null -> Unit
+                    }
+                }
+            }
+        }
+
+        // Dual Side-by-Side Statistics Metrics Cards
+        AnimateEntrance(index = 4) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -740,35 +1080,33 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                 )
-                                if (isSandboxProcessing) {
+                                if (isSandboxProcessing || sandboxSuccess) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(10.dp),
-                                            strokeWidth = 1.5.dp,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = stringResource(R.string.dashboard_sandbox_replacing),
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                } else if (sandboxSuccess) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.CheckCircle,
+                                        SlateMorphIcon(
+                                            type = SlateMorphIconType.LoadingSuccess,
+                                            toggled = sandboxSuccess,
+                                            tint = if (sandboxSuccess) {
+                                                MaterialTheme.colorScheme.tertiary
+                                            } else {
+                                                MaterialTheme.colorScheme.primary
+                                            },
                                             contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.tertiary,
-                                            modifier = Modifier.size(12.dp)
+                                            modifier = Modifier.size(14.dp)
                                         )
-                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Spacer(modifier = Modifier.width(5.dp))
                                         Text(
-                                            text = stringResource(R.string.dashboard_sandbox_replaced),
+                                            text = if (sandboxSuccess) {
+                                                stringResource(R.string.dashboard_sandbox_replaced)
+                                            } else {
+                                                stringResource(R.string.dashboard_sandbox_replacing)
+                                            },
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.tertiary
+                                            color = if (sandboxSuccess) {
+                                                MaterialTheme.colorScheme.tertiary
+                                            } else {
+                                                MaterialTheme.colorScheme.primary
+                                            }
                                         )
                                     }
                                 }
@@ -792,7 +1130,6 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                         Button(
                             onClick = {
                                 if (!isSandboxProcessing) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     isSandboxProcessing = true
                                 }
                             },
@@ -800,7 +1137,7 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                             enabled = !isSandboxProcessing,
                             modifier = Modifier
                                 .weight(1.3f)
-                                .heightIn(min = 44.dp)
+                                .heightIn(min = 48.dp)
                                 .bounceClick(),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary
@@ -820,7 +1157,6 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                         OutlinedButton(
                             onClick = {
                                 if (!isSandboxProcessing) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     sandboxText = sandboxDemoInput
                                     sandboxSuccess = false
                                 }
@@ -829,7 +1165,7 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                             enabled = !isSandboxProcessing,
                             modifier = Modifier
                                 .weight(1f)
-                                .heightIn(min = 44.dp)
+                                .heightIn(min = 48.dp)
                                 .bounceClick()
                         ) {
                             Text(stringResource(R.string.dashboard_sandbox_reset), fontWeight = FontWeight.Bold, fontSize = 13.sp)

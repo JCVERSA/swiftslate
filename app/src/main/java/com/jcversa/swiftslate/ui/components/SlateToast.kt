@@ -52,17 +52,26 @@ fun SlateToast(
     message: String?,
     modifier: Modifier = Modifier
 ) {
+    val motion = LocalSlateMotion.current
     Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         AnimatedVisibility(
             visible = message != null,
-            enter = fadeIn(tween(SlateToastTokens.ANIM_DURATION_MS)) +
-                slideInVertically(tween(SlateToastTokens.ANIM_DURATION_MS)) {
-                    SlateToastTokens.SLIDE_DISTANCE_DP
-                },
-            exit = fadeOut(tween(SlateToastTokens.ANIM_DURATION_MS)) +
-                slideOutVertically(tween(SlateToastTokens.ANIM_DURATION_MS)) {
-                    SlateToastTokens.SLIDE_DISTANCE_DP
-                }
+            enter = if (motion.reduceMotion) {
+                fadeIn(motion.transitionSpec(0))
+            } else {
+                fadeIn(tween(SlateToastTokens.ANIM_DURATION_MS)) +
+                    slideInVertically(tween(SlateToastTokens.ANIM_DURATION_MS)) {
+                        SlateToastTokens.SLIDE_DISTANCE_DP
+                    }
+            },
+            exit = if (motion.reduceMotion) {
+                fadeOut(motion.transitionSpec(0))
+            } else {
+                fadeOut(tween(SlateToastTokens.ANIM_DURATION_MS)) +
+                    slideOutVertically(tween(SlateToastTokens.ANIM_DURATION_MS)) {
+                        SlateToastTokens.SLIDE_DISTANCE_DP
+                    }
+            }
         ) {
             Text(
                 // Kept after the animation starts running so the exit transition has something
