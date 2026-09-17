@@ -1723,17 +1723,3 @@ private fun DynamicModelDropdown(
         }
     }
 }
-}
-              } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                }
-                            )
-                        },
-                        onClick = { onSelect(id) }
-                    )
-                }
-            }
-        }
-    }
-}
-}
