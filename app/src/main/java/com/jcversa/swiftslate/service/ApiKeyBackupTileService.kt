@@ -1,12 +1,12 @@
 package com.jcversa.swiftslate.service
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import androidx.annotation.RequiresApi
-import androidx.annotation.SuppressLint
 import com.jcversa.swiftslate.EXTRA_OPEN_SECURE_BACKUP
 import com.jcversa.swiftslate.MainActivity
 
