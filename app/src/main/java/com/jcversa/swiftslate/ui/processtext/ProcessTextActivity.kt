@@ -53,6 +53,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.jcversa.swiftslate.R
 import com.jcversa.swiftslate.model.Command
+import com.jcversa.swiftslate.model.CommandType
 import com.jcversa.swiftslate.ui.components.SlateCard
 import com.jcversa.swiftslate.ui.components.LocalSlateMotion
 import com.jcversa.swiftslate.ui.components.SlateItemCard
@@ -376,16 +377,23 @@ private fun ResultCard(result: String) {
 @Composable
 private fun QuickActions(commands: List<Command>, onPick: (Command) -> Unit) {
     val quickDefinitions = listOf(
-        "fix" to R.string.process_quick_fix,
-        "improve" to R.string.process_quick_improve,
-        "shorten" to R.string.process_quick_shorten,
-        "formal" to R.string.process_quick_formal,
-        "casual" to R.string.process_quick_casual,
-        "reply" to R.string.process_quick_reply
+        Triple("fix", R.string.process_quick_fix, CommandType.AI),
+        Triple("improve", R.string.process_quick_improve, CommandType.AI),
+        Triple("shorten", R.string.process_quick_shorten, CommandType.AI),
+        Triple("formal", R.string.process_quick_formal, CommandType.AI),
+        Triple("casual", R.string.process_quick_casual, CommandType.AI),
+        Triple("reply", R.string.process_quick_reply, CommandType.AI),
+        Triple("bold", R.string.process_quick_bold, CommandType.TEXT_REPLACER),
+        Triple("italic", R.string.process_quick_italic, CommandType.TEXT_REPLACER),
+        Triple("mono", R.string.process_quick_mono, CommandType.TEXT_REPLACER),
+        Triple("bubble", R.string.process_quick_bubble, CommandType.TEXT_REPLACER),
+        Triple("gothic", R.string.process_quick_gothic, CommandType.TEXT_REPLACER),
+        Triple("smallcaps", R.string.process_quick_smallcaps, CommandType.TEXT_REPLACER),
+        Triple("normal", R.string.process_quick_normal, CommandType.TEXT_REPLACER)
     )
-    val actions = quickDefinitions.mapNotNull { (name, label) ->
+    val actions = quickDefinitions.mapNotNull { (name, label, type) ->
         commands.firstOrNull {
-            it.type == com.jcversa.swiftslate.model.CommandType.AI &&
+            it.type == type &&
                 (it.trigger.drop(1) == name || it.aliases.any { alias -> alias.drop(1) == name })
         }?.let { command -> command to label }
     }

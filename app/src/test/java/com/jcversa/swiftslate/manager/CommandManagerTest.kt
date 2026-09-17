@@ -109,9 +109,9 @@ class CommandManagerTest {
     // --- getCommands ---
 
     @Test
-    fun getCommands_returnsFifteenBuiltInByDefault() {
+    fun getCommands_returnsTwentyTwoCommandsByDefault() {
         val commands = commandManager.getCommands()
-        assertEquals(15, commands.size)
+        assertEquals(22, commands.size)
     }
 
     @Test
@@ -133,10 +133,36 @@ class CommandManagerTest {
     }
 
     @Test
+    fun getCommands_styleCommandsAreBuiltInLocalCommands() {
+        val commands = commandManager.getCommands()
+        val styleTriggers = listOf("?bold", "?italic", "?mono", "?bubble", "?gothic", "?smallcaps", "?normal")
+        val styleCommands = commands.filter { it.trigger in styleTriggers }
+        assertEquals(7, styleCommands.size)
+        assertTrue(styleCommands.all {
+            it.isBuiltIn && it.type == CommandType.TEXT_REPLACER && TextStyleTransformer.isStyleCommand(it)
+        })
+    }
+
+    @Test
+    fun findCommand_styleTriggerReturnsLocalStyleCommand() {
+        val result = commandManager.findCommand("hello?bold")
+        assertNotNull(result)
+        assertEquals("?bold", result!!.trigger)
+        assertEquals(CommandType.TEXT_REPLACER, result.type)
+        assertTrue(TextStyleTransformer.isStyleCommand(result))
+    }
+
+    @Test
+    fun saveCustomCommand_rejectsCollisionWithStyleCommand() {
+        assertFalse(commandManager.saveCustomCommand(Command("?bold", "replace with something else")))
+        assertFalse(commandManager.saveCustomCommand(Command("?boldface", "shadow style command")))
+    }
+
+    @Test
     fun getCommands_afterAddingCustom_includesIt() {
         commandManager.saveCustomCommand(Command("?myCmd", "do something"))
         val commands = commandManager.getCommands()
-        assertEquals(16, commands.size)
+        assertEquals(23, commands.size)
         assertTrue(commands.any { it.trigger == "?myCmd" })
     }
 

@@ -196,6 +196,13 @@
     <string name="process_quick_formal" tools:ignore="MissingTranslation">Formal</string>
     <string name="process_quick_casual" tools:ignore="MissingTranslation">Casual</string>
     <string name="process_quick_reply" tools:ignore="MissingTranslation">Reply</string>
+    <string name="process_quick_bold" tools:ignore="MissingTranslation">Bold</string>
+    <string name="process_quick_italic" tools:ignore="MissingTranslation">Italic</string>
+    <string name="process_quick_mono" tools:ignore="MissingTranslation">Mono</string>
+    <string name="process_quick_bubble" tools:ignore="MissingTranslation">Bubble</string>
+    <string name="process_quick_gothic" tools:ignore="MissingTranslation">Gothic</string>
+    <string name="process_quick_smallcaps" tools:ignore="MissingTranslation">Small caps</string>
+    <string name="process_quick_normal" tools:ignore="MissingTranslation">Normal</string>
     <string name="toast_restore_failed">Could not restore original text</string>
     <string name="toast_nothing_to_undo">Nothing to undo</string>
     <string name="toast_undo_failed">Could not undo</string>

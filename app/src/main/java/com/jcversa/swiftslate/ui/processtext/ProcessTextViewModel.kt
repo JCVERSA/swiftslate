@@ -11,6 +11,7 @@ import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.CommandManager
 import com.jcversa.swiftslate.manager.HistoryManager
 import com.jcversa.swiftslate.manager.StatsManager
+import com.jcversa.swiftslate.manager.TextStyleTransformer
 import com.jcversa.swiftslate.model.Command
 import com.jcversa.swiftslate.model.PrefKeys
 import com.jcversa.swiftslate.model.CommandType
@@ -88,11 +89,14 @@ class ProcessTextViewModel(
             // Dispatchers.Main.immediate — never touch it on the main thread.
             commands = try {
                 withContext(Dispatchers.IO) {
-                    // Built-ins are the clipboard/undo commands, which need the live field the
-                    // accessibility service has and this flow does not. Filtered on isBuiltIn, not
-                    // on trigger text: the prefix is user-configurable, so matching "?copy" would
-                    // silently stop filtering the moment someone changed it.
-                    commandManager.getCommands().filterNot { it.isBuiltIn }
+                    // Clipboard/undo built-ins need the live field the accessibility service has
+                    // and this flow does not. Local text-style built-ins are the exception: they
+                    // transform the selection in this activity without a network request.
+                    // Filter by command metadata, not trigger text, because the prefix is user-
+                    // configurable.
+                    commandManager.getCommands().filterNot {
+                        it.isBuiltIn && !TextStyleTransformer.isStyleCommand(it)
+                    }
                 }
             } catch (e: Exception) {
                 // This activity shares the process with the accessibility service — an
@@ -108,13 +112,16 @@ class ProcessTextViewModel(
     fun run(command: Command) {
         if (!inFlight.compareAndSet(false, true)) return
 
-        // A snippet needs no request at all — resolve it without touching the network.
+        // Local commands need no request at all — resolve them without touching the network.
         if (command.type == CommandType.TEXT_REPLACER) {
+            val result = TextStyleTransformer.styleFor(command)?.let { style ->
+                TextStyleTransformer.transform(style, selection.text)
+            } ?: command.prompt
             inFlight.set(false)
             _uiState.value = UiState.Preview(
-                result = command.prompt,
+                result = result,
                 canInsert = !selection.readOnly,
-                animateReplacement = command.type == CommandType.AI
+                animateReplacement = false
             )
             viewModelScope.launch {
                 try {
@@ -123,7 +130,7 @@ class ProcessTextViewModel(
                         historyManager.record(
                             command.trigger,
                             selection.text,
-                            command.prompt,
+                            result,
                             currentProviderForHistory()
                         )
                     }

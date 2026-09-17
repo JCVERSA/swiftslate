@@ -120,7 +120,8 @@ class CommandManager(context: Context) {
      * `prefix + translate` would otherwise shadow every language variant accepted below.
      */
     private fun conflictsWithBuiltIn(name: String, prefix: String): Boolean {
-        val builtIns = systemDefinitions.map { (trigger, _) -> prefix + trigger }
+        val builtIns = systemDefinitions.map { (trigger, _) -> prefix + trigger } +
+            TextStyleTransformer.definitions.map { definition -> prefix + definition.name }
         return builtIns.any { isTriggerConflict(name, it) } ||
             isTriggerConflict(name, prefix + "translate")
     }
@@ -221,7 +222,18 @@ class CommandManager(context: Context) {
 
     private fun getBuiltInCommands(): List<Command> {
         val prefix = getTriggerPrefix()
-        return systemDefinitions.map { (name, prompt) -> Command("$prefix$name", prompt, true) }
+        val systemCommands = systemDefinitions.map { (name, prompt) ->
+            Command("$prefix$name", prompt, true)
+        }
+        val styleCommands = TextStyleTransformer.definitions.map { definition ->
+            Command(
+                trigger = "$prefix${definition.name}",
+                prompt = definition.description,
+                isBuiltIn = true,
+                type = CommandType.TEXT_REPLACER
+            )
+        }
+        return systemCommands + styleCommands
     }
 
     private fun seedDefaultAiCommands() {

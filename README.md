@@ -54,6 +54,7 @@ Type a trigger like **`?fix`** at the end of any text, in any app, and watch it 
 - [Features](#-features)
 - [Built-in Commands](#-built-in-commands)
 - [Text Replacer Commands](#-text-replacer-commands)
+- [Text Styles](#-text-styles)
 - [Supported AI Providers](#-supported-ai-providers)
 - [Getting Started](#-getting-started)
 - [How It Works](#%EF%B8%8F-how-it-works)
@@ -146,7 +147,7 @@ No telemetry, no tracking, no crash reporting — text is sent only to your conf
 
 ## 🧩 Built-in Commands
 
-SwiftSlate ships with **9 AI-powered commands**, dynamic translation, and **5 built-in local commands** — ready to use out of the box. The AI commands are seeded as editable entries, so you can reword or delete any of them:
+SwiftSlate ships with **9 AI-powered commands**, dynamic translation, **7 local text styles**, and clipboard helpers — ready to use out of the box. The AI commands are seeded as editable entries, so you can reword or delete any of them:
 
 | Trigger | Action | Example |
 |:--------|:-------|:--------|
@@ -161,6 +162,13 @@ SwiftSlate ships with **9 AI-powered commands**, dynamic translation, and **5 bu
 | **`?reply`** | Generate a contextual reply | `Do you want to grab lunch tomorrow?` → `Sure, I'd love to! What time works for you?` |
 | **`?undo`** | Restore text from before the last replacement | Reverts to your original text before AI modified it |
 | **`?translate:XX`** | Translate to any language | `Hello, how are you?` **`?translate:es`** → `Hola, ¿cómo estás?` |
+| **`?bold`** | Apply bold Unicode characters locally | `Hello ?bold` → `𝗛𝗲𝗹𝗹𝗼` |
+| **`?italic`** | Apply italic Unicode characters locally | `Hello ?italic` → `𝘏𝘦𝘭𝘭𝘰` |
+| **`?mono`** | Apply monospace Unicode characters locally | `Hello ?mono` → `𝙷𝚎𝚕𝚕𝚘` |
+| **`?bubble`** | Apply circled characters locally | `Hello ?bubble` → `Ⓗⓔⓛⓛⓞ` |
+| **`?gothic`** | Apply Fraktur characters locally | `Hello ?gothic` → `ℌ𝔢𝔩𝔩𝔬` |
+| **`?smallcaps`** | Apply small-cap characters locally | `Hello ?smallcaps` → `ʜᴇʟʟᴏ` |
+| **`?normal`** | Convert supported styles back to normal text | `𝗛𝗲𝗹𝗹𝗼 ?normal` → `Hello` |
 
 <details>
 <summary>🌍 <strong>Supported language codes for translation</strong></summary>
@@ -180,6 +188,24 @@ Use any standard language code with `?translate:XX`:
 …and many more. Any ISO 639 language code works — the AI model handles it.
 
 </details>
+
+### 🎨 Text Styles
+
+SwiftSlate includes local Unicode text styles that work instantly without an API key or network request. Type the command at the end of text, or select text and choose the style from SwiftSlate in Android's text-selection menu:
+
+| Trigger | Style | Example |
+|:--------|:------|:--------|
+| **`?bold`** | Bold | `Hello ?bold` → `𝗛𝗲𝗹𝗹𝗼` |
+| **`?italic`** | Italic | `Hello ?italic` → `𝘏𝘦𝘭𝘭𝘰` |
+| **`?mono`** | Monospace | `Hello ?mono` → `𝙷𝚎𝚕𝚕𝚘` |
+| **`?bubble`** | Circled | `Hello ?bubble` → `Ⓗⓔⓛⓛⓞ` |
+| **`?gothic`** | Fraktur | `Hello ?gothic` → `ℌ𝔢𝔩𝔩𝔬` |
+| **`?smallcaps`** | Small capitals | `Hello ?smallcaps` → `ʜᴇʟʟᴏ` |
+| **`?normal`** | Restore supported styles | `𝗛𝗲𝗹𝗹𝗼 ?normal` → `Hello` |
+
+These are Unicode characters that imitate font styles, not actual font changes. Unsupported characters, accents, emoji, and non-Latin scripts are preserved instead of being removed. Some apps may render Unicode styles differently.
+
+<br>
 
 ### 📋 Clipboard Commands
 
@@ -575,6 +601,8 @@ com.jcversa.swiftslate/
 │   │                            # KeyManager is testable without the keystore
 │   ├── CommandManager.kt        # Command CRUD, trigger matching (longest-match),
 │   │                            # prefix migration, import/export
+│   ├── TextStyleTransformer.kt  # Offline Unicode styles for bold, italic, mono, bubble,
+│   │                            # gothic, small caps and normalizing supported glyphs
 │   └── StatsManager.kt          # Usage counters — monthly total, per-command, last 7 days
 ├── provider/
 │   └── ProviderConfig.kt        # Per-provider config (transport, endpoint, model key,

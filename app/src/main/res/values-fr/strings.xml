@@ -174,6 +174,13 @@
     <string name="process_quick_formal">Formel</string>
     <string name="process_quick_casual">Décontracté</string>
     <string name="process_quick_reply">Répondre</string>
+    <string name="process_quick_bold">Gras</string>
+    <string name="process_quick_italic">Italique</string>
+    <string name="process_quick_mono">Monospace</string>
+    <string name="process_quick_bubble">Bulles</string>
+    <string name="process_quick_gothic">Gothique</string>
+    <string name="process_quick_smallcaps">Petites capitales</string>
+    <string name="process_quick_normal">Normal</string>
     <string name="toast_restore_failed">Impossible de restaurer le texte d\'origine</string>
     <string name="toast_nothing_to_undo">Rien à annuler</string>
     <string name="toast_undo_failed">Impossible d\'annuler</string>

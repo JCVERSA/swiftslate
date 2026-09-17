@@ -1,0 +1,161 @@
+package com.jcversa.swiftslate.manager
+
+import com.jcversa.swiftslate.model.Command
+import com.jcversa.swiftslate.model.CommandType
+
+/**
+ * Unicode text styles that can be applied locally, without an API request.
+ *
+ * These are deliberately character transformations rather than font files: SwiftSlate replaces
+ * text in another app, but it cannot change the host app's Typeface. Characters that do not have
+ * a safe Unicode equivalent (including most accented alphabets, CJK, Arabic, and emoji) are
+ * preserved exactly as entered.
+ */
+enum class TextStyle {
+    NORMAL,
+    BOLD,
+    ITALIC,
+    MONOSPACE,
+    BUBBLE,
+    GOTHIC,
+    SMALL_CAPS
+}
+
+object TextStyleTransformer {
+    data class Definition(
+        val name: String,
+        val style: TextStyle,
+        val description: String
+    )
+
+    /** Built-in trigger definitions exposed by CommandManager. */
+    val definitions: List<Definition> = listOf(
+        Definition("bold", TextStyle.BOLD, "Apply bold Unicode characters locally."),
+        Definition("italic", TextStyle.ITALIC, "Apply italic Unicode characters locally."),
+        Definition("mono", TextStyle.MONOSPACE, "Apply monospace Unicode characters locally."),
+        Definition("bubble", TextStyle.BUBBLE, "Apply circled Unicode characters locally."),
+        Definition("gothic", TextStyle.GOTHIC, "Apply Fraktur Unicode characters locally."),
+        Definition("smallcaps", TextStyle.SMALL_CAPS, "Apply small-cap Unicode characters locally."),
+        Definition("normal", TextStyle.NORMAL, "Convert supported Unicode styles back to normal text.")
+    )
+
+    private val boldUpper = "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭"
+    private val boldLower = "𝗮𝗯𝗰𝗱𝗲𝗳𝗴𝗵𝗶𝗷𝗸𝗹𝗺𝗻𝗼𝗽𝗾𝗿𝘀𝘁𝘂𝘃𝘄𝘅𝘆𝘇"
+    private val boldDigits = "𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵"
+
+    private val italicUpper = "𝘈𝘉𝘊𝘋𝘌𝘍𝘎𝘏𝘐𝘑𝘒𝘓𝘔𝘕𝘖𝘗𝘘𝘙𝘚𝘛𝘜𝘝𝘞𝘟𝘠𝘡"
+    private val italicLower = "𝘢𝘣𝘤𝘥𝘦𝘧𝘨𝘩𝘪𝘫𝘬𝘭𝘮𝘯𝘰𝘱𝘲𝘳𝘴𝘵𝘶𝘷𝘸𝘹𝘺𝘻"
+
+    private val monospaceUpper = "𝙰𝙱𝙲𝙳𝙴𝙵𝙶𝙷𝙸𝙹𝙺𝙻𝙼𝙽𝙾𝙿𝚀𝚁𝚂𝚃𝚄𝚅𝚆𝚇𝚈𝚉"
+    private val monospaceLower = "𝚊𝚋𝚌𝚍𝚎𝚏𝚐𝚑𝚒𝚓𝚔𝚕𝚖𝚗𝚘𝚙𝚚𝚛𝚜𝚝𝚞𝚟𝚠𝚡𝚢𝚣"
+    private val monospaceDigits = "𝟶𝟷𝟸𝟹𝟺𝟻𝟼𝟽𝟾𝟿"
+
+    private val bubbleUpper = "ⒶⒷⒸⒹⒺⒻⒼⒽⒾⒿⓀⓁⓂⓃⓄⓅⓆⓇⓈⓉⓊⓋⓌⓍⓎⓏ"
+    private val bubbleLower = "ⓐⓑⓒⓓⓔⓕⓖⓗⓘⓙⓚⓛⓜⓝⓞⓟⓠⓡⓢⓣⓤⓥⓦⓧⓨⓩ"
+    private val bubbleDigits = "⓪①②③④⑤⑥⑦⑧⑨"
+
+    // Fraktur has a handful of compatibility characters for capitals (C, H, I, R, Z).
+    private val gothicUpper = "𝔄𝔅ℭ𝔇𝔈𝔉𝔊ℌℑ𝔍𝔎𝔏𝔐𝔑𝔒𝔓𝔔ℜ𝔖𝔗𝔘𝔙𝔚𝔛𝔜ℨ"
+    private val gothicLower = "𝔞𝔟𝔠𝔡𝔢𝔣𝔤𝔥𝔦𝔧𝔨𝔩𝔪𝔫𝔬𝔭𝔮𝔯𝔰𝔱𝔲𝔳𝔴𝔵𝔶𝔷"
+
+    // Unicode does not provide small capitals for every Latin letter. The closest supported
+    // character is used where available; unsupported letters intentionally remain unchanged.
+    private val smallCaps = "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀꜱᴛᴜᴠᴡxʏᴢ"
+
+    /** Returns the local style represented by a built-in command, or null for every other command. */
+    fun styleFor(command: Command): TextStyle? {
+        if (!command.isBuiltIn || command.type != CommandType.TEXT_REPLACER) return null
+        return definitions.firstOrNull { command.trigger.drop(1) == it.name }?.style
+    }
+
+    fun isStyleCommand(command: Command): Boolean = styleFor(command) != null
+
+    /** Applies [style] while preserving whitespace, punctuation, emoji, and unsupported scripts. */
+    fun transform(style: TextStyle, text: String): String = when (style) {
+        TextStyle.NORMAL -> normalize(text)
+        TextStyle.BOLD -> mapAscii(text, boldUpper, boldLower, boldDigits)
+        TextStyle.ITALIC -> mapAscii(text, italicUpper, italicLower)
+        TextStyle.MONOSPACE -> mapAscii(text, monospaceUpper, monospaceLower, monospaceDigits)
+        TextStyle.BUBBLE -> mapAscii(text, bubbleUpper, bubbleLower, bubbleDigits)
+        TextStyle.GOTHIC -> mapAscii(text, gothicUpper, gothicLower)
+        TextStyle.SMALL_CAPS -> text.map { char ->
+            when {
+                char in 'A'..'Z' -> smallCaps[char - 'A']
+                char in 'a'..'z' -> smallCaps[char - 'a']
+                else -> char
+            }
+        }.joinToString("")
+    }
+
+    private fun mapAscii(
+        text: String,
+        upper: String,
+        lower: String,
+        digits: String? = null
+    ): String = buildString(text.length) {
+        text.forEach { char ->
+            when {
+                char in 'A'..'Z' -> appendCodePointAt(upper, char - 'A')
+                char in 'a'..'z' -> appendCodePointAt(lower, char - 'a')
+                digits != null && char in '0'..'9' -> appendCodePointAt(digits, char - '0')
+                else -> append(char)
+            }
+        }
+    }
+
+    /** Appends one Unicode glyph, including supplementary-plane mathematical characters. */
+    private fun StringBuilder.appendCodePointAt(glyphs: String, index: Int) {
+        var offset = 0
+        repeat(index) {
+            offset += Character.charCount(glyphs.codePointAt(offset))
+        }
+        val codePoint = glyphs.codePointAt(offset)
+        appendCodePoint(codePoint)
+    }
+
+    /** Converts glyphs generated by this object back to ASCII; ordinary text is untouched. */
+    private fun normalize(text: String): String {
+        val reverse = normalForms
+        return buildString(text.length) {
+            var offset = 0
+            while (offset < text.length) {
+                val codePoint = text.codePointAt(offset)
+                val glyph = String(Character.toChars(codePoint))
+                append(reverse[glyph] ?: glyph)
+                offset += Character.charCount(codePoint)
+            }
+        }
+    }
+
+    private val normalForms: Map<String, Char> by lazy {
+        buildMap {
+            addReverse(this, boldUpper, 'A')
+            addReverse(this, boldLower, 'a')
+            addReverse(this, boldDigits, '0')
+            addReverse(this, italicUpper, 'A')
+            addReverse(this, italicLower, 'a')
+            addReverse(this, monospaceUpper, 'A')
+            addReverse(this, monospaceLower, 'a')
+            addReverse(this, monospaceDigits, '0')
+            addReverse(this, bubbleUpper, 'A')
+            addReverse(this, bubbleLower, 'a')
+            addReverse(this, bubbleDigits, '0')
+            addReverse(this, gothicUpper, 'A')
+            addReverse(this, gothicLower, 'a')
+            smallCaps.forEachIndexed { index, glyph ->
+                put(glyph.toString(), ('a'.code + index).toChar())
+            }
+        }
+    }
+
+    private fun addReverse(target: MutableMap<String, Char>, glyphs: String, plainStart: Char) {
+        var offset = 0
+        var plain = 0
+        while (offset < glyphs.length) {
+            val codePoint = glyphs.codePointAt(offset)
+            target[String(Character.toChars(codePoint))] = (plainStart.code + plain).toChar()
+            offset += Character.charCount(codePoint)
+            plain++
+        }
+    }
+}

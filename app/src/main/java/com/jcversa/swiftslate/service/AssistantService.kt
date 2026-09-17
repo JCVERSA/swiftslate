@@ -22,6 +22,7 @@ import com.jcversa.swiftslate.manager.CommandManager
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.manager.HistoryManager
 import com.jcversa.swiftslate.manager.StatsManager
+import com.jcversa.swiftslate.manager.TextStyleTransformer
 import com.jcversa.swiftslate.model.Command
 import com.jcversa.swiftslate.model.CommandType
 import com.jcversa.swiftslate.model.PrefKeys
@@ -299,6 +300,12 @@ class AssistantService : AccessibilityService() {
 
         when (command.type) {
             CommandType.TEXT_REPLACER -> {
+                // Style commands are built-in local transformations. Unlike a user snippet,
+                // their output depends on the text before the trigger and must never append the
+                // command's descriptive prompt into the user's field.
+                val replacement = TextStyleTransformer.styleFor(command)?.let { style ->
+                    TextStyleTransformer.transform(style, precedingText)
+                } ?: (precedingText + command.prompt)
                 if (!isProcessing.compareAndSet(false, true)) {
                     source.safeRecycle()
                     return
@@ -310,7 +317,7 @@ class AssistantService : AccessibilityService() {
                     val thisJob = coroutineContext[Job]
                     try {
                         withContext(Dispatchers.Main) {
-                            val replacerOk = replaceText(source, precedingText + command.prompt)
+                            val replacerOk = replaceText(source, replacement)
                             if (!replacerOk) {
                                 // Don't record an undo point, a CONFIRM haptic or a usage stat
                                 // for a replacement the field silently refused.
@@ -321,7 +328,7 @@ class AssistantService : AccessibilityService() {
                                 lastUndoSourceId = sourceId(source)
                                 performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                                 statsManager.recordUsage(command.trigger)
-                                recordHistory(command.trigger, precedingText, precedingText + command.prompt)
+                                recordHistory(command.trigger, precedingText, replacement)
                             }
                         }
                     } catch (e: CancellationException) {
