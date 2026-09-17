@@ -406,27 +406,29 @@ class AssistantService : AccessibilityService() {
         source: AccessibilityNodeInfo,
         afterText: String
     ): Boolean {
-        val request = ProcessTextReplacementBridge.current(SystemClock.elapsedRealtime())
-            ?: return false
-        // The request's package is optional, but an event without a package can never be
-        // verified against it — previously a pending request with a null sourcePackage was
-        // matched against (and consumed by) an edit in ANY app, or one with no package at all.
+        // A process can host several Process Text activities at once. Pick a pending request
+        // by package and exact edit shape instead of using one global slot, so a late event for
+        // request A cannot consume request B.
         val eventPackage = event.packageName?.toString() ?: return false
-        if (request.sourcePackage != null && eventPackage != request.sourcePackage) {
-            return false
-        }
         val beforeText = event.beforeText?.toString() ?: return false
-        val edit = resolveProcessTextEdit(
-            beforeText = beforeText,
-            afterText = afterText,
-            fromIndex = event.fromIndex,
-            removedCount = event.removedCount,
-            addedCount = event.addedCount,
-            request = request
-        )
-        if (edit == ProcessTextEdit.Unrelated) {
-            return false
+        var request: com.jcversa.swiftslate.ui.processtext.PendingProcessTextReplacement? = null
+        var edit: ProcessTextEdit = ProcessTextEdit.Unrelated
+        for (candidate in ProcessTextReplacementBridge.candidates(SystemClock.elapsedRealtime(), eventPackage)) {
+            val candidateEdit = resolveProcessTextEdit(
+                beforeText = beforeText,
+                afterText = afterText,
+                fromIndex = event.fromIndex,
+                removedCount = event.removedCount,
+                addedCount = event.addedCount,
+                request = candidate
+            )
+            if (candidateEdit != ProcessTextEdit.Unrelated) {
+                request = candidate
+                edit = candidateEdit
+                break
+            }
         }
+        val matchedRequest = request ?: return false
         if (edit is ProcessTextEdit.Appended && isProcessing.get()) {
             // A command is already running. Leave the request pending and the field untouched
             // instead of consuming the request and swallowing the user's keystroke — a later
@@ -434,12 +436,12 @@ class AssistantService : AccessibilityService() {
             source.safeRecycle()
             return false
         }
-        if (!ProcessTextReplacementBridge.consume(request)) {
+        if (!ProcessTextReplacementBridge.consume(matchedRequest)) {
             return false
         }
         if (edit == ProcessTextEdit.Replaced) {
-            if (request.animateReplacement && typingAnimationEnabled()) {
-                startProcessTextAnimation(source, beforeText, request.replacement)
+            if (matchedRequest.animateReplacement && typingAnimationEnabled()) {
+                startProcessTextAnimation(source, beforeText, matchedRequest.replacement)
             } else {
                 source.safeRecycle()
             }
@@ -458,7 +460,7 @@ class AssistantService : AccessibilityService() {
         currentJob = serviceScope.launch {
             val thisJob = coroutineContext[Job]
             try {
-                val replaced = if (request.animateReplacement && typingAnimationEnabled()) {
+                val replaced = if (matchedRequest.animateReplacement && typingAnimationEnabled()) {
                     replaceTextWithTypingAnimation(
                         source,
                         beforeText,
@@ -1147,7 +1149,7 @@ class AssistantService : AccessibilityService() {
         if (!::historyManager.isInitialized) return
         try {
             val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
-            val provider = Providers.forType(prefs.getString(PrefKeys.PROVIDER_TYPE, null)).type
+            val provider = Providers.forStoredType(prefs.getString(PrefKeys.PROVIDER_TYPE, null))?.type.orEmpty()
             historyManager.record(command, input, output, provider)
         } catch (_: Exception) {
             // History is optional and must never make a successful replacement fail.

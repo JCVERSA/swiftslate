@@ -99,7 +99,8 @@ suspend fun runTextCommand(
         return CommandOutcome.Unavailable(context.getString(R.string.privacy_mode_blocked))
     }
 
-    val provider = Providers.forType(prefs.getString(PrefKeys.PROVIDER_TYPE, null))
+    val provider = Providers.forStoredType(prefs.getString(PrefKeys.PROVIDER_TYPE, null))
+        ?: return CommandOutcome.Unavailable(context.getString(R.string.error_provider_selection_invalid))
     val providerType = provider.type
     val model = provider.sanitizeModel(prefs.getString(provider.modelPrefKey, provider.defaultModel))
     val endpoint = provider.resolveEndpoint(prefs.getString(PrefKeys.CUSTOM_ENDPOINT, "") ?: "")

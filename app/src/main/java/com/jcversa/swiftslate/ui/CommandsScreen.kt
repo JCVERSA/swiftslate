@@ -100,6 +100,7 @@ fun CommandsScreen(commandManager: CommandManager) {
     var previewOutput by remember { mutableStateOf<String?>(null) }
     var previewError by remember { mutableStateOf<String?>(null) }
     var isPreviewing by remember { mutableStateOf(false) }
+    var isSavingCommand by remember { mutableStateOf(false) }
 
     fun openHistory() {
         showHistory = true
@@ -314,18 +315,28 @@ fun CommandsScreen(commandManager: CommandManager) {
             return
         }
 
+        if (isSavingCommand) return
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        val saved = commandManager.saveCustomCommand(
-            command = Command(trimmedTrigger, trimmedPrompt, false, selectedType, aliases),
-            replacing = editingTrigger ?: trimmedTrigger
-        )
-        if (!saved) {
-            errorMessage = errorDuplicate
-            return
+        isSavingCommand = true
+        val commandToSave = Command(trimmedTrigger, trimmedPrompt, false, selectedType, aliases)
+        val oldTrigger = editingTrigger ?: trimmedTrigger
+        scope.launch {
+            val savedCommands = withContext(Dispatchers.IO) {
+                val saved = commandManager.saveCustomCommand(
+                    command = commandToSave,
+                    replacing = oldTrigger
+                )
+                if (saved) commandManager.getCommands() else null
+            }
+            isSavingCommand = false
+            if (savedCommands == null) {
+                errorMessage = errorDuplicate
+                return@launch
+            }
+            commands = savedCommands
+            expandedIds = expandedIds - oldTrigger
+            closeEditor()
         }
-        commands = commandManager.getCommands()
-        expandedIds = expandedIds - (editingTrigger ?: trimmedTrigger)
-        closeEditor()
     }
 
     Column(
@@ -1001,7 +1012,7 @@ fun CommandsScreen(commandManager: CommandManager) {
                         }
                         Button(
                             onClick = { saveCommand() },
-                            enabled = trigger.isNotBlank() && prompt.isNotBlank(),
+                            enabled = trigger.isNotBlank() && prompt.isNotBlank() && !isSavingCommand,
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
@@ -1054,7 +1065,9 @@ fun CommandsScreen(commandManager: CommandManager) {
                     }
                     if (historyEntries.isNotEmpty()) {
                         TextButton(onClick = {
-                            historyManager.clear()
+                            scope.launch(Dispatchers.IO) {
+                                historyManager.clear()
+                            }
                             historyEntries = emptyList()
                         }) {
                             Text(
@@ -1135,8 +1148,11 @@ fun CommandsScreen(commandManager: CommandManager) {
                                 }
                                 IconButton(
                                     onClick = {
-                                        historyManager.delete(entry.id)
-                                        historyEntries = historyEntries.filterNot { it.id == entry.id }
+                                        val entryId = entry.id
+                                        scope.launch(Dispatchers.IO) {
+                                            historyManager.delete(entryId)
+                                        }
+                                        historyEntries = historyEntries.filterNot { it.id == entryId }
                                     },
                                     modifier = Modifier.size(48.dp)
                                 ) {
@@ -1162,11 +1178,16 @@ fun CommandsScreen(commandManager: CommandManager) {
             confirmButton = {
                 TextButton(onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    commandManager.removeCustomCommand(triggerToDelete)
-                    expandedIds = expandedIds - triggerToDelete
-                    commands = commandManager.getCommands()
-                    if (editingTrigger == triggerToDelete) closeEditor()
                     commandToDelete = null
+                    scope.launch {
+                        val updatedCommands = withContext(Dispatchers.IO) {
+                            commandManager.removeCustomCommand(triggerToDelete)
+                            commandManager.getCommands()
+                        }
+                        expandedIds = expandedIds - triggerToDelete
+                        commands = updatedCommands
+                        if (editingTrigger == triggerToDelete) closeEditor()
+                    }
                 }) {
                     Text(stringResource(R.string.delete_confirm_button), color = MaterialTheme.colorScheme.error)
                 }

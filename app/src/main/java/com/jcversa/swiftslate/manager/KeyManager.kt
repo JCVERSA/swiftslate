@@ -26,6 +26,7 @@ class KeyManager internal constructor(
     companion object {
         private const val LEGACY_PREF_KEY_ARRAY = "keys_array"
         private const val PREF_KEY_PREFIX = "keys_array_"
+        private const val INVALID_PROVIDER = "__invalid_provider__"
         private const val CACHE_TTL_MS = 5_000L
         private const val MAX_KEY_LENGTH = 256
         // Invalid-key marks expire. A 403 is not always the key's fault (e.g. selecting a
@@ -71,7 +72,11 @@ class KeyManager internal constructor(
 
     val keystoreAvailable: Boolean get() = cipher.available
 
-    private fun providerOf(provider: String?): String = ProviderType.sanitize(provider)
+    private fun providerOf(provider: String?): String =
+        if (provider == null) ProviderType.GEMINI
+        else ProviderType.storedOrNull(provider) ?: INVALID_PROVIDER
+
+    private fun isInvalidProvider(provider: String): Boolean = provider == INVALID_PROVIDER
 
     private fun storageKey(provider: String): String = PREF_KEY_PREFIX + provider
 
@@ -113,6 +118,7 @@ class KeyManager internal constructor(
     @Synchronized
     fun getKeys(providerType: String = ProviderType.GEMINI): List<String> {
         val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return emptyList()
         val now = System.currentTimeMillis()
         val cached = cachedKeys
         if (cached != null && cachedProvider == provider && now - cacheTimestamp < CACHE_TTL_MS) {
@@ -195,6 +201,7 @@ class KeyManager internal constructor(
     @Synchronized
     private fun saveKeys(providerType: String, keys: List<String>): Boolean {
         val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return false
         val arr = JSONArray(keys)
         return try {
             val cipherText = cipher.encrypt(arr.toString())
@@ -217,6 +224,7 @@ class KeyManager internal constructor(
     fun addKey(key: String, providerType: String = ProviderType.GEMINI): Boolean {
         if (key.isBlank() || key.length > MAX_KEY_LENGTH) return false
         val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return false
         val keys = getKeys(provider).toMutableList()
         if (!keys.contains(key)) {
             keys.add(key)
@@ -229,6 +237,7 @@ class KeyManager internal constructor(
     @Synchronized
     fun removeKey(key: String, providerType: String = ProviderType.GEMINI): Boolean {
         val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return false
         val keys = getKeys(provider).toMutableList()
         keys.remove(key)
         val saved = saveKeys(provider, keys)
@@ -253,6 +262,7 @@ class KeyManager internal constructor(
         providerType: String = ProviderType.GEMINI
     ): String? {
         val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return null
         val keys = getKeys(provider)
         if (keys.isEmpty()) return null
 
@@ -276,13 +286,17 @@ class KeyManager internal constructor(
         retryAfterSeconds: Long = 60,
         providerType: String = ProviderType.GEMINI
     ) {
+        val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return
         val cooldown = retryAfterSeconds.coerceIn(1, 600)
-        rateLimitedKeys[namespaced(providerOf(providerType), key)] =
+        rateLimitedKeys[namespaced(provider, key)] =
             System.currentTimeMillis() + cooldown * 1_000
     }
 
     fun markInvalid(key: String, providerType: String = ProviderType.GEMINI) {
-        invalidKeys[namespaced(providerOf(providerType), key)] =
+        val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return
+        invalidKeys[namespaced(provider, key)] =
             System.currentTimeMillis() + INVALID_KEY_TTL_MS
     }
 
@@ -294,7 +308,9 @@ class KeyManager internal constructor(
      */
     @Synchronized
     fun clearMarks(key: String, providerType: String = ProviderType.GEMINI) {
-        val scoped = namespaced(providerOf(providerType), key)
+        val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return
+        val scoped = namespaced(provider, key)
         invalidKeys.remove(scoped)
         rateLimitedKeys.remove(scoped)
     }
@@ -315,6 +331,7 @@ class KeyManager internal constructor(
 
     fun getShortestWaitTimeMs(providerType: String = ProviderType.GEMINI): Long? {
         val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return null
         val keys = getKeys(provider)
         if (keys.isEmpty()) return null
         val now = System.currentTimeMillis()

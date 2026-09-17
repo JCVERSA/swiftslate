@@ -81,4 +81,23 @@ class ProcessTextReplacementTest {
 
         assertEquals(ProcessTextEdit.Unrelated, edit)
     }
+
+    @Test
+    fun `bridge keeps concurrent requests isolated by host package`() {
+        val now = System.currentTimeMillis()
+        ProcessTextReplacementBridge.prepare("one", "ONE", "host.one", false, now)
+        ProcessTextReplacementBridge.prepare("two", "TWO", "host.two", false, now)
+
+        val one = ProcessTextReplacementBridge.candidates(now, "host.one")
+        assertEquals(1, one.size)
+        assertEquals("one", one.single().original)
+        assertEquals(0, ProcessTextReplacementBridge.candidates(now, "unrelated.host").size)
+        assertEquals(1, ProcessTextReplacementBridge.candidates(now, "host.two").size)
+
+        assertEquals(true, ProcessTextReplacementBridge.consume(one.single()))
+        assertEquals(1, ProcessTextReplacementBridge.candidates(now, "host.two").size)
+        ProcessTextReplacementBridge.consume(
+            ProcessTextReplacementBridge.candidates(now, "host.two").single()
+        )
+    }
 }

@@ -266,8 +266,21 @@ class CommandManager(context: Context) {
      * the user and are never silently removed again.
      */
     private fun resetAliasesOnce() {
-        if (prefs.getBoolean(PREF_ALIASES_RESET_V1, false)) return
-        val raw = prefs.getString("custom_commands", "[]") ?: "[]"
+        val alreadyReset = try {
+            prefs.getBoolean(PREF_ALIASES_RESET_V1, false)
+        } catch (_: ClassCastException) {
+            // A restored or manually-corrupted preference must not disable the accessibility
+            // service during construction. Remove only the bad marker and retry the migration.
+            prefs.edit().remove(PREF_ALIASES_RESET_V1).apply()
+            false
+        }
+        if (alreadyReset) return
+        val raw = try {
+            prefs.getString("custom_commands", "[]") ?: "[]"
+        } catch (_: ClassCastException) {
+            prefs.edit().remove("custom_commands").apply()
+            "[]"
+        }
         val commands = try { JSONArray(raw) } catch (_: Exception) { JSONArray() }
         for (index in 0 until commands.length()) {
             commands.optJSONObject(index)?.remove("aliases")

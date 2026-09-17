@@ -298,6 +298,7 @@
     <string name="settings_history_clear_title" tools:ignore="MissingTranslation">Clear local history?</string>
     <string name="settings_history_clear_message" tools:ignore="MissingTranslation">All saved command inputs and results will be removed from this device.</string>
     <string name="privacy_mode_blocked" tools:ignore="MissingTranslation">Privacy mode is enabled. AI commands are blocked; local replacements still work.</string>
+    <string name="error_provider_selection_invalid" tools:ignore="MissingTranslation">The selected provider configuration is invalid. Choose a provider again in Settings before sending text.</string>
     <string name="service_reliability_channel_name" tools:ignore="MissingTranslation">Service reliability</string>
     <string name="service_reliability_channel_desc" tools:ignore="MissingTranslation">Alerts when SwiftSlate needs a system setting to stay available.</string>
     <string name="service_reliability_notification_title" tools:ignore="MissingTranslation">Keep SwiftSlate available</string>

@@ -25,6 +25,21 @@ class CommandManagerTest {
         commandManager = CommandManager(context)
     }
 
+    @Test
+    fun corruptedMigrationPreferences_doNotPreventConstruction() {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        context.getSharedPreferences("commands", 0).edit()
+            .putInt("aliases_reset_v1", 1)
+            .putInt("custom_commands", 2)
+            .commit()
+
+        val repaired = CommandManager(context)
+
+        assertNotNull(repaired.getCommands())
+        assertEquals("[]", context.getSharedPreferences("commands", 0)
+            .getString("custom_commands", null))
+    }
+
     // --- findCommand ---
 
     @Test

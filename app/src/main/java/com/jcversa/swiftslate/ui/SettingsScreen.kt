@@ -62,7 +62,7 @@ private const val SAFE_BACKUP_VERSION = 2
 /** Exports configuration without API keys, history contents, or endpoint credentials. */
 private fun buildSafeBackup(commandManager: CommandManager, prefs: SharedPreferences): String {
     val settings = JSONObject().apply {
-        put(PrefKeys.PROVIDER_TYPE, ProviderType.sanitize(prefs.getString(PrefKeys.PROVIDER_TYPE, null)))
+        put(PrefKeys.PROVIDER_TYPE, prefs.getString(PrefKeys.PROVIDER_TYPE, null) ?: ProviderType.GEMINI)
         put(PrefKeys.GEMINI_MODEL, prefs.getString(PrefKeys.GEMINI_MODEL, "").orEmpty())
         put(PrefKeys.GROQ_MODEL, prefs.getString(PrefKeys.GROQ_MODEL, "").orEmpty())
         put(PrefKeys.NVIDIA_MODEL, prefs.getString(PrefKeys.NVIDIA_MODEL, "").orEmpty())
@@ -97,8 +97,10 @@ private fun importSafeBackup(json: String, commandManager: CommandManager, prefs
         if (!commandManager.importCommands(commands.toString())) return false
         if (settings != null) {
             val editor = prefs.edit()
-            settings.optString(PrefKeys.PROVIDER_TYPE).takeIf { it.isNotBlank() }?.let {
-                editor.putString(PrefKeys.PROVIDER_TYPE, ProviderType.sanitize(it))
+            settings.optString(PrefKeys.PROVIDER_TYPE).takeIf {
+                it.isNotBlank() && ProviderType.isValid(it)
+            }?.let {
+                editor.putString(PrefKeys.PROVIDER_TYPE, it)
             }
             listOf(
                 PrefKeys.GEMINI_MODEL,
@@ -171,7 +173,13 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     var saveEndpointJob by remember { mutableStateOf<Job?>(null) }
     var saveModelJob by remember { mutableStateOf<Job?>(null) }
 
-    var providerType by remember { mutableStateOf(ProviderType.sanitize(prefs.getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI))) }
+    val storedProviderType = prefs.getString(PrefKeys.PROVIDER_TYPE, null)
+    var providerConfigurationInvalid by remember {
+        mutableStateOf(storedProviderType != null && !ProviderType.isValid(storedProviderType))
+    }
+    var providerType by remember {
+        mutableStateOf(ProviderType.storedOrNull(storedProviderType) ?: ProviderType.GEMINI)
+    }
     var providerExpanded by remember { mutableStateOf(false) }
 
     var selectedModel by remember { mutableStateOf(prefs.getString(PrefKeys.GEMINI_MODEL, "") ?: "") }
@@ -201,6 +209,8 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     var isFetchingGeminiModels by remember { mutableStateOf(false) }
     var isFetchingGroqModels by remember { mutableStateOf(false) }
     var apiKeys by remember { mutableStateOf<List<String>>(emptyList()) }
+    var apiKeysProvider by remember { mutableStateOf<String?>(null) }
+    var modelFetchJob by remember { mutableStateOf<Job?>(null) }
     val openAIClient = remember { OpenAICompatibleClient() }
     val geminiClient = remember { GeminiClient() }
 
@@ -222,10 +232,33 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     val signinRequiredMsg = stringResource(R.string.error_provider_auth_required)
 
     // Registered keys are decrypted through the Keystore — load off the main thread, as
-    // KeysScreen does. The first key is sent as Bearer when fetching models; keyless local
-    // servers get no header at all.
-    LaunchedEffect(providerType) {
-        apiKeys = withContext(Dispatchers.IO) { keyManager.getKeys(providerType) }
+    // KeysScreen does. Clear the previous provider's keys before loading the new namespace;
+    // otherwise a provider switch can briefly send a Gemini key to Groq (or vice versa).
+    LaunchedEffect(providerType, providerConfigurationInvalid) {
+        modelFetchJob?.cancel()
+        modelFetchJob = null
+        isFetchingGeminiModels = false
+        isFetchingGroqModels = false
+        isFetchingManagedModels = false
+        isFetchingModels = false
+        apiKeys = emptyList()
+        apiKeysProvider = null
+        if (!providerConfigurationInvalid) {
+            val loaded = withContext(Dispatchers.IO) { keyManager.getKeys(providerType) }
+            apiKeys = loaded
+            apiKeysProvider = providerType
+        }
+    }
+
+    LaunchedEffect(privacyMode) {
+        if (privacyMode) {
+            modelFetchJob?.cancel()
+            modelFetchJob = null
+            isFetchingGeminiModels = false
+            isFetchingGroqModels = false
+            isFetchingManagedModels = false
+            isFetchingModels = false
+        }
     }
 
     // Fetches one provider's live model list (issue #148). Groq rides the existing
@@ -238,6 +271,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
         val isManaged = type == ProviderType.NVIDIA ||
             type == ProviderType.OPENROUTER || type == ProviderType.DEEPSEEK
         if (!isGemini && !isGroq && !isManaged) return
+        if (providerConfigurationInvalid || privacyMode || apiKeysProvider != type) return
         if (isGemini && isFetchingGeminiModels) return
         if (isGroq && isFetchingGroqModels) return
         if (isManaged && isFetchingManagedModels) return
@@ -248,7 +282,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
         else if (isGroq) isFetchingGroqModels = true
         else isFetchingManagedModels = true
 
-        scope.launch {
+        modelFetchJob = scope.launch {
             val result = withContext(Dispatchers.IO) {
                 when {
                     isGemini -> geminiClient.fetchModels(key)
@@ -267,6 +301,9 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                     }
                 }
             }
+            // The provider effect cancels old jobs and clears apiKeysProvider before loading
+            // another namespace. Do not let a late response repopulate the new provider's UI.
+            if (apiKeysProvider != type || privacyMode || providerConfigurationInvalid) return@launch
             val models = result.getOrNull().orEmpty()
             val success = result.isSuccess && models.isNotEmpty()
             val currentModels = when {
@@ -315,18 +352,8 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
         }
     }
 
-    // Auto-fetch once per session per provider when a user-owned key exists.
-    LaunchedEffect(providerType, apiKeys) {
-        val managed = providerType == ProviderType.GEMINI || providerType == ProviderType.GROQ ||
-            providerType == ProviderType.NVIDIA || providerType == ProviderType.OPENROUTER ||
-            providerType == ProviderType.DEEPSEEK
-        if (managed) {
-            val cached = ProviderModelsCache.get(providerType)
-            if (apiKeys.isNotEmpty() && (cached == null || !cached.attempted)) {
-                startModelFetch(providerType)
-            }
-        }
-    }
+    // Model catalogs are never fetched merely by entering Settings. Opening a dropdown is
+    // the explicit user action that may contact the selected provider.
 
     // Restore the independent model choice when moving between NVIDIA, OpenRouter
     // and DeepSeek. Their lists remain session-only and are kept in the cache above.
@@ -401,7 +428,10 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                             if (text.length > 1_000_000) null else text
                         } ?: ""
                     }
-                    if (importSafeBackup(json, commandManager, prefs)) {
+                    val imported = withContext(Dispatchers.IO) {
+                        importSafeBackup(json, commandManager, prefs)
+                    }
+                    if (imported) {
                         backupMessage = importSuccessMsg
                         backupSuccess = true
                     } else {
@@ -486,13 +516,17 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                     onExpandedChange = { providerExpanded = !providerExpanded }
                 ) {
                     SlateTextField(
-                        value = when (providerType) {
-                            ProviderType.GEMINI -> stringResource(R.string.settings_provider_gemini)
-                            ProviderType.GROQ -> stringResource(R.string.settings_provider_groq)
-                            ProviderType.NVIDIA -> stringResource(R.string.settings_provider_nvidia)
-                            ProviderType.OPENROUTER -> stringResource(R.string.settings_provider_openrouter)
-                            ProviderType.DEEPSEEK -> stringResource(R.string.settings_provider_deepseek)
-                            else -> stringResource(R.string.settings_provider_custom)
+                        value = if (providerConfigurationInvalid) {
+                            stringResource(R.string.error_provider_selection_invalid)
+                        } else {
+                            when (providerType) {
+                                ProviderType.GEMINI -> stringResource(R.string.settings_provider_gemini)
+                                ProviderType.GROQ -> stringResource(R.string.settings_provider_groq)
+                                ProviderType.NVIDIA -> stringResource(R.string.settings_provider_nvidia)
+                                ProviderType.OPENROUTER -> stringResource(R.string.settings_provider_openrouter)
+                                ProviderType.DEEPSEEK -> stringResource(R.string.settings_provider_deepseek)
+                                else -> stringResource(R.string.settings_provider_custom)
+                            }
                         },
                         onValueChange = {},
                         readOnly = true,
@@ -509,6 +543,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 providerType = ProviderType.GEMINI
+                                providerConfigurationInvalid = false
                                 prefs.edit().putString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI).remove(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT).apply()
                                 providerExpanded = false
                             }
@@ -518,6 +553,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 providerType = ProviderType.GROQ
+                                providerConfigurationInvalid = false
                                 prefs.edit().putString(PrefKeys.PROVIDER_TYPE, ProviderType.GROQ).remove(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT).apply()
                                 providerExpanded = false
                             }
@@ -527,6 +563,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 providerType = ProviderType.NVIDIA
+                                providerConfigurationInvalid = false
                                 prefs.edit().putString(PrefKeys.PROVIDER_TYPE, ProviderType.NVIDIA).remove(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT).apply()
                                 providerExpanded = false
                             }
@@ -536,6 +573,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 providerType = ProviderType.OPENROUTER
+                                providerConfigurationInvalid = false
                                 prefs.edit().putString(PrefKeys.PROVIDER_TYPE, ProviderType.OPENROUTER).remove(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT).apply()
                                 providerExpanded = false
                             }
@@ -545,6 +583,7 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 providerType = ProviderType.DEEPSEEK
+                                providerConfigurationInvalid = false
                                 prefs.edit().putString(PrefKeys.PROVIDER_TYPE, ProviderType.DEEPSEEK).remove(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT).apply()
                                 providerExpanded = false
                             }
@@ -554,11 +593,21 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 providerType = ProviderType.CUSTOM
+                                providerConfigurationInvalid = false
                                 prefs.edit().putString(PrefKeys.PROVIDER_TYPE, ProviderType.CUSTOM).remove(PrefKeys.STRUCTURED_OUTPUT_DISABLED_AT).apply()
                                 providerExpanded = false
                             }
                         )
                     }
+                }
+
+                if (providerConfigurationInvalid) {
+                    Text(
+                        text = stringResource(R.string.error_provider_selection_invalid),
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -574,13 +623,10 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                     )
                     DynamicModelDropdown(
                         selectedModel = if (apiKeys.isEmpty() || selectedModel.isBlank()) "" else selectedModel,
-                        enabled = apiKeys.isNotEmpty(),
+                        enabled = apiKeys.isNotEmpty() && !providerConfigurationInvalid,
                         expanded = modelExpanded,
                         onExpandedChange = { isOpening ->
                             modelExpanded = isOpening
-                            if (isOpening && apiKeys.isNotEmpty() && !isFetchingGeminiModels) {
-                                startModelFetch(ProviderType.GEMINI)
-                            }
                         },
                         models = geminiModelList,
                         onSelect = { id ->
@@ -593,6 +639,22 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                         isFetching = isFetchingGeminiModels,
                         fetchingText = fetchingModelsMsg
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                startModelFetch(ProviderType.GEMINI)
+                            },
+                            enabled = apiKeysProvider == ProviderType.GEMINI &&
+                                apiKeys.isNotEmpty() && !isFetchingGeminiModels &&
+                                !privacyMode && !providerConfigurationInvalid
+                        ) {
+                            Text(if (isFetchingGeminiModels) fetchingModelsMsg else fetchModelsMsg)
+                        }
+                    }
                 } else if (providerType == ProviderType.GROQ) {
                     Text(
                         text = stringResource(R.string.settings_model_title),
@@ -604,13 +666,10 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                     )
                     DynamicModelDropdown(
                         selectedModel = if (apiKeys.isEmpty() || groqModel.isBlank()) "" else groqModel,
-                        enabled = apiKeys.isNotEmpty(),
+                        enabled = apiKeys.isNotEmpty() && !providerConfigurationInvalid,
                         expanded = groqModelExpanded,
                         onExpandedChange = { isOpening ->
                             groqModelExpanded = isOpening
-                            if (isOpening && apiKeys.isNotEmpty() && !isFetchingGroqModels) {
-                                startModelFetch(ProviderType.GROQ)
-                            }
                         },
                         models = groqModelList,
                         onSelect = { id ->
@@ -623,6 +682,22 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                         isFetching = isFetchingGroqModels,
                         fetchingText = fetchingModelsMsg
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                startModelFetch(ProviderType.GROQ)
+                            },
+                            enabled = apiKeysProvider == ProviderType.GROQ &&
+                                apiKeys.isNotEmpty() && !isFetchingGroqModels &&
+                                !privacyMode && !providerConfigurationInvalid
+                        ) {
+                            Text(if (isFetchingGroqModels) fetchingModelsMsg else fetchModelsMsg)
+                        }
+                    }
                 } else if (providerType == ProviderType.CUSTOM) {
                     Text(
                         text = stringResource(R.string.settings_endpoint_title),
@@ -743,10 +818,18 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 isFetchingModels = true
                                 fetchMessage = null
-                                scope.launch {
+                                modelFetchJob = scope.launch {
                                     val result = withContext(Dispatchers.IO) {
-                                        openAIClient.fetchModels(apiKeys.firstOrNull(), customEndpoint)
+                                        val key = if (apiKeysProvider == ProviderType.CUSTOM) {
+                                            apiKeys.firstOrNull()
+                                        } else {
+                                            null
+                                        }
+                                        openAIClient.fetchModels(key, customEndpoint)
                                     }
+                                    if (apiKeysProvider != ProviderType.CUSTOM ||
+                                        privacyMode || providerConfigurationInvalid
+                                    ) return@launch
                                     isFetchingModels = false
                                     result.onSuccess { ids ->
                                         if (ids.isEmpty()) {
@@ -771,7 +854,8 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                                     }
                                 }
                             },
-                            enabled = customEndpoint.isNotBlank() && endpointError == null && !isFetchingModels
+                            enabled = customEndpoint.isNotBlank() && endpointError == null &&
+                                !isFetchingModels && !privacyMode && !providerConfigurationInvalid
                         ) {
                             Text(if (isFetchingModels) fetchingModelsMsg else fetchModelsMsg)
                         }
@@ -796,13 +880,10 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                     )
                     DynamicModelDropdown(
                         selectedModel = if (apiKeys.isEmpty() || managedModel.isBlank()) "" else managedModel,
-                        enabled = apiKeys.isNotEmpty(),
+                        enabled = apiKeys.isNotEmpty() && !providerConfigurationInvalid,
                         expanded = managedModelExpanded,
                         onExpandedChange = { isOpening ->
                             managedModelExpanded = isOpening
-                            if (isOpening && apiKeys.isNotEmpty() && !isFetchingManagedModels) {
-                                startModelFetch(providerType)
-                            }
                         },
                         models = managedModelList,
                         onSelect = { id ->
@@ -816,6 +897,22 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                         isFetching = isFetchingManagedModels,
                         fetchingText = fetchingModelsMsg
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                startModelFetch(providerType)
+                            },
+                            enabled = apiKeysProvider == providerType &&
+                                apiKeys.isNotEmpty() && !isFetchingManagedModels &&
+                                !privacyMode && !providerConfigurationInvalid
+                        ) {
+                            Text(if (isFetchingManagedModels) fetchingModelsMsg else fetchModelsMsg)
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -925,7 +1022,9 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                                 filtered[0].isLetterOrDigit() -> prefixErrorAlphanumeric
                                 else -> {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    commandManager.setTriggerPrefix(filtered)
+                                    scope.launch(Dispatchers.IO) {
+                                        commandManager.setTriggerPrefix(filtered)
+                                    }
                                     null
                                 }
                             }
@@ -1210,7 +1309,9 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                             onCheckedChange = { enabled ->
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 historyEnabled = enabled
-                                historyManager.setEnabled(enabled)
+                                scope.launch(Dispatchers.IO) {
+                                    historyManager.setEnabled(enabled)
+                                }
                             }
                         )
                     }
@@ -1232,7 +1333,9 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                                         onClick = {
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             historyRetentionDays = days
-                                            historyManager.setRetentionDays(days)
+                                            scope.launch(Dispatchers.IO) {
+                                                historyManager.setRetentionDays(days)
+                                            }
                                         },
                                         shape = SegmentedButtonDefaults.itemShape(
                                             index = index,
@@ -1502,7 +1605,9 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
             confirmButton = {
                 TextButton(onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    historyManager.clear()
+                    scope.launch(Dispatchers.IO) {
+                        historyManager.clear()
+                    }
                     showClearHistoryConfirm = false
                 }) {
                     Text(stringResource(R.string.settings_history_clear), color = MaterialTheme.colorScheme.error)
@@ -1617,4 +1722,18 @@ private fun DynamicModelDropdown(
             }
         }
     }
+}
+}
+              } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                }
+                            )
+                        },
+                        onClick = { onSelect(id) }
+                    )
+                }
+            }
+        }
+    }
+}
 }

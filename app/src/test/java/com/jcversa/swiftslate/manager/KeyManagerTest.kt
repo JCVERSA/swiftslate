@@ -137,6 +137,16 @@ class KeyManagerTest {
     }
 
     @Test
+    fun unknownProviderNeverFallsBackToGeminiKeys() {
+        keyManager.addKey("gemini-key", ProviderType.GEMINI)
+
+        assertTrue(keyManager.getKeys("nonsense").isEmpty())
+        assertFalse(keyManager.addKey("should-not-be-stored", "nonsense"))
+        assertNull(keyManager.getNextKey(providerType = "nonsense"))
+        assertEquals(listOf("gemini-key"), keyManager.getKeys(ProviderType.GEMINI))
+    }
+
+    @Test
     fun marksAreIsolatedPerProvider() {
         keyManager.addKey("shared-key", ProviderType.GEMINI)
         keyManager.addKey("shared-key", ProviderType.GROQ)

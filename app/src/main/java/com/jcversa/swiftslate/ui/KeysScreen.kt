@@ -74,12 +74,17 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
 
     // Read on every recomposition: the Settings tab can change the active provider while this
     // movable screen is kept alive by MainActivity's tab container.
-    val providerType = ProviderType.sanitize(
-        prefs.getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI)
-    )
+    val storedProviderType = prefs.getString(PrefKeys.PROVIDER_TYPE, null)
+    val providerConfigurationInvalid =
+        storedProviderType != null && !ProviderType.isValid(storedProviderType)
+    val providerType = ProviderType.storedOrNull(storedProviderType) ?: ProviderType.GEMINI
 
-    LaunchedEffect(providerType) {
-        keys = withContext(Dispatchers.IO) { keyManager.getKeys(providerType) }
+    LaunchedEffect(providerType, providerConfigurationInvalid) {
+        keys = if (providerConfigurationInvalid) {
+            emptyList()
+        } else {
+            withContext(Dispatchers.IO) { keyManager.getKeys(providerType) }
+        }
     }
 
     val validAddedMsg = stringResource(R.string.keys_valid_added)
@@ -92,22 +97,30 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
     val rhythm = LocalSlateRhythm.current
 
     // Provider display names stay literals: proper nouns, like the pre-redesign "Groq"/"Gemini".
-    val providerName = when (providerType) {
-        ProviderType.GROQ -> "Groq AI"
-        ProviderType.NVIDIA -> "NVIDIA NIM"
-        ProviderType.OPENROUTER -> "OpenRouter"
-        ProviderType.DEEPSEEK -> "DeepSeek"
-        ProviderType.CUSTOM -> "Custom OpenAI Provider"
-        else -> "Google Gemini AI"
+    val providerName = if (providerConfigurationInvalid) {
+        stringResource(R.string.error_provider_selection_invalid)
+    } else {
+        when (providerType) {
+            ProviderType.GROQ -> "Groq AI"
+            ProviderType.NVIDIA -> "NVIDIA NIM"
+            ProviderType.OPENROUTER -> "OpenRouter"
+            ProviderType.DEEPSEEK -> "DeepSeek"
+            ProviderType.CUSTOM -> "Custom OpenAI Provider"
+            else -> "Google Gemini AI"
+        }
     }
 
-    val apiKeyUrl = when (providerType) {
-        ProviderType.GROQ -> "https://console.groq.com/keys"
-        ProviderType.NVIDIA -> "https://build.nvidia.com/settings/api-keys"
-        ProviderType.OPENROUTER -> "https://openrouter.ai/settings/keys"
-        ProviderType.DEEPSEEK -> "https://platform.deepseek.com/api_keys"
-        ProviderType.CUSTOM -> null
-        else -> "https://aistudio.google.com/api-keys"
+    val apiKeyUrl = if (providerConfigurationInvalid) {
+        null
+    } else {
+        when (providerType) {
+            ProviderType.GROQ -> "https://console.groq.com/keys"
+            ProviderType.NVIDIA -> "https://build.nvidia.com/settings/api-keys"
+            ProviderType.OPENROUTER -> "https://openrouter.ai/settings/keys"
+            ProviderType.DEEPSEEK -> "https://platform.deepseek.com/api_keys"
+            ProviderType.CUSTOM -> null
+            else -> "https://aistudio.google.com/api-keys"
+        }
     }
 
     Column(
@@ -137,6 +150,30 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                     )
                 }
             }
+        }
+
+        if (providerConfigurationInvalid) {
+            SlateCard {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(2.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ErrorOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = stringResource(R.string.error_provider_selection_invalid),
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(rhythm.cardGap))
         }
 
         if (!keyManager.keystoreAvailable) {
@@ -284,7 +321,8 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                             }
                         }
                     },
-                    enabled = newKey.isNotBlank() && !isTesting && keyManager.keystoreAvailable,
+                    enabled = newKey.isNotBlank() && !isTesting && keyManager.keystoreAvailable &&
+                        !providerConfigurationInvalid,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 ) {

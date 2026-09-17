@@ -11,6 +11,12 @@ object ProviderType {
 
     private val VALID = setOf(GEMINI, GROQ, NVIDIA, OPENROUTER, DEEPSEEK, CUSTOM)
 
-    /** Unknown or legacy values safely fall back to Gemini. */
-    fun sanitize(value: String?): String = if (value in VALID) value!! else GEMINI
+    /** Whether a stored provider value is known. Null means a first-run default is allowed. */
+    fun isValid(value: String?): Boolean = value == null || value in VALID
+
+    /** Returns a known stored value, or null when an existing value is invalid. */
+    fun storedOrNull(value: String?): String? = value?.takeIf { it in VALID }
+
+    /** Compatibility helper for UI-only paths where null means the documented Gemini default. */
+    fun sanitize(value: String?): String = storedOrNull(value) ?: GEMINI
 }

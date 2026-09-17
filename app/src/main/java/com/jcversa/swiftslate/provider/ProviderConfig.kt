@@ -118,6 +118,11 @@ object CustomConfig : ProviderConfig {
 
 /** Registry resolving a stored provider value to its [ProviderConfig]. */
 object Providers {
+    /**
+     * Resolves a provider for legacy/UI callers. A missing value means the documented
+     * first-run Gemini default; an invalid stored value must use [forStoredType] instead
+     * so it cannot silently route user text to another provider.
+     */
     fun forType(type: String?): ProviderConfig = when (ProviderType.sanitize(type)) {
         ProviderType.GROQ -> GroqConfig
         ProviderType.NVIDIA -> NvidiaConfig
@@ -126,4 +131,8 @@ object Providers {
         ProviderType.CUSTOM -> CustomConfig
         else -> GeminiConfig
     }
+
+    /** Null means no preference yet; non-null unknown values are a configuration error. */
+    fun forStoredType(type: String?): ProviderConfig? =
+        if (type == null || ProviderType.isValid(type)) forType(type) else null
 }

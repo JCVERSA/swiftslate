@@ -9,8 +9,10 @@ import com.jcversa.swiftslate.SwiftSlateApp
 import com.jcversa.swiftslate.api.GeminiClient
 import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.CommandManager
+import com.jcversa.swiftslate.manager.HistoryManager
 import com.jcversa.swiftslate.manager.StatsManager
 import com.jcversa.swiftslate.model.Command
+import com.jcversa.swiftslate.model.PrefKeys
 import com.jcversa.swiftslate.model.CommandType
 import com.jcversa.swiftslate.service.CommandOutcome
 import com.jcversa.swiftslate.service.runTextCommand
@@ -64,6 +66,7 @@ class ProcessTextViewModel(
     private val keyManager by lazy { (app as SwiftSlateApp).keyManager }
     private val commandManager by lazy { CommandManager(app) }
     private val statsManager by lazy { StatsManager(app) }
+    private val historyManager by lazy { HistoryManager(app) }
     private val geminiClient by lazy { GeminiClient() }
     private val openAIClient by lazy { OpenAICompatibleClient() }
 
@@ -114,8 +117,19 @@ class ProcessTextViewModel(
                 animateReplacement = command.type == CommandType.AI
             )
             viewModelScope.launch {
-                try { withContext(Dispatchers.IO) { statsManager.recordUsage(command.trigger) } }
-                catch (e: Exception) { Log.w(TAG, "recording usage failed", e) }
+                try {
+                    withContext(Dispatchers.IO) {
+                        statsManager.recordUsage(command.trigger)
+                        historyManager.record(
+                            command.trigger,
+                            selection.text,
+                            command.prompt,
+                            currentProviderForHistory()
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "recording usage failed", e)
+                }
             }
             return
         }
@@ -135,8 +149,19 @@ class ProcessTextViewModel(
                 }
                 when (outcome) {
                     is CommandOutcome.Success -> {
-                        try { withContext(Dispatchers.IO) { statsManager.recordUsage(command.trigger) } }
-                        catch (e: Exception) { Log.w(TAG, "recording usage failed", e) }
+                        try {
+                            withContext(Dispatchers.IO) {
+                                statsManager.recordUsage(command.trigger)
+                                historyManager.record(
+                                    command.trigger,
+                                    selection.text,
+                                    outcome.text,
+                                    currentProviderForHistory()
+                                )
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "recording usage failed", e)
+                        }
                         UiState.Preview(
                             result = outcome.text,
                             canInsert = !selection.readOnly,
@@ -166,6 +191,12 @@ class ProcessTextViewModel(
         if (inFlight.get()) return
         _uiState.value = UiState.CommandList(commands)
     }
+
+    private fun currentProviderForHistory(): String =
+        getApplication<Application>()
+            .getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
+            .getString(PrefKeys.PROVIDER_TYPE, "")
+            .orEmpty()
 
     private fun string(resId: Int) = getApplication<Application>().getString(resId)
 }

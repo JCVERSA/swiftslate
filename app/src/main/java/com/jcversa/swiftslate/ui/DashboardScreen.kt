@@ -191,13 +191,16 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
         val lifecycle = lifecycleOwner.lifecycle
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             val (newEnabled, newKeyCount, killed) = withContext(Dispatchers.IO) {
-                val providerType = ProviderType.sanitize(
-                    context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-                        .getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI)
-                )
+                val storedProviderType = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                    .getString(PrefKeys.PROVIDER_TYPE, null)
+                val providerType = ProviderType.storedOrNull(storedProviderType) ?: ProviderType.GEMINI
                 Triple(
                     checkServiceEnabled(context),
-                    keyManager.getKeys(providerType).size,
+                    if (storedProviderType != null && !ProviderType.isValid(storedProviderType)) {
+                        0
+                    } else {
+                        keyManager.getKeys(providerType).size
+                    },
                     readCrashMarker(context) > 0L || isServiceCrashed(context)
                 )
             }
@@ -216,15 +219,20 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
     val noData = stringResource(R.string.dashboard_no_data)
     val rhythm = LocalSlateRhythm.current
     val scrollState = rememberScrollState()
-    val activeProviderType = ProviderType.sanitize(
-        context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-            .getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI)
-    )
+    val storedProviderType = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+        .getString(PrefKeys.PROVIDER_TYPE, null)
+    val providerConfigurationInvalid =
+        storedProviderType != null && !ProviderType.isValid(storedProviderType)
+    val activeProviderType = ProviderType.storedOrNull(storedProviderType) ?: ProviderType.GEMINI
     val activeProvider = Providers.forType(activeProviderType)
-    val activeModel = activeProvider.sanitizeModel(
-        context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-            .getString(activeProvider.modelPrefKey, activeProvider.defaultModel)
-    )
+    val activeModel = if (providerConfigurationInvalid) {
+        ""
+    } else {
+        activeProvider.sanitizeModel(
+            context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+                .getString(activeProvider.modelPrefKey, activeProvider.defaultModel)
+        )
+    }
     val activeModelLabel = if (activeModel.isBlank()) {
         stringResource(R.string.dashboard_configuration_not_set)
     } else {
@@ -269,6 +277,41 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                             text = stringResource(R.string.dashboard_subtitle),
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
+        if (providerConfigurationInvalid) {
+            AnimateEntrance(index = 1) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = rhythm.cardGap),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.24f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.error.copy(alpha = 0.35f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ErrorOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(9.dp))
+                        Text(
+                            text = stringResource(R.string.error_provider_selection_invalid),
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
@@ -616,13 +659,17 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = when (activeProviderType) {
-                                        ProviderType.GROQ -> stringResource(R.string.settings_provider_groq)
-                                        ProviderType.NVIDIA -> stringResource(R.string.settings_provider_nvidia)
-                                        ProviderType.OPENROUTER -> stringResource(R.string.settings_provider_openrouter)
-                                        ProviderType.DEEPSEEK -> stringResource(R.string.settings_provider_deepseek)
-                                        ProviderType.CUSTOM -> stringResource(R.string.settings_provider_custom)
-                                        else -> stringResource(R.string.settings_provider_gemini)
+                                    text = if (providerConfigurationInvalid) {
+                                        stringResource(R.string.error_provider_selection_invalid)
+                                    } else {
+                                        when (activeProviderType) {
+                                            ProviderType.GROQ -> stringResource(R.string.settings_provider_groq)
+                                            ProviderType.NVIDIA -> stringResource(R.string.settings_provider_nvidia)
+                                            ProviderType.OPENROUTER -> stringResource(R.string.settings_provider_openrouter)
+                                            ProviderType.DEEPSEEK -> stringResource(R.string.settings_provider_deepseek)
+                                            ProviderType.CUSTOM -> stringResource(R.string.settings_provider_custom)
+                                            else -> stringResource(R.string.settings_provider_gemini)
+                                        }
                                     },
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
@@ -685,7 +732,7 @@ fun DashboardScreen(keyManager: KeyManager, commandManager: CommandManager, stat
                                 }
                             }
                         },
-                        enabled = !diagnosticRunning,
+                        enabled = !diagnosticRunning && !privacyMode && !providerConfigurationInvalid,
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 48.dp),

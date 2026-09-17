@@ -24,9 +24,16 @@ class ProviderConfigTest {
     }
 
     @Test
-    fun forType_defaults_to_gemini_for_null_or_unknown() {
+    fun forType_defaults_to_gemini_for_missing_value_only() {
         assertSame(GeminiConfig, Providers.forType(null))
         assertSame(GeminiConfig, Providers.forType("nonsense"))
+    }
+
+    @Test
+    fun forStoredType_rejects_unknown_values_instead_of_routing_them() {
+        assertSame(GeminiConfig, Providers.forStoredType(null))
+        assertSame(GeminiConfig, Providers.forStoredType(ProviderType.GEMINI))
+        assertNull(Providers.forStoredType("nonsense"))
     }
 
     @Test
