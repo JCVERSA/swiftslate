@@ -4,4 +4,6 @@
     <exclude domain="sharedpref" path="settings.xml" />
     <exclude domain="sharedpref" path="commands.xml" />
     <exclude domain="sharedpref" path="stats.xml" />
+    <!-- Optional local history contains user-selected text and must never enter a device or cloud backup. -->
+    <exclude domain="sharedpref" path="history.xml" />
 </full-backup-content>

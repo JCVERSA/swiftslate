@@ -69,6 +69,7 @@ Type a trigger like **`?fix`** at the end of any text, in any app, and watch it 
 - [Tech Stack](#%EF%B8%8F-tech-stack)
 - [Architecture](#-architecture)
 - [Building from Source](#-building-from-source)
+- [Release Runbook](#-release-runbook)
 - [Trying a Pull Request](#-trying-a-pull-request-without-touching-your-install)
 - [Contributing](#-contributing)
 - [Sponsors](#-sponsors)
@@ -665,7 +666,21 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
 > [!NOTE]
-> Every push to `main` and every pull request also produces an **installable preview APK** (separate app, debug-signed) — grab it from the run's **Artifacts** section, no signing setup needed.
+> Every push to `main` and every pull request also produces an **installable preview APK** (separate app, debug-signed) — grab it from the run's **Artifacts** section, no signing setup needed. Preview APKs are not stable releases.
+
+### Stable release builds
+
+Stable distribution uses the `release` variant, the production signing key, and R8/resource
+shrinking. The tag-driven `Release stable APK` workflow verifies the exact `versionName`,
+`versionCode`, package ID, alignment, shrink output, and signature before publishing. See the
+[release runbook](RELEASE.md) for signing setup, device acceptance checks, and rollback. Never
+rename or distribute a Preview APK as a stable release.
+
+<br>
+
+## 📦 Release Runbook
+
+See [`RELEASE.md`](RELEASE.md) for the complete release and rollback procedure.
 
 <br>
 
