@@ -136,6 +136,8 @@ fun SwiftSlateNavigationRail(
     expanded: Boolean,
     onSelect: (Tab) -> Unit
 ) {
+    val motion = LocalSlateMotion.current
+    val selectedIndex = Tab.entries.indexOf(selectedTab).coerceAtLeast(0)
     val railWidth = if (expanded) 228.dp else 88.dp
     Surface(
         modifier = Modifier
@@ -181,19 +183,42 @@ fun SwiftSlateNavigationRail(
 
             Spacer(modifier = Modifier.width(1.dp).padding(top = if (expanded) 28.dp else 20.dp))
 
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Tab.entries.forEach { tab ->
-                    SlateNavigationItem(
-                        tab = tab,
-                        selected = selectedTab == tab,
-                        expanded = expanded,
-                        compact = false,
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { if (selectedTab != tab) onSelect(tab) }
-                    )
+            Box(modifier = Modifier.fillMaxWidth()) {
+                val gap = 6.dp
+                val itemHeight = 56.dp
+                val indicatorOffset by animateDpAsState(
+                    targetValue = (itemHeight + gap) * selectedIndex,
+                    animationSpec = if (motion.reduceMotion) snap() else tween(220),
+                    label = "rail_navigation_indicator"
+                )
+
+                // The rail uses the same shared indicator as the compact bar. The selected
+                // destination therefore travels vertically through the same ordered tabs,
+                // rather than the old background switching independently per item.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(y = indicatorOffset)
+                        .height(itemHeight)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                )
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(gap)
+                ) {
+                    Tab.entries.forEach { tab ->
+                        SlateNavigationItem(
+                            tab = tab,
+                            selected = selectedTab == tab,
+                            expanded = expanded,
+                            compact = false,
+                            sharedIndicator = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { if (selectedTab != tab) onSelect(tab) }
+                        )
+                    }
                 }
             }
 
@@ -208,6 +233,7 @@ private fun SlateNavigationItem(
     selected: Boolean,
     expanded: Boolean,
     compact: Boolean,
+    sharedIndicator: Boolean = false,
     modifier: Modifier,
     onClick: () -> Unit
 ) {
@@ -254,7 +280,9 @@ private fun SlateNavigationItem(
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(18.dp))
-                        .background(background)
+                        .background(
+                            if (sharedIndicator) MaterialTheme.colorScheme.surface.copy(alpha = 0f) else background
+                        )
                         .padding(
                             horizontal = if (expanded) 12.dp else 8.dp,
                             vertical = 8.dp
