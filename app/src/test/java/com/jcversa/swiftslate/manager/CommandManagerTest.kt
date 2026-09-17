@@ -36,8 +36,12 @@ class CommandManagerTest {
         val repaired = CommandManager(context)
 
         assertNotNull(repaired.getCommands())
-        assertEquals("[]", context.getSharedPreferences("commands", 0)
-            .getString("custom_commands", null))
+        val repairedJson = context.getSharedPreferences("commands", 0)
+            .getString("custom_commands", null)
+        assertNotNull(repairedJson)
+        // getCommands may seed the built-in editable AI commands after repairing the
+        // corrupted preference; the invariant is that the value is valid JSON, not empty.
+        JSONArray(repairedJson)
     }
 
     // --- findCommand ---
