@@ -1,16 +1,22 @@
 package com.jcversa.swiftslate
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -58,6 +64,9 @@ fun SwiftSlateCompactNavigation(
     selectedTab: Tab,
     onSelect: (Tab) -> Unit
 ) {
+    val motion = LocalSlateMotion.current
+    val selectedIndex = Tab.entries.indexOf(selectedTab).coerceAtLeast(0)
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -72,22 +81,49 @@ fun SwiftSlateCompactNavigation(
         tonalElevation = 4.dp,
         shadowElevation = 8.dp
     ) {
-        Row(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 6.dp, vertical = 5.dp)
+                .height(56.dp)
         ) {
-            Tab.entries.forEach { tab ->
-                SlateNavigationItem(
-                    tab = tab,
-                    selected = selectedTab == tab,
-                    expanded = true,
-                    compact = true,
-                    modifier = Modifier.weight(1f),
-                    onClick = { if (selectedTab != tab) onSelect(tab) }
-                )
+            val gap = 4.dp
+            val itemWidth = (maxWidth - gap * (Tab.entries.size - 1)) / Tab.entries.size
+            val targetOffset = (itemWidth + gap) * selectedIndex
+            val indicatorOffset by animateDpAsState(
+                targetValue = targetOffset,
+                animationSpec = if (motion.reduceMotion) snap() else tween(220),
+                label = "compact_navigation_indicator"
+            )
+
+            // One shared indicator travels between destinations instead of each item
+            // appearing/disappearing independently. Compact remains icon-only, while the
+            // semantics below still expose the destination name to TalkBack.
+            Box(
+                modifier = Modifier
+                    .offset(x = indicatorOffset)
+                    .width(itemWidth)
+                    .height(48.dp)
+                    .align(Alignment.CenterStart)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(gap),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Tab.entries.forEach { tab ->
+                    SlateNavigationItem(
+                        tab = tab,
+                        selected = selectedTab == tab,
+                        expanded = true,
+                        compact = true,
+                        modifier = Modifier.weight(1f),
+                        onClick = { if (selectedTab != tab) onSelect(tab) }
+                    )
+                }
             }
         }
     }
@@ -209,7 +245,9 @@ private fun SlateNavigationItem(
                     Modifier
                         .size(48.dp)
                         .clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(background)
+                        .background(
+                            if (compact) MaterialTheme.colorScheme.surface.copy(alpha = 0f) else background
+                        )
                         .padding(12.dp)
                 } else {
                     Modifier

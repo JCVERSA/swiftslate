@@ -38,9 +38,15 @@ class CommandManager(context: Context) {
     private var aiCommandsSeeded =
         try { prefs.getBoolean("ai_commands_seeded", false) } catch (_: Exception) { false }
 
+    init {
+        // Apply the one-time clean slate before the UI or service can create a new alias.
+        resetAliasesOnce()
+    }
+
     companion object {
         const val DEFAULT_PREFIX = "?"
         const val PREF_TRIGGER_PREFIX = "trigger_prefix"
+        private const val PREF_ALIASES_RESET_V1 = "aliases_reset_v1"
         private const val CACHE_TTL_MS = 5_000L
 
         /** Limits enforced on every write path — see [isValidCommand] / [importCommands]. */
@@ -253,6 +259,25 @@ class CommandManager(context: Context) {
 
     @Volatile
     private var migrating = false
+
+    /**
+     * The first alias implementation could persist aliases in command backups or previews.
+     * Start this release with a clean alias slate exactly once; after that, aliases belong to
+     * the user and are never silently removed again.
+     */
+    private fun resetAliasesOnce() {
+        if (prefs.getBoolean(PREF_ALIASES_RESET_V1, false)) return
+        val raw = prefs.getString("custom_commands", "[]") ?: "[]"
+        val commands = try { JSONArray(raw) } catch (_: Exception) { JSONArray() }
+        for (index in 0 until commands.length()) {
+            commands.optJSONObject(index)?.remove("aliases")
+        }
+        prefs.edit()
+            .putString("custom_commands", commands.toString())
+            .putBoolean(PREF_ALIASES_RESET_V1, true)
+            .apply()
+        invalidateCache()
+    }
 
     @Synchronized fun getCommands(): List<Command> {
         if (!aiCommandsSeeded) {
