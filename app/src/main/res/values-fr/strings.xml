@@ -224,6 +224,8 @@
     <string name="settings_privacy_desc">Désactive toutes les requêtes IA. Les remplacements locaux continuent de fonctionner.</string>
     <string name="settings_privacy_enabled">Privé : aucun texte n\'est envoyé à un fournisseur IA.</string>
     <string name="settings_privacy_disabled">Les commandes IA peuvent utiliser votre fournisseur configuré.</string>
+    <string name="settings_typing_animation_title">Animation de frappe</string>
+    <string name="settings_typing_animation_desc">Révéler progressivement les remplacements IA dans le champ actif.</string>
     <string name="settings_history_title">Historique local facultatif</string>
     <string name="settings_history_desc">Conservez les résultats de commandes sur cet appareil. Désactivé par défaut.</string>
     <string name="settings_history_retention">Conserver pendant</string>

@@ -33,7 +33,11 @@ sealed interface UiState {
     data object Initializing : UiState
     data class CommandList(val commands: List<Command>) : UiState
     data class Loading(val command: Command) : UiState
-    data class Preview(val result: String, val canInsert: Boolean) : UiState
+    data class Preview(
+        val result: String,
+        val canInsert: Boolean,
+        val animateReplacement: Boolean
+    ) : UiState
     /** [retry] is null for failures that re-running cannot fix (e.g. nothing configured). */
     data class Error(val message: String, val retry: Command? = null) : UiState
 }
@@ -104,7 +108,11 @@ class ProcessTextViewModel(
         // A snippet needs no request at all — resolve it without touching the network.
         if (command.type == CommandType.TEXT_REPLACER) {
             inFlight.set(false)
-            _uiState.value = UiState.Preview(command.prompt, canInsert = !selection.readOnly)
+            _uiState.value = UiState.Preview(
+                result = command.prompt,
+                canInsert = !selection.readOnly,
+                animateReplacement = command.type == CommandType.AI
+            )
             viewModelScope.launch {
                 try { withContext(Dispatchers.IO) { statsManager.recordUsage(command.trigger) } }
                 catch (e: Exception) { Log.w(TAG, "recording usage failed", e) }
@@ -129,7 +137,11 @@ class ProcessTextViewModel(
                     is CommandOutcome.Success -> {
                         try { withContext(Dispatchers.IO) { statsManager.recordUsage(command.trigger) } }
                         catch (e: Exception) { Log.w(TAG, "recording usage failed", e) }
-                        UiState.Preview(outcome.text, canInsert = !selection.readOnly)
+                        UiState.Preview(
+                            result = outcome.text,
+                            canInsert = !selection.readOnly,
+                            animateReplacement = command.type == CommandType.AI
+                        )
                     }
                     is CommandOutcome.Refusal ->
                         UiState.Error(string(R.string.error_safety_blocked))

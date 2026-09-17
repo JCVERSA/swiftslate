@@ -71,6 +71,10 @@ private fun buildSafeBackup(commandManager: CommandManager, prefs: SharedPrefere
         put(PrefKeys.CUSTOM_MODEL, prefs.getString(PrefKeys.CUSTOM_MODEL, "").orEmpty())
         put(PrefKeys.TEMPERATURE, prefs.getFloat(PrefKeys.TEMPERATURE, 0.5f).toDouble())
         put(PrefKeys.PRIVACY_MODE, prefs.getBoolean(PrefKeys.PRIVACY_MODE, false))
+        put(
+            PrefKeys.TYPING_ANIMATION_ENABLED,
+            prefs.getBoolean(PrefKeys.TYPING_ANIMATION_ENABLED, true)
+        )
         put("trigger_prefix", prefs.getString(CommandManager.PREF_TRIGGER_PREFIX, CommandManager.DEFAULT_PREFIX))
     }
     return JSONObject().apply {
@@ -112,6 +116,12 @@ private fun importSafeBackup(json: String, commandManager: CommandManager, prefs
             if (settings.has(PrefKeys.PRIVACY_MODE)) {
                 editor.putBoolean(PrefKeys.PRIVACY_MODE, settings.optBoolean(PrefKeys.PRIVACY_MODE, false))
             }
+            if (settings.has(PrefKeys.TYPING_ANIMATION_ENABLED)) {
+                editor.putBoolean(
+                    PrefKeys.TYPING_ANIMATION_ENABLED,
+                    settings.optBoolean(PrefKeys.TYPING_ANIMATION_ENABLED, true)
+                )
+            }
             editor.apply()
         }
         true
@@ -136,6 +146,9 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     }
     var privacyMode by remember {
         mutableStateOf(prefs.getBoolean(PrefKeys.PRIVACY_MODE, false))
+    }
+    var typingAnimationEnabled by remember {
+        mutableStateOf(prefs.getBoolean(PrefKeys.TYPING_ANIMATION_ENABLED, true))
     }
     val historyManager = remember { HistoryManager(context) }
     var historyEnabled by remember { mutableStateOf(historyManager.isEnabled) }
@@ -1114,8 +1127,58 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
 
         Spacer(modifier = Modifier.height(rhythm.cardGap))
 
-        // Optional local history: disabled by default and always removable in one action.
+        // Typing animation for AI replacements.
         AnimateEntrance(index = 5) {
+            SlateCard {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.TextFields,
+                        contentDescription = null,
+                        tint = if (typingAnimationEnabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.settings_typing_animation_title),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = stringResource(R.string.settings_typing_animation_desc),
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = typingAnimationEnabled,
+                        onCheckedChange = { enabled ->
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            typingAnimationEnabled = enabled
+                            prefs.edit()
+                                .putBoolean(PrefKeys.TYPING_ANIMATION_ENABLED, enabled)
+                                .apply()
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(rhythm.cardGap))
+
+        // Optional local history: disabled by default and always removable in one action.
+        AnimateEntrance(index = 6) {
             SlateCard {
                 Column(modifier = Modifier.padding(2.dp)) {
                     Row(
@@ -1199,8 +1262,8 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
 
         Spacer(modifier = Modifier.height(rhythm.cardGap))
 
-        // Card 6: Backup Vault
-        AnimateEntrance(index = 6) {
+        // Card 7: Backup Vault
+        AnimateEntrance(index = 7) {
             SlateCard {
                 Column(modifier = Modifier.padding(2.dp)) {
                 Row(

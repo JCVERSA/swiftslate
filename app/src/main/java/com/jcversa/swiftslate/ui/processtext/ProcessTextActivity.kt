@@ -102,7 +102,7 @@ class ProcessTextActivity : ComponentActivity() {
                     rejectionMessage = rejectionMessage,
                     factory = { app, sel -> viewModelFactory { initializer { ProcessTextViewModel(app, sel) } } },
                     application = application,
-                    onInsert = { original, text -> replaceAndFinish(original, text) },
+                    onInsert = { original, text, animate -> replaceAndFinish(original, text, animate) },
                     onCopy = { text -> copyToClipboard(text) },
                     onFinish = { finish() }
                 )
@@ -114,13 +114,14 @@ class ProcessTextActivity : ComponentActivity() {
      * Hands the result back for the host to substitute into the selection. Whether it actually
      * does is the host's choice — Copy is always offered as the manual fallback.
      */
-    private fun replaceAndFinish(original: String, replacement: String) {
+    private fun replaceAndFinish(original: String, replacement: String, animateReplacement: Boolean) {
         if (resultDelivered) return
         resultDelivered = true
         ProcessTextReplacementBridge.prepare(
             original = original,
             replacement = replacement,
             sourcePackage = callingPackage,
+            animateReplacement = animateReplacement,
             now = SystemClock.elapsedRealtime()
         )
         setResult(
@@ -149,7 +150,7 @@ private fun ProcessTextRoot(
     rejectionMessage: String?,
     application: Application,
     factory: (Application, Selection) -> androidx.lifecycle.ViewModelProvider.Factory,
-    onInsert: (String, String) -> Unit,
+    onInsert: (String, String, Boolean) -> Unit,
     onCopy: (String) -> Unit,
     onFinish: () -> Unit
 ) {
@@ -185,7 +186,7 @@ private fun ProcessTextSheet(
     application: Application,
     factory: (Application, Selection) -> androidx.lifecycle.ViewModelProvider.Factory,
     confirmation: String?,
-    onInsert: (String, String) -> Unit,
+    onInsert: (String, String, Boolean) -> Unit,
     onCopy: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -263,7 +264,7 @@ private fun ProcessTextSheet(
                             Button(
                                 onClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onInsert(selection.text, s.result)
+                                    onInsert(selection.text, s.result, s.animateReplacement)
                                 },
                                 shape = SlateButtonShape,
                                 modifier = Modifier.weight(1f).heightIn(min = 48.dp)

@@ -6,7 +6,8 @@ internal data class PendingProcessTextReplacement(
     val original: String,
     val replacement: String,
     val sourcePackage: String?,
-    val createdAt: Long
+    val createdAt: Long,
+    val animateReplacement: Boolean = false
 )
 
 internal sealed interface ProcessTextEdit {
@@ -20,8 +21,22 @@ internal object ProcessTextReplacementBridge {
     private const val MAX_AGE_MS = 3_000L
     private val pending = AtomicReference<PendingProcessTextReplacement?>()
 
-    fun prepare(original: String, replacement: String, sourcePackage: String?, now: Long) {
-        pending.set(PendingProcessTextReplacement(original, replacement, sourcePackage, now))
+    fun prepare(
+        original: String,
+        replacement: String,
+        sourcePackage: String?,
+        animateReplacement: Boolean,
+        now: Long
+    ) {
+        pending.set(
+            PendingProcessTextReplacement(
+                original = original,
+                replacement = replacement,
+                sourcePackage = sourcePackage,
+                createdAt = now,
+                animateReplacement = animateReplacement
+            )
+        )
     }
 
     fun current(now: Long): PendingProcessTextReplacement? {

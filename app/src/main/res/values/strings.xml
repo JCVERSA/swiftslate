@@ -288,6 +288,8 @@
     <string name="settings_privacy_desc" tools:ignore="MissingTranslation">Disable every AI network request. Local text replacers continue to work.</string>
     <string name="settings_privacy_enabled" tools:ignore="MissingTranslation">Private: no text is sent to an AI provider.</string>
     <string name="settings_privacy_disabled" tools:ignore="MissingTranslation">AI commands may use your configured provider.</string>
+    <string name="settings_typing_animation_title" tools:ignore="MissingTranslation">Typing animation</string>
+    <string name="settings_typing_animation_desc" tools:ignore="MissingTranslation">Reveal AI replacements progressively in the focused field.</string>
     <string name="settings_history_title" tools:ignore="MissingTranslation">Optional local history</string>
     <string name="settings_history_desc" tools:ignore="MissingTranslation">Keep successful command results on this device. Disabled by default.</string>
     <string name="settings_history_retention" tools:ignore="MissingTranslation">Keep results for</string>

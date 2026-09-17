@@ -117,6 +117,9 @@ class AssistantService : AccessibilityService() {
         const val TRIGGER_REFRESH_INTERVAL_MS = 5_000L
         const val PROCESSING_WATCHDOG_MS = 120_000L
         const val FOCUS_FALLBACK_MIN_INTERVAL_MS = 300L
+        const val TYPING_ANIMATION_MAX_STEPS = 72
+        const val TYPING_ANIMATION_MIN_DELAY_MS = 16L
+        const val TYPING_ANIMATION_MAX_DELAY_MS = 40L
         val SPINNER_FRAMES = arrayOf("◐", "◓", "◑", "◒")
     }
 
@@ -435,7 +438,11 @@ class AssistantService : AccessibilityService() {
             return false
         }
         if (edit == ProcessTextEdit.Replaced) {
-            source.safeRecycle()
+            if (request.animateReplacement && typingAnimationEnabled()) {
+                startProcessTextAnimation(source, beforeText, request.replacement)
+            } else {
+                source.safeRecycle()
+            }
             return true
         }
 
@@ -451,7 +458,16 @@ class AssistantService : AccessibilityService() {
         currentJob = serviceScope.launch {
             val thisJob = coroutineContext[Job]
             try {
-                val replaced = replaceText(source, edit.correctedText)
+                val replaced = if (request.animateReplacement && typingAnimationEnabled()) {
+                    replaceTextWithTypingAnimation(
+                        source,
+                        beforeText,
+                        edit.correctedText,
+                        restoreOriginalFirst = true
+                    )
+                } else {
+                    replaceText(source, edit.correctedText)
+                }
                 if (replaced) {
                     lastOriginalText = beforeText
                     lastUndoSourceId = sourceId(source)
@@ -477,6 +493,53 @@ class AssistantService : AccessibilityService() {
             }
         }
         return true
+    }
+
+    private fun startProcessTextAnimation(
+        source: AccessibilityNodeInfo,
+        originalText: String,
+        replacement: String
+    ) {
+        if (!isProcessing.compareAndSet(false, true)) {
+            source.safeRecycle()
+            return
+        }
+        startWatchdog()
+        cancelPendingProcessingReset()
+        currentJob?.cancel()
+        currentJob = serviceScope.launch {
+            val thisJob = coroutineContext[Job]
+            try {
+                if (replaceTextWithTypingAnimation(
+                        source,
+                        originalText,
+                        replacement,
+                        restoreOriginalFirst = true
+                    )
+                ) {
+                    lastOriginalText = originalText
+                    lastUndoSourceId = sourceId(source)
+                } else {
+                    withContext(Dispatchers.Main) {
+                        showToast(getString(R.string.toast_replace_failed))
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                withContext(Dispatchers.Main) {
+                    showToast(getString(R.string.toast_replace_failed))
+                }
+            } finally {
+                withContext(NonCancellable + Dispatchers.Main) {
+                    if (currentJob === thisJob) {
+                        cancelWatchdog()
+                        scheduleProcessingReset()
+                    }
+                    recycleIfUnowned(source)
+                }
+            }
+        }
     }
 
     private fun processCommand(source: AccessibilityNodeInfo, text: String, command: Command) {
@@ -513,7 +576,7 @@ class AssistantService : AccessibilityService() {
 
                 when (outcome) {
                     is CommandOutcome.Success -> {
-                        if (!replaceText(source, outcome.text)) {
+                        if (!replaceTextWithTypingAnimation(source, originalText, outcome.text)) {
                             // The field rejected the write. Restore the user's text, and don't
                             // record an undo point or a CONFIRM haptic for text that never landed.
                             replaceText(source, originalText)
@@ -797,6 +860,73 @@ class AssistantService : AccessibilityService() {
         if (after == keepPrefix || !after.startsWith(keepPrefix)) return@withContext null
         scheduleTextVerification(source, after)
         after
+    }
+
+    private fun typingAnimationEnabled(): Boolean =
+        getSharedPreferences("settings", Context.MODE_PRIVATE)
+            .getBoolean(PrefKeys.TYPING_ANIMATION_ENABLED, true)
+
+    /**
+     * Writes AI output progressively while keeping the existing ACTION_SET_TEXT and clipboard
+     * fallback path as the final safety net. The focused field is always restored first for
+     * PROCESS_TEXT hosts, because those hosts have already inserted the complete result before
+     * the accessibility service sees the event.
+     */
+    private suspend fun replaceTextWithTypingAnimation(
+        source: AccessibilityNodeInfo,
+        originalText: String,
+        newText: String,
+        restoreOriginalFirst: Boolean = false
+    ): Boolean {
+        if (!typingAnimationEnabled() || newText.length < 2 || newText == originalText) {
+            return replaceText(source, newText)
+        }
+
+        return withContext(Dispatchers.Main) {
+            fun setTextDirect(text: String): Boolean {
+                if (!source.refresh()) return false
+                val bundle = Bundle().apply {
+                    putCharSequence(
+                        AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                        text
+                    )
+                }
+                return source.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
+            }
+
+            if (restoreOriginalFirst && !setTextDirect(originalText)) {
+                return@withContext replaceText(source, newText)
+            }
+
+            val steps = minOf(TYPING_ANIMATION_MAX_STEPS, newText.length)
+            val chunkSize = (newText.length + steps - 1) / steps
+            val pauseMs = (1_100L / steps).coerceIn(
+                TYPING_ANIMATION_MIN_DELAY_MS,
+                TYPING_ANIMATION_MAX_DELAY_MS
+            )
+            var end = 0
+            while (end < newText.length) {
+                var next = minOf(newText.length, end + chunkSize)
+                // Never expose half of a UTF-16 surrogate pair during an intermediate frame.
+                if (next < newText.length &&
+                    newText[next - 1].isHighSurrogate() && newText[next].isLowSurrogate()
+                ) {
+                    next++
+                }
+                if (!setTextDirect(newText.substring(0, next))) {
+                    return@withContext replaceText(source, newText)
+                }
+                end = next
+                if (end < newText.length) delay(pauseMs)
+            }
+
+            delay(80)
+            if (!source.refresh() || source.text?.toString() != newText) {
+                return@withContext replaceText(source, newText)
+            }
+            scheduleTextVerification(source, newText)
+            true
+        }
     }
 
     /**

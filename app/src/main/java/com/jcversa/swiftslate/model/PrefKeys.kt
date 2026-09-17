@@ -43,6 +43,9 @@ object PrefKeys {
     /** Whether AI requests are disabled while local text replacers remain available. */
     const val PRIVACY_MODE = "privacy_mode"
 
+    /** Whether AI text replacements are revealed progressively in the focused field. */
+    const val TYPING_ANIMATION_ENABLED = "typing_animation_enabled"
+
     /** Whether the optional local command history is enabled. */
     const val HISTORY_ENABLED = "history_enabled"
 
