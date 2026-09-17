@@ -141,9 +141,13 @@ fun OnboardingScreen(
     val geminiClient = remember { GeminiClient() }
     val scrollState = rememberScrollState()
     var step by remember { mutableStateOf(0) }
+    val storedProviderType = prefs.getString(PrefKeys.PROVIDER_TYPE, null)
+    var providerConfigurationInvalid by remember {
+        mutableStateOf(storedProviderType != null && !ProviderType.isValid(storedProviderType))
+    }
     var providerType by remember {
         mutableStateOf(
-            prefs.getString(PrefKeys.PROVIDER_TYPE, ProviderType.NVIDIA)
+            ProviderType.storedOrNull(storedProviderType)
                 ?.takeIf { it in onboardingProviders } ?: ProviderType.NVIDIA
         )
     }
@@ -165,17 +169,30 @@ fun OnboardingScreen(
     val keystoreError = stringResource(R.string.keys_keystore_error)
     val authRequired = stringResource(R.string.error_provider_auth_required)
     val onboardingTestFailed = stringResource(R.string.onboarding_test_failed)
-    val providerLabel = when (providerType) {
-        ProviderType.OPENROUTER -> stringResource(R.string.settings_provider_openrouter)
-        ProviderType.DEEPSEEK -> stringResource(R.string.settings_provider_deepseek)
-        else -> stringResource(R.string.settings_provider_nvidia)
+    val providerLabel = if (providerConfigurationInvalid) {
+        stringResource(R.string.error_provider_selection_invalid)
+    } else {
+        when (providerType) {
+            ProviderType.OPENROUTER -> stringResource(R.string.settings_provider_openrouter)
+            ProviderType.DEEPSEEK -> stringResource(R.string.settings_provider_deepseek)
+            else -> stringResource(R.string.settings_provider_nvidia)
+        }
     }
 
     LaunchedEffect(step) {
         scrollState.scrollTo(0)
     }
 
-    LaunchedEffect(providerType) {
+    LaunchedEffect(providerType, providerConfigurationInvalid) {
+        if (providerConfigurationInvalid) {
+            selectedModel = ""
+            keyMessage = null
+            keySuccess = false
+            apiKey = ""
+            isEditingKey = false
+            hasKey = false
+            return@LaunchedEffect
+        }
         val availableModels = onboardingModels(providerType)
         val storedModel = prefs.getString(config.modelPrefKey, "").orEmpty()
         selectedModel = storedModel.takeIf { it in availableModels } ?: config.defaultModel
@@ -190,9 +207,13 @@ fun OnboardingScreen(
         hasKey = false
     }
 
-    LaunchedEffect(providerType) {
-        hasKey = withContext(Dispatchers.IO) {
-            keyManager.getKeys(providerType).isNotEmpty()
+    LaunchedEffect(providerType, providerConfigurationInvalid) {
+        hasKey = if (providerConfigurationInvalid) {
+            false
+        } else {
+            withContext(Dispatchers.IO) {
+                keyManager.getKeys(providerType).isNotEmpty()
+            }
         }
     }
 
@@ -216,6 +237,7 @@ fun OnboardingScreen(
     }
 
     fun validateAndStoreKey() {
+        if (providerConfigurationInvalid) return
         val trimmed = apiKey.trim()
         if (trimmed.isBlank() || isTestingKey) return
         isTestingKey = true
@@ -311,6 +333,7 @@ fun OnboardingScreen(
                             2 -> selectedModel.isNotBlank()
                             3 -> serviceEnabled
                             4 -> testOutput != null
+                            0 -> !providerConfigurationInvalid
                             else -> true
                         },
                         onBack = { step = (step - 1).coerceAtLeast(0) },
@@ -366,6 +389,7 @@ fun OnboardingScreen(
                                 step = currentStep,
                                 providerType = providerType,
                                 providerLabel = providerLabel,
+                                providerConfigurationInvalid = providerConfigurationInvalid,
                                 selectedModel = selectedModel,
                                 hasKey = hasKey,
                                 isEditingKey = isEditingKey,
@@ -377,7 +401,10 @@ fun OnboardingScreen(
                                 testOutput = testOutput,
                                 testError = testError,
                                 isTestingCommand = isTestingCommand,
-                                onProviderSelected = { providerType = it },
+                                onProviderSelected = {
+                                    providerType = it
+                                    providerConfigurationInvalid = false
+                                },
                                 onModelSelected = {
                                     selectedModel = it
                                     prefs.edit().putString(config.modelPrefKey, it).apply()
@@ -419,6 +446,7 @@ fun OnboardingScreen(
                             2 -> selectedModel.isNotBlank()
                             3 -> serviceEnabled
                             4 -> testOutput != null
+                            0 -> !providerConfigurationInvalid
                             else -> true
                         },
                         onBack = { step = (step - 1).coerceAtLeast(0) },
@@ -543,6 +571,7 @@ private fun OnboardingStepContent(
     step: Int,
     providerType: String,
     providerLabel: String,
+    providerConfigurationInvalid: Boolean,
     selectedModel: String,
     hasKey: Boolean,
     isEditingKey: Boolean,
@@ -565,6 +594,7 @@ private fun OnboardingStepContent(
     when (step) {
         0 -> ProviderStep(
             providerType = providerType,
+            providerConfigurationInvalid = providerConfigurationInvalid,
             onProviderSelected = onProviderSelected
         )
         1 -> ApiKeyStep(
@@ -600,6 +630,7 @@ private fun OnboardingStepContent(
 @Composable
 private fun ProviderStep(
     providerType: String,
+    providerConfigurationInvalid: Boolean,
     onProviderSelected: (String) -> Unit
 ) {
     SlateCard {
@@ -613,6 +644,13 @@ private fun ProviderStep(
                 stringResource(R.string.onboarding_provider_message),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (providerConfigurationInvalid) {
+                Text(
+                    text = stringResource(R.string.error_provider_selection_invalid),
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Medium
+                )
+            }
             onboardingProviders.forEach { candidate ->
                 val selected = candidate == providerType
                 val label = when (candidate) {

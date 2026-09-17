@@ -378,6 +378,7 @@ SwiftSlate supports multiple API keys with intelligent rotation:
 | **Rate-Limit Handling** | If a key gets rate-limited (HTTP 429), SwiftSlate tracks the cooldown and skips it automatically |
 | **Invalid Key Detection** | Keys returning 401/403 errors are marked invalid and excluded from rotation |
 | **Encrypted Storage** | All keys encrypted with AES-256-GCM via Android Keystore before being saved locally; storage is isolated per provider |
+| **Provider Isolation** | A corrupted or unknown provider value never falls back to Gemini; the app stops and asks for an explicit provider selection |
 | **Live Validation** | Keys are validated against the selected provider's API before being saved |
 
 > [!TIP]
@@ -387,15 +388,16 @@ SwiftSlate supports multiple API keys with intelligent rotation:
 
 ## 💾 Backup & Restore
 
-Export and import your custom commands as JSON files — useful for migrating to a new device or sharing command sets.
+Export and import a safe configuration envelope as JSON — useful for migrating to a new device or sharing command sets.
 
-- **Export** — Saves all custom commands to a `.json` file via Android's file picker
-- **Import** — Loads commands from a `.json` file (validates format, trigger prefix, and size limits before importing)
+- **Export** — Saves custom commands, selected models, the trigger prefix, temperature, privacy mode, and typing-animation preference via Android's file picker
+- **Import** — Loads that safe configuration (validates format, trigger prefix, provider values, and size limits before importing)
+- **Never exported** — API keys, the custom endpoint, and optional local history. Keys remain in Android Keystore storage and must be configured again on a new device.
 
-Find both options in the **Settings** tab under **Backup & Restore**.
+Find both options in the **Settings** tab under **Backup & Restore**. SwiftSlate's Android backup rules also exclude app data from standard cloud/device-transfer backups.
 
 > [!NOTE]
-> Imported commands must use the same trigger prefix currently configured in the app. API keys are **not** included in backups for security.
+> Local command history is opt-in and stays on the device. Disabling it clears saved inputs and results.
 
 <br>
 
@@ -516,12 +518,14 @@ Adding a translation is a single directory: drop `values-<locale>/strings.xml` i
 |:--|:--------|:------------------------|
 | 👁️ | **Text Monitoring** | Only processes text when a trigger command is detected at the end. All other typing is completely ignored. Password fields are always skipped. |
 | 📡 | **Data Transmission** | Text is sent **only** to the configured AI provider (Google Gemini, Groq, NVIDIA NIM, OpenRouter, DeepSeek, or your custom endpoint). The only other network contact is a daily GitHub Releases check for update notifications — your text is never part of it. Text replacer commands never leave your device. |
+| 🧭 | **Network Requests** | Model catalogs are fetched only after the user presses the catalog action, never automatically on app return. Privacy mode blocks catalog and AI requests. Automatic HTTP redirects are disabled so provider keys cannot be forwarded to another host or downgraded. |
 | 🌐 | **Local HTTP** | HTTPS is preferred. HTTP is accepted only for private-LAN endpoints and the app warns that this traffic is unencrypted. |
 | 🔐 | **Key Storage** | API keys are encrypted with AES-256-GCM using the Android Keystore system and isolated per provider. Encryption failures throw rather than falling back to plaintext. |
 | 📊 | **Analytics** | **None.** Zero telemetry, zero tracking, zero crash reporting. |
 | 📖 | **Open Source** | The entire codebase is open for inspection under the MIT License. |
 | 🔑 | **Permissions** | Requires Internet (provider API calls + update check), Accessibility Service, notification, and vibration (haptics) permissions. |
-| 💾 | **Backups** | API keys and settings are excluded from Android cloud backups and device transfers. |
+| 💾 | **Backups** | Android cloud/device-transfer backups are disabled. The recommended manual safe backup contains commands and non-sensitive preferences/models only; API keys, custom endpoints, and optional local history are excluded. |
+| 📖 | **Local History** | Successful command inputs and results are stored only when the user explicitly enables optional local history. It is disabled by default and can be cleared from Settings or the Commands history view. |
 
 <br>
 
