@@ -9,7 +9,10 @@ object ProviderType {
     const val DEEPSEEK = "deepseek"
     const val CUSTOM = "custom"
 
-    private val VALID = setOf(GEMINI, GROQ, NVIDIA, OPENROUTER, DEEPSEEK, CUSTOM)
+    /** Stable order used by configuration exports and provider-wide maintenance operations. */
+    val ALL = listOf(GEMINI, GROQ, NVIDIA, OPENROUTER, DEEPSEEK, CUSTOM)
+
+    private val VALID = ALL.toSet()
 
     /** Whether a stored provider value is known. Null means a first-run default is allowed. */
     fun isValid(value: String?): Boolean = value == null || value in VALID

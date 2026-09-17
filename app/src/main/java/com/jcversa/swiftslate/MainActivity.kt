@@ -2,6 +2,7 @@ package com.jcversa.swiftslate
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -68,9 +69,14 @@ enum class Tab(@param:StringRes val titleRes: Int, val icon: ImageVector) {
     Settings(R.string.settings_title, Icons.Default.Settings)
 }
 
+const val EXTRA_OPEN_SECURE_BACKUP = "com.jcversa.swiftslate.OPEN_SECURE_BACKUP"
+
 class MainActivity : ComponentActivity() {
+    private var openSecureBackupRequest by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        openSecureBackupRequest = intent.getBooleanExtra(EXTRA_OPEN_SECURE_BACKUP, false)
         enableEdgeToEdge()
         setContent {
             var showSplash by rememberSaveable { mutableStateOf(true) }
@@ -88,9 +94,20 @@ class MainActivity : ComponentActivity() {
                         onComplete = { showOnboarding = false }
                     )
                 } else {
-                    SwiftSlateMainScreen()
+                    SwiftSlateMainScreen(
+                        openSecureBackup = openSecureBackupRequest,
+                        onSecureBackupRequestConsumed = { openSecureBackupRequest = false }
+                    )
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_OPEN_SECURE_BACKUP, false)) {
+            openSecureBackupRequest = true
         }
     }
 }
@@ -114,10 +131,23 @@ private fun shouldShowFirstRunAssistant(context: Context): Boolean {
 }
 
 @Composable
-fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
+fun SwiftSlateMainScreen(
+    vm: SwiftSlateViewModel = viewModel(),
+    openSecureBackup: Boolean = false,
+    onSecureBackupRequestConsumed: () -> Unit = {}
+) {
     val context = LocalContext.current
     val motion = LocalSlateMotion.current
-    var selectedTab by rememberSaveable { mutableStateOf(Tab.Dashboard) }
+    var selectedTab by rememberSaveable {
+        mutableStateOf(if (openSecureBackup) Tab.Settings else Tab.Dashboard)
+    }
+
+    LaunchedEffect(openSecureBackup) {
+        if (openSecureBackup) {
+            selectedTab = Tab.Settings
+            onSecureBackupRequestConsumed()
+        }
+    }
 
     // The opening motion is shared by every form factor and becomes instantaneous when Android
     // asks the app to reduce motion.
@@ -176,14 +206,20 @@ fun SwiftSlateMainScreen(vm: SwiftSlateViewModel = viewModel()) {
                 }
             }
         ) { innerPadding ->
-            val screens = remember {
+            val screens = remember(openSecureBackup) {
                 Tab.entries.associateWith { tab ->
                     movableContentOf {
                         when (tab) {
                             Tab.Dashboard -> DashboardScreen(vm.keyManager, vm.commandManager, vm.statsManager)
                             Tab.Keys -> KeysScreen(vm.keyManager, vm.prefs)
                             Tab.Commands -> CommandsScreen(vm.commandManager)
-                            Tab.Settings -> SettingsScreen(vm.commandManager, vm.prefs, vm.keyManager)
+                            Tab.Settings -> SettingsScreen(
+                                commandManager = vm.commandManager,
+                                prefs = vm.prefs,
+                                keyManager = vm.keyManager,
+                                openSecureBackup = openSecureBackup,
+                                onSecureBackupRequestConsumed = onSecureBackupRequestConsumed
+                            )
                         }
                     }
                 }

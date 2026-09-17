@@ -388,13 +388,14 @@ SwiftSlate supports multiple API keys with intelligent rotation:
 
 ## 💾 Backup & Restore
 
-Export and import a safe configuration envelope as JSON — useful for migrating to a new device or sharing command sets.
+SwiftSlate provides two deliberately separate backup paths:
 
-- **Export** — Saves custom commands, selected models, the trigger prefix, temperature, privacy mode, and typing-animation preference via Android's file picker
-- **Import** — Loads that safe configuration (validates format, trigger prefix, provider values, and size limits before importing)
-- **Never exported** — API keys, the custom endpoint, and optional local history. Keys remain in Android Keystore storage and must be configured again on a new device.
+- **Safe Backup & Restore** — Saves custom commands, selected models, the trigger prefix, temperature, privacy mode, and typing-animation preference via Android's file picker
+- **Encrypted API Key Export** — An explicit, manual export of all configured provider keys, the selected model per provider, and the custom endpoint. The payload is encrypted with AES-256-GCM using a passphrase-derived key (PBKDF2), and the passphrase is never stored or sent anywhere
+- **Encrypted Import** — Decrypts the file locally, displays a summary, then asks for confirmation before replacing the provider key namespaces and selected models. It never runs a network validation automatically
+- **Safe Backup never contains** — API keys, the custom endpoint, and optional local history. Keys remain in Android Keystore storage and must be configured again on a new device unless the user explicitly uses the encrypted export
 
-Find both options in the **Settings** tab under **Backup & Restore**. SwiftSlate's Android backup rules also exclude app data from standard cloud/device-transfer backups.
+Find both paths in the **Settings** tab under **Backup & Migration Vault**. The **Encrypted API backup** Android Quick Settings tile opens the same explicit export/import chooser; tapping it never exports a key by itself. SwiftSlate's Android backup rules also exclude app data from standard cloud/device-transfer backups.
 
 > [!NOTE]
 > Local command history is opt-in and stays on the device. Disabling it clears saved inputs and results.
@@ -444,7 +445,7 @@ SwiftSlate has **four screens** accessible via the bottom navigation bar:
 - **Model picker** per provider
 - Custom endpoint URL & model
 - Trigger prefix customization
-- Backup & restore commands
+- Safe backup and encrypted API-key export/import
 
 </td>
 </tr>
@@ -524,7 +525,7 @@ Adding a translation is a single directory: drop `values-<locale>/strings.xml` i
 | 📊 | **Analytics** | **None.** Zero telemetry, zero tracking, zero crash reporting. |
 | 📖 | **Open Source** | The entire codebase is open for inspection under the MIT License. |
 | 🔑 | **Permissions** | Requires Internet (provider API calls + update check), Accessibility Service, notification, and vibration (haptics) permissions. |
-| 💾 | **Backups** | Android cloud/device-transfer backups are disabled. The recommended manual safe backup contains commands and non-sensitive preferences/models only; API keys, custom endpoints, and optional local history are excluded. |
+| 💾 | **Backups** | Android cloud/device-transfer backups are disabled. The recommended manual safe backup contains commands and non-sensitive preferences/models only; API keys, custom endpoints, and optional local history are excluded. A separate user-initiated encrypted API-key export uses a passphrase and requires confirmation on import. |
 | 📖 | **Local History** | Successful command inputs and results are stored only when the user explicitly enables optional local history. It is disabled by default and can be cleared from Settings or the Commands history view. |
 
 <br>

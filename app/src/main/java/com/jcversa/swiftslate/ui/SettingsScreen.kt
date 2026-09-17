@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import com.jcversa.swiftslate.manager.ApiKeyBackupManager
 import com.jcversa.swiftslate.manager.CommandManager
 import com.jcversa.swiftslate.manager.HistoryManager
 import com.jcversa.swiftslate.manager.KeyManager
@@ -58,6 +59,8 @@ import com.jcversa.swiftslate.ui.components.SlateTextField
 import com.jcversa.swiftslate.ui.components.AnimateEntrance
 
 private const val SAFE_BACKUP_VERSION = 2
+
+private enum class SecureBackupAction { EXPORT, IMPORT }
 
 /** Exports configuration without API keys, history contents, or endpoint credentials. */
 private fun buildSafeBackup(commandManager: CommandManager, prefs: SharedPreferences): String {
@@ -135,7 +138,13 @@ private fun importSafeBackup(json: String, commandManager: CommandManager, prefs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, keyManager: KeyManager) {
+fun SettingsScreen(
+    commandManager: CommandManager,
+    prefs: SharedPreferences,
+    keyManager: KeyManager,
+    openSecureBackup: Boolean = false,
+    onSecureBackupRequestConsumed: () -> Unit = {}
+) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val uriHandler = LocalUriHandler.current
@@ -373,6 +382,25 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     var backupSuccess by remember { mutableStateOf(false) }
     var showImportConfirm by remember { mutableStateOf(false) }
 
+    val apiKeyBackupManager = remember { ApiKeyBackupManager(context, keyManager) }
+    var secureBackupAction by remember { mutableStateOf<SecureBackupAction?>(null) }
+    var securePassphrase by remember { mutableStateOf("") }
+    var secureBackupMessage by remember { mutableStateOf<String?>(null) }
+    var secureBackupSuccess by remember { mutableStateOf(false) }
+    var secureBackupChooserVisible by remember { mutableStateOf(false) }
+    var pendingExportPassphrase by remember { mutableStateOf<String?>(null) }
+    var pendingImportFile by remember { mutableStateOf<String?>(null) }
+    var pendingImportData by remember {
+        mutableStateOf<Pair<ApiKeyBackupManager.ImportedData, ApiKeyBackupManager.ImportSummary>?>(null)
+    }
+
+    LaunchedEffect(openSecureBackup) {
+        if (openSecureBackup) {
+            secureBackupChooserVisible = true
+            onSecureBackupRequestConsumed()
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose {
             saveEndpointJob?.cancel()
@@ -398,6 +426,12 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
     val exportErrorMsg = stringResource(R.string.backup_export_error)
     val importSuccessMsg = stringResource(R.string.backup_import_success)
     val importErrorMsg = stringResource(R.string.backup_import_error)
+    val secureExportSuccessMsg = stringResource(R.string.secure_backup_export_success)
+    val secureImportSuccessMsg = stringResource(R.string.secure_backup_import_success)
+    val secureBackupErrorMsg = stringResource(R.string.secure_backup_error)
+    val securePassphraseShortMsg = stringResource(R.string.secure_backup_passphrase_short)
+    val secureImportConfirmMsg = stringResource(R.string.secure_backup_import_confirm)
+    val secureChooserMessage = stringResource(R.string.secure_backup_chooser_message)
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         uri?.let {
@@ -442,6 +476,56 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                     backupMessage = importErrorMsg
                     backupSuccess = false
                 }
+            }
+        }
+    }
+
+    val secureExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        val passphrase = pendingExportPassphrase
+        pendingExportPassphrase = null
+        if (uri == null || passphrase == null) {
+            return@rememberLauncherForActivityResult
+        }
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val encrypted = apiKeyBackupManager.export(passphrase)
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        output.write(encrypted.toByteArray(Charsets.UTF_8))
+                    } ?: error("Unable to open export destination")
+                }
+                secureBackupMessage = secureExportSuccessMsg
+                secureBackupSuccess = true
+            } catch (_: Exception) {
+                secureBackupMessage = secureBackupErrorMsg
+                secureBackupSuccess = false
+            } finally {
+                passphrase.toCharArray().fill('\u0000')
+            }
+        }
+    }
+
+    val secureImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            try {
+                val encrypted = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
+                        val text = reader.readText()
+                        if (text.toByteArray(Charsets.UTF_8).size > 1_000_000) null else text
+                    } ?: ""
+                }
+                if (encrypted.isBlank()) error("Empty backup")
+                pendingImportFile = encrypted
+                securePassphrase = ""
+                secureBackupAction = SecureBackupAction.IMPORT
+            } catch (_: Exception) {
+                secureBackupMessage = secureBackupErrorMsg
+                secureBackupSuccess = false
             }
         }
     }
@@ -1470,6 +1554,75 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(18.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.secure_backup_title),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.secure_backup_desc),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            secureBackupMessage = null
+                            securePassphrase = ""
+                            secureBackupAction = SecureBackupAction.EXPORT
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.Lock, null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.secure_backup_export), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Button(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            secureBackupMessage = null
+                            secureBackupChooserVisible = false
+                            secureImportLauncher.launch(arrayOf("application/json", "application/octet-stream"))
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.LockOpen, null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.secure_backup_import), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                AnimatedVisibility(
+                    visible = secureBackupMessage != null,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    secureBackupMessage?.let { message ->
+                        Text(
+                            text = message,
+                            modifier = Modifier.padding(top = 10.dp),
+                            color = if (secureBackupSuccess) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
             }
         }
     }
@@ -1635,6 +1788,165 @@ fun SettingsScreen(commandManager: CommandManager, prefs: SharedPreferences, key
             },
             dismissButton = {
                 TextButton(onClick = { showImportConfirm = false }) {
+                    Text(stringResource(R.string.backup_import_cancel))
+                }
+            }
+        )
+    }
+
+    if (secureBackupChooserVisible) {
+        AlertDialog(
+            onDismissRequest = { secureBackupChooserVisible = false },
+            title = { Text(stringResource(R.string.secure_backup_title)) },
+            text = { Text(secureChooserMessage) },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = {
+                        secureBackupChooserVisible = false
+                        secureBackupMessage = null
+                        securePassphrase = ""
+                        secureBackupAction = SecureBackupAction.EXPORT
+                    }) { Text(stringResource(R.string.secure_backup_export)) }
+                    TextButton(onClick = {
+                        secureBackupChooserVisible = false
+                        secureBackupMessage = null
+                        secureImportLauncher.launch(arrayOf("application/json", "application/octet-stream"))
+                    }) { Text(stringResource(R.string.secure_backup_import)) }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { secureBackupChooserVisible = false }) {
+                    Text(stringResource(R.string.backup_import_cancel))
+                }
+            }
+        )
+    }
+
+    if (secureBackupAction != null) {
+        AlertDialog(
+            onDismissRequest = {
+                secureBackupAction = null
+                pendingImportFile = null
+                securePassphrase = ""
+            },
+            title = {
+                Text(
+                    stringResource(
+                        if (secureBackupAction == SecureBackupAction.EXPORT) {
+                            R.string.secure_backup_export_title
+                        } else {
+                            R.string.secure_backup_import_title
+                        }
+                    )
+                )
+            },
+            text = {
+                Column {
+                    Text(stringResource(R.string.secure_backup_passphrase_message))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = securePassphrase,
+                        onValueChange = { securePassphrase = it },
+                        label = { Text(stringResource(R.string.secure_backup_passphrase_label)) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        supportingText = { Text(stringResource(R.string.secure_backup_passphrase_hint)) }
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (!ApiKeyBackupManager.isPassphraseAcceptable(securePassphrase)) {
+                        secureBackupMessage = securePassphraseShortMsg
+                        return@TextButton
+                    }
+                    if (secureBackupAction == SecureBackupAction.EXPORT) {
+                        pendingExportPassphrase = securePassphrase
+                        securePassphrase = ""
+                        secureBackupAction = null
+                        secureExportLauncher.launch("swiftslate-api-keys.json")
+                    } else {
+                        val encrypted = pendingImportFile
+                        if (encrypted == null) {
+                            secureBackupAction = null
+                            secureBackupMessage = secureBackupErrorMsg
+                            secureBackupSuccess = false
+                        } else {
+                            val passphrase = securePassphrase
+                            secureBackupAction = null
+                            scope.launch {
+                                try {
+                                    val inspected = withContext(Dispatchers.IO) {
+                                        apiKeyBackupManager.inspect(encrypted, passphrase)
+                                    }
+                                    pendingImportData = inspected
+                                } catch (_: Exception) {
+                                    secureBackupMessage = secureBackupErrorMsg
+                                    secureBackupSuccess = false
+                                } finally {
+                                    securePassphrase = ""
+                                    pendingImportFile = null
+                                    passphrase.toCharArray().fill('\u0000')
+                                }
+                            }
+                        }
+                    }
+                }) {
+                    Text(stringResource(R.string.secure_backup_continue))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    secureBackupAction = null
+                    pendingImportFile = null
+                    securePassphrase = ""
+                }) { Text(stringResource(R.string.backup_import_cancel)) }
+            }
+        )
+    }
+
+    pendingImportData?.let { (data, summary) ->
+        AlertDialog(
+            onDismissRequest = { pendingImportData = null },
+            title = { Text(stringResource(R.string.secure_backup_import_confirm_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.secure_backup_import_confirm_details,
+                        summary.keyCount,
+                        summary.configuredProviderCount,
+                        summary.modelsIncluded
+                    ) + "\\n\\n" + secureImportConfirmMsg
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingImportData = null
+                    scope.launch {
+                        val applied = withContext(Dispatchers.IO) {
+                            apiKeyBackupManager.apply(data)
+                        }
+                        if (applied) {
+                            providerType = data.activeProvider
+                            providerConfigurationInvalid = false
+                            selectedModel = data.modelsByProvider[ProviderType.GEMINI].orEmpty()
+                            groqModel = data.modelsByProvider[ProviderType.GROQ].orEmpty()
+                            managedModel = data.modelsByProvider[data.activeProvider].orEmpty()
+                            customModel = data.modelsByProvider[ProviderType.CUSTOM].orEmpty()
+                            customEndpoint = data.customEndpoint
+                            apiKeys = data.keysByProvider[data.activeProvider].orEmpty()
+                            apiKeysProvider = data.activeProvider
+                            secureBackupMessage = secureImportSuccessMsg
+                            secureBackupSuccess = true
+                        } else {
+                            secureBackupMessage = secureBackupErrorMsg
+                            secureBackupSuccess = false
+                        }
+                    }
+                }) { Text(stringResource(R.string.secure_backup_import)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingImportData = null }) {
                     Text(stringResource(R.string.backup_import_cancel))
                 }
             }

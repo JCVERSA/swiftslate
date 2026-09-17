@@ -2,6 +2,7 @@
     <string name="app_name">SwiftSlate</string>
     <string name="accessibility_service_label">SwiftSlate Assistant</string>
     <string name="accessibility_service_desc">Provides system-wide AI text replacements when trigger commands are typed.</string>
+    <string name="quick_tile_api_backup" tools:ignore="MissingTranslation">Encrypted API backup</string>
 
     <!-- Dashboard -->
     <string name="dashboard_title">Dashboard</string>
@@ -132,6 +133,24 @@
     <string name="backup_import_error">Invalid backup file</string>
     <string name="backup_import_confirm">This will replace your custom commands and update safe preferences. API keys and local history will not be imported. Continue?</string>
     <string name="backup_import_cancel">Cancel</string>
+    <string name="secure_backup_title" tools:ignore="MissingTranslation">Encrypted API key export</string>
+    <string name="secure_backup_desc" tools:ignore="MissingTranslation">Export all configured provider keys with the selected model for each provider. The file is protected by a passphrase and is never included in standard backups.</string>
+    <string name="secure_backup_export" tools:ignore="MissingTranslation">Export keys</string>
+    <string name="secure_backup_import" tools:ignore="MissingTranslation">Import keys</string>
+    <string name="secure_backup_export_title" tools:ignore="MissingTranslation">Protect your export</string>
+    <string name="secure_backup_import_title" tools:ignore="MissingTranslation">Unlock your import</string>
+    <string name="secure_backup_passphrase_message" tools:ignore="MissingTranslation">Choose a portable passphrase for this file. SwiftSlate never stores it or sends it anywhere.</string>
+    <string name="secure_backup_passphrase_label" tools:ignore="MissingTranslation">Passphrase</string>
+    <string name="secure_backup_passphrase_hint" tools:ignore="MissingTranslation">At least 8 characters</string>
+    <string name="secure_backup_passphrase_short" tools:ignore="MissingTranslation">Use a passphrase of at least 8 characters.</string>
+    <string name="secure_backup_continue" tools:ignore="MissingTranslation">Continue</string>
+    <string name="secure_backup_chooser_message" tools:ignore="MissingTranslation">Choose whether to export or import your encrypted API key file.</string>
+    <string name="secure_backup_import_confirm_title" tools:ignore="MissingTranslation">Confirm encrypted import</string>
+    <string name="secure_backup_import_confirm_details" tools:ignore="MissingTranslation">This file contains %1$d API keys for %2$d providers and %3$d selected models.</string>
+    <string name="secure_backup_import_confirm" tools:ignore="MissingTranslation">Importing will replace the configured keys and selected models for the providers in this file. No network test will be run.</string>
+    <string name="secure_backup_export_success" tools:ignore="MissingTranslation">Encrypted API key export saved successfully.</string>
+    <string name="secure_backup_import_success" tools:ignore="MissingTranslation">Encrypted API key import completed.</string>
+    <string name="secure_backup_error" tools:ignore="MissingTranslation">The encrypted backup could not be read, unlocked, or saved.</string>
     <string name="settings_check_updates">Check for updates</string>
     <string name="settings_made_by">Made with love by JCVERSA, based on SwiftSlate by Musheer Alam</string>
     <string name="settings_sponsor">Sponsor on GitHub</string>

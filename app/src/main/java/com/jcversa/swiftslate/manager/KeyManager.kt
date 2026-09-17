@@ -220,6 +220,42 @@ class KeyManager internal constructor(
         }
     }
 
+    /**
+     * Replaces every provider namespace in one durable edit. Secure imports prepare and encrypt
+     * every provider before this method is called, so a failed Keystore operation cannot leave a
+     * half-imported set of keys.
+     */
+    @Synchronized
+    fun replaceAllKeys(keysByProvider: Map<String, List<String>>): Boolean {
+        if (keysByProvider.keys.any { it !in ProviderType.ALL }) return false
+        if (keysByProvider.keys != ProviderType.ALL.toSet()) return false
+        if (keysByProvider.values.any { values ->
+                values.size > 100 || values.distinct().size != values.size ||
+                    values.any { it.isBlank() || it.length > MAX_KEY_LENGTH }
+            }) return false
+
+        return try {
+            val encrypted = keysByProvider.mapValues { (_, keys) ->
+                cipher.encrypt(JSONArray(keys).toString())
+            }
+            val editor = prefs.edit()
+            encrypted.forEach { (provider, value) ->
+                editor.putString(storageKey(provider), value)
+            }
+            editor.remove(LEGACY_PREF_KEY_ARRAY)
+            if (!editor.commit()) {
+                invalidateCache()
+                false
+            } else {
+                invalidateCache()
+                true
+            }
+        } catch (_: Exception) {
+            invalidateCache()
+            false
+        }
+    }
+
     @Synchronized
     fun addKey(key: String, providerType: String = ProviderType.GEMINI): Boolean {
         if (key.isBlank() || key.length > MAX_KEY_LENGTH) return false
