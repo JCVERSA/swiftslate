@@ -37,6 +37,8 @@ class ApiKeyBackupManager(
         private const val KDF = "PBKDF2"
         private const val PRF_SHA256 = "HmacSHA256"
         private const val PRF_SHA1 = "HmacSHA1"
+        private const val PBKDF2_SHA256 = "PBKDF2WithHmacSHA256"
+        private const val PBKDF2_SHA1 = "PBKDF2WithHmacSHA1"
         private const val CIPHER = "AES-256-GCM"
         private const val ITERATIONS_SHA256 = 210_000
         private const val ITERATIONS_SHA1 = 310_000
@@ -220,15 +222,16 @@ class ApiKeyBackupManager(
         requestedIterations: Int? = null
     ): DerivedKey {
         val prf = requestedPrf ?: try {
-            SecretKeyFactory.getInstance(PRF_SHA256)
+            SecretKeyFactory.getInstance(PBKDF2_SHA256)
             PRF_SHA256
         } catch (_: Exception) {
             PRF_SHA1
         }
         val iterations = requestedIterations ?: if (prf == PRF_SHA256) ITERATIONS_SHA256 else ITERATIONS_SHA1
+        val factoryAlgorithm = if (prf == PRF_SHA256) PBKDF2_SHA256 else PBKDF2_SHA1
         val spec = PBEKeySpec(passphrase.toString().toCharArray(), salt, iterations, KEY_BITS)
         return try {
-            val factory = SecretKeyFactory.getInstance(prf)
+            val factory = SecretKeyFactory.getInstance(factoryAlgorithm)
             val bytes = factory.generateSecret(spec).encoded
             DerivedKey(SecretKeySpec(bytes, "AES"), prf, iterations)
         } finally {
