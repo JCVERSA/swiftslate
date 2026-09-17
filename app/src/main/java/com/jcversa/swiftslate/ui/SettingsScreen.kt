@@ -485,24 +485,23 @@ fun SettingsScreen(
     ) { uri ->
         val passphrase = pendingExportPassphrase
         pendingExportPassphrase = null
-        if (uri == null || passphrase == null) {
-            return@rememberLauncherForActivityResult
-        }
-        scope.launch {
-            try {
-                withContext(Dispatchers.IO) {
-                    val encrypted = apiKeyBackupManager.export(passphrase)
-                    context.contentResolver.openOutputStream(uri)?.use { output ->
-                        output.write(encrypted.toByteArray(Charsets.UTF_8))
-                    } ?: error("Unable to open export destination")
+        if (uri != null && passphrase != null) {
+            scope.launch {
+                try {
+                    withContext(Dispatchers.IO) {
+                        val encrypted = apiKeyBackupManager.export(passphrase)
+                        context.contentResolver.openOutputStream(uri)?.use { output ->
+                            output.write(encrypted.toByteArray(Charsets.UTF_8))
+                        } ?: error("Unable to open export destination")
+                    }
+                    secureBackupMessage = secureExportSuccessMsg
+                    secureBackupSuccess = true
+                } catch (_: Exception) {
+                    secureBackupMessage = secureBackupErrorMsg
+                    secureBackupSuccess = false
+                } finally {
+                    passphrase.toCharArray().fill('\u0000')
                 }
-                secureBackupMessage = secureExportSuccessMsg
-                secureBackupSuccess = true
-            } catch (_: Exception) {
-                secureBackupMessage = secureBackupErrorMsg
-                secureBackupSuccess = false
-            } finally {
-                passphrase.toCharArray().fill('\u0000')
             }
         }
     }
@@ -510,22 +509,23 @@ fun SettingsScreen(
     val secureImportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            try {
-                val encrypted = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
-                        val text = reader.readText()
-                        if (text.toByteArray(Charsets.UTF_8).size > 1_000_000) null else text
-                    } ?: ""
+        if (uri != null) {
+            scope.launch {
+                try {
+                    val encrypted = withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
+                            val text = reader.readText()
+                            if (text.toByteArray(Charsets.UTF_8).size > 1_000_000) null else text
+                        } ?: ""
+                    }
+                    if (encrypted.isBlank()) error("Empty backup")
+                    pendingImportFile = encrypted
+                    securePassphrase = ""
+                    secureBackupAction = SecureBackupAction.IMPORT
+                } catch (_: Exception) {
+                    secureBackupMessage = secureBackupErrorMsg
+                    secureBackupSuccess = false
                 }
-                if (encrypted.isBlank()) error("Empty backup")
-                pendingImportFile = encrypted
-                securePassphrase = ""
-                secureBackupAction = SecureBackupAction.IMPORT
-            } catch (_: Exception) {
-                secureBackupMessage = secureBackupErrorMsg
-                secureBackupSuccess = false
             }
         }
     }
@@ -1858,9 +1858,7 @@ fun SettingsScreen(
                 TextButton(onClick = {
                     if (!ApiKeyBackupManager.isPassphraseAcceptable(securePassphrase)) {
                         secureBackupMessage = securePassphraseShortMsg
-                        return@TextButton
-                    }
-                    if (secureBackupAction == SecureBackupAction.EXPORT) {
+                    } else if (secureBackupAction == SecureBackupAction.EXPORT) {
                         pendingExportPassphrase = securePassphrase
                         securePassphrase = ""
                         secureBackupAction = null

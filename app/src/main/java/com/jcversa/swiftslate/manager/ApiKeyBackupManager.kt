@@ -191,7 +191,8 @@ class ApiKeyBackupManager(
         val keyMap = data.keysByProvider
         if (keyMap.keys.any { it !in supportedProviders }) return false
         if (data.activeProvider !in supportedProviders) return false
-        return keyManager.replaceAllKeys(keyMap) && try {
+        if (!keyManager.replaceAllKeys(keyMap)) return false
+        return try {
             val editor = settings.edit()
             editor.putString(PrefKeys.PROVIDER_TYPE, data.activeProvider)
             data.modelsByProvider.forEach { (provider, model) ->
