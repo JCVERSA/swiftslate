@@ -15,10 +15,7 @@ val versionMetadata = java.util.Properties().apply {
 // the checked-in metadata (or an explicit -P override in CI), so a release can never accidentally
 // ship the development suffix used by local builds.
 val releaseTaskRequested = gradle.startParameter.taskNames.any { taskName ->
-    when (taskName.substringAfterLast(':')) {
-        "assembleRelease", "bundleRelease", "lintRelease" -> true
-        else -> false
-    }
+    taskName.substringAfterLast(':').contains("Release", ignoreCase = true)
 }
 val versionCode = (project.findProperty("versionCode") as? String)?.toIntOrNull()
     ?: versionMetadata.getProperty("versionCode")?.toIntOrNull()
