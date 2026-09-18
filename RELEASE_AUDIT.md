@@ -1,8 +1,8 @@
 # SwiftSlate release audit
 
 **Audit scope:** branch `arena/01a09365-swiftslate`, implementation commit `61a14ca`, and
-release-readiness changes in `49d2802`, `d672d86`, `9be16a0`, `0d37bda`, `0a6ca98`,
-`b6f6978`, and `ea994a7`.
+release-readiness changes in `49d2802`, `d672d86`, `9be16a0`, `0d37bda`, `0a6ca98`, and
+`b6f6978`.
 
 **Decision: HOLD. No release was published.** A final stable APK has not yet been built and
 installed in this sandbox because Java/Android SDK tooling and the production signing keystore
@@ -31,12 +31,9 @@ until the remaining operational checks below are complete.
 1. Keep the `release` environment secrets configured, preserve an offline backup of the production
    keystore, and require maintainer approval. Environment-secret values cannot be read back by the
    audit agent, so verify the four names manually against `RELEASE.md`.
-2. Run `Stable APK dry run` manually from the Actions page on `arena/01a09365-swiftslate`,
-   download its signed dry-run artifact, and complete the real-device installation and upgrade
-   checks. This workflow uploads an artifact only and cannot create a GitHub Release.
-3. Merge pull request #4 only after review. Its current code checks are successful; do not use the
-   Preview artifact as a stable release.
-4. After the reviewed changes are on `main`, update `version.properties` and its matching changelog,
+2. Merge pull request #4 after review. Its current head is `b6f6978`; the Build APK, Lint, and Unit
+   Tests checks are successful. Do not use the Preview artifact as a stable release.
+3. After the reviewed changes are on `main`, update `version.properties` and its matching changelog,
    create an annotated `v1.0.0` tag, and let the tag workflow run.
 4. Inspect the workflow's stable artifact and `SHA256SUMS.txt`, then install the exact signed APK
    over the previous stable installation on a real API 23 device and a current API 36 device.
