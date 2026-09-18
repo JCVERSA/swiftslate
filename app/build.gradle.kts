@@ -1,10 +1,13 @@
+import java.io.File
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
 val baseVersion = "1.0"
-val versionMetadata = java.util.Properties().apply {
+val versionMetadata = Properties().apply {
     val versionFile = rootProject.file("version.properties")
     if (versionFile.isFile) {
         versionFile.inputStream().use { load(it) }
@@ -42,7 +45,7 @@ if (releaseTaskRequested) {
     require(releaseSigningConfigured) {
         "assembleRelease requires KEYSTORE_FILE, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD"
     }
-    require(java.io.File(keystorePath!!).isFile) {
+    require(File(keystorePath!!).isFile) {
         "KEYSTORE_FILE does not point to a readable release keystore"
     }
 }
