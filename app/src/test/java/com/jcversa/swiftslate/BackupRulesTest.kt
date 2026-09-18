@@ -16,7 +16,7 @@ class BackupRulesTest {
     @Test
     fun backupPoliciesExcludeKeysConfigurationStatsAndOptInHistory() {
         listOf("backup_rules.xml", "data_extraction_rules.xml").forEach { name ->
-            val document = secureParser().parse(locateResource(name))
+            val document = secureParser().newDocumentBuilder().parse(locateResource(name))
             val excludes = document.getElementsByTagName("exclude")
             val paths = (0 until excludes.length).mapNotNull { index ->
                 (excludes.item(index) as? Element)?.let { element ->
