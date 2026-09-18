@@ -16,17 +16,17 @@ The desktop port is based on the existing [SwiftSlate Desktop project](https://g
 
 ## Install
 
-Run this in a normal, non-administrator PowerShell window:
+Run the installer from a clean local checkout in a normal, non-administrator PowerShell window:
 
 ```powershell
-irm https://raw.githubusercontent.com/JCVERSA/swiftslate/main/desktop/install.ps1 | iex
+powershell -ExecutionPolicy Bypass -File "C:\Users\user\Documents\swiftslate-arena-01a09365-swiftslate\swiftslate-arena-01a09365-swiftslate\desktop\install.ps1"
 ```
+
+The installer prefers the files beside itself, which works for private repositories where anonymous raw GitHub URLs return `404`. It falls back to the public GitHub Raw source when local files are not available.
 
 The installer targets Windows x64, downloads an embedded Python runtime when necessary, installs the application under `%USERPROFILE%\.swiftslate`, and can create a per-user startup shortcut. It does not require Python to be installed system-wide.
 
-The installer is intentionally pinned with SHA-256 checksums for the application files and embedded runtime. It uses the GitHub Raw source first and jsDelivr only as a fallback.
-
-To update, run the same command again. To uninstall, run it again and follow the prompt.
+The installer is intentionally pinned with SHA-256 checksums for the application files and embedded runtime. To update, run the same command again. To uninstall, run it again and follow the prompt.
 
 ## Local styles
 

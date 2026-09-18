@@ -14,6 +14,9 @@ $shortcutPath = Join-Path $startupDir "SwiftSlate Desktop.lnk"
 # jsDelivr is the fallback: fast, but can lag a push by up to ~12 hours.
 $repoRaw = "https://raw.githubusercontent.com/JCVERSA/swiftslate/main/desktop"
 $repoCdn = "https://cdn.jsdelivr.net/gh/JCVERSA/swiftslate@main/desktop"
+# When launched from a checkout, prefer files beside this script. This also
+# works for private repositories where anonymous raw GitHub URLs return 404.
+$localSource = if ($PSScriptRoot) { $PSScriptRoot } else { "" }
 $pythonVersion = "3.13.15"
 $pythonZipUrl = "https://www.python.org/ftp/python/$pythonVersion/python-$pythonVersion-embed-amd64.zip"
 # "3.13.15" -> "313" for python313.dll / python313.zip (major.minor only)
@@ -43,9 +46,24 @@ try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 }
 
-# --- Download a file (GitHub raw first, jsDelivr fallback), verifying its SHA-256 ---
+# --- Get a file from the local checkout or remote sources, verifying SHA-256 ---
 function Get-File {
     param([string]$Name, [string]$OutFile)
+
+    if ($localSource) {
+        $localPath = Join-Path $localSource $Name
+        if (Test-Path -LiteralPath $localPath) {
+            Copy-Item -LiteralPath $localPath -Destination $OutFile -Force
+            $actual = (Get-FileHash -Path $OutFile -Algorithm SHA256).Hash
+            if ($actual -ieq $hashes[$Name]) {
+                Write-Host "  Using local $Name" -ForegroundColor DarkGray
+                return
+            }
+            Remove-Item $OutFile -Force -EA SilentlyContinue
+            throw "Local $Name failed its integrity check. Do not run this installer from a modified checkout."
+        }
+    }
+
     $urls = @("$repoRaw/$Name", "$repoCdn/$Name")
     foreach ($url in $urls) {
         try {
@@ -58,7 +76,7 @@ function Get-File {
         }
         Remove-Item $OutFile -Force -EA SilentlyContinue
     }
-    throw "Could not download $Name from any source (network failure or failed integrity check). Check your internet connection, proxy/VPN, or antivirus, then run this command again. If the message above says BAD HASH, the CDN is mid-update - wait a minute and re-run."
+    throw "Could not obtain $Name from the local checkout or a remote source. Check the repository files, network connection, proxy/VPN, or antivirus, then run this command again."
 }
 
 # --- Stop running SwiftSlate instances and wait for them to exit ---
