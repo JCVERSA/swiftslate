@@ -90,7 +90,7 @@ jobs:
           test -n "$KEY_ALIAS"
           test -n "$KEY_PASSWORD"
 
-          ./gradlew :app:signingReport lintRelease test :app:assembleRelease \
+          ./gradlew lintRelease test :app:assembleRelease \
             --parallel \
             --no-build-cache \
             --no-configuration-cache \
