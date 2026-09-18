@@ -1,7 +1,7 @@
 # SwiftSlate release audit
 
 **Audit scope:** branch `arena/01a09365-swiftslate`, implementation commit `61a14ca`, and
-release-readiness changes in `49d2802`.
+release-readiness changes in `49d2802`, `d672d86`, and `9be16a0`.
 
 **Decision: HOLD. No release was published.** A final stable APK has not yet been built and
 installed in this sandbox because Java/Android SDK tooling and the production signing keystore
