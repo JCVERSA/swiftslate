@@ -100,7 +100,7 @@ android {
         // do not need this configuration.
         if (releaseSigningConfigured) {
             create("release") {
-                this.storeFile = file(keystorePath!!)
+                this.storeFile = File(keystorePath!!)
                 this.storePassword = keystorePassword
                 this.keyAlias = keyAlias
                 this.keyPassword = keyPassword
@@ -114,7 +114,11 @@ android {
             isShrinkResources = true
             // The configuration check above makes an assembleRelease without the protected
             // signing inputs fail before this variant can produce an unsigned artifact.
-            signingConfig = signingConfigs.findByName("release")
+            signingConfig = if (releaseSigningConfigured) {
+                signingConfigs.getByName("release")
+            } else {
+                null
+            }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         // Installable side by side with a stable release: a different applicationId means
