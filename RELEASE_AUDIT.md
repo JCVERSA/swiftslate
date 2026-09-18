@@ -1,7 +1,8 @@
 # SwiftSlate release audit
 
 **Audit scope:** branch `arena/01a09365-swiftslate`, implementation commit `61a14ca`, and
-release-readiness changes in `49d2802`, `d672d86`, and `9be16a0`.
+release-readiness changes in `49d2802`, `d672d86`, `9be16a0`, `0d37bda`, `0a6ca98`, and
+`b6f6978`.
 
 **Decision: HOLD. No release was published.** A final stable APK has not yet been built and
 installed in this sandbox because Java/Android SDK tooling and the production signing keystore
@@ -27,13 +28,13 @@ until the remaining operational checks below are complete.
 
 ## Remaining release gates
 
-1. Push `49d2802` and the workflow files to the fixed branch after granting the GitHub connection
-   workflow-write permission. The attempted push was rejected because the current GitHub App cannot
-   create or update `.github/workflows/release.yml`; no remote files were changed.
-2. Configure the protected GitHub `release` environment secrets listed in `RELEASE.md`, preserve an
-   offline backup of the production keystore, and require maintainer approval.
-3. Merge the reviewed changes to `main`, update `version.properties` and its matching changelog,
-   create an annotated `v1.0.0` tag, and let the tag workflow run. Do not use the Preview artifact.
+1. Keep the `release` environment secrets configured, preserve an offline backup of the production
+   keystore, and require maintainer approval. Environment-secret values cannot be read back by the
+   audit agent, so verify the four names manually against `RELEASE.md`.
+2. Merge pull request #4 after review. Its current head is `b6f6978`; the Build APK, Lint, and Unit
+   Tests checks are successful. Do not use the Preview artifact as a stable release.
+3. After the reviewed changes are on `main`, update `version.properties` and its matching changelog,
+   create an annotated `v1.0.0` tag, and let the tag workflow run.
 4. Inspect the workflow's stable artifact and `SHA256SUMS.txt`, then install the exact signed APK
    over the previous stable installation on a real API 23 device and a current API 36 device.
 5. Complete the manual matrix: accessibility and selection-menu styles, offline styles, accents and
@@ -43,7 +44,6 @@ until the remaining operational checks below are complete.
 6. Record the final APK package ID, versionName, versionCode, signing certificate digest, SHA-256,
    test results, lint report, and install/upgrade result in the release record before publishing.
 
-The last successful remote checks available during this audit were the pre-remediation commit
-`61a14ca`: Verify and Build APK runs `35286408726` and `35286408725`. They validate the then-current
-Preview build, lint, and unit tests, but they are **not** evidence of a signed stable APK for
-`49d2802`.
+The corrected remote checks for `b6f6978` are Build APK run `35293627978` and Verify run
+`35293627948`, both successful. They validate the Preview build, lint, and unit tests, but they are
+**not** evidence of a signed stable APK until the tag workflow completes.
