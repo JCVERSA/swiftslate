@@ -25,6 +25,25 @@ class CommandManagerTest {
         commandManager = CommandManager(context)
     }
 
+    @Test
+    fun corruptedMigrationPreferences_doNotPreventConstruction() {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        context.getSharedPreferences("commands", 0).edit()
+            .putInt("aliases_reset_v1", 1)
+            .putInt("custom_commands", 2)
+            .commit()
+
+        val repaired = CommandManager(context)
+
+        assertNotNull(repaired.getCommands())
+        val repairedJson = context.getSharedPreferences("commands", 0)
+            .getString("custom_commands", null)
+        assertNotNull(repairedJson)
+        // getCommands may seed the built-in editable AI commands after repairing the
+        // corrupted preference; the invariant is that the value is valid JSON, not empty.
+        JSONArray(repairedJson)
+    }
+
     // --- findCommand ---
 
     @Test
@@ -90,9 +109,9 @@ class CommandManagerTest {
     // --- getCommands ---
 
     @Test
-    fun getCommands_returnsFifteenBuiltInByDefault() {
+    fun getCommands_returnsTwentyTwoCommandsByDefault() {
         val commands = commandManager.getCommands()
-        assertEquals(15, commands.size)
+        assertEquals(22, commands.size)
     }
 
     @Test
@@ -114,10 +133,36 @@ class CommandManagerTest {
     }
 
     @Test
+    fun getCommands_styleCommandsAreBuiltInLocalCommands() {
+        val commands = commandManager.getCommands()
+        val styleTriggers = listOf("?bold", "?italic", "?mono", "?bubble", "?gothic", "?smallcaps", "?normal")
+        val styleCommands = commands.filter { it.trigger in styleTriggers }
+        assertEquals(7, styleCommands.size)
+        assertTrue(styleCommands.all {
+            it.isBuiltIn && it.type == CommandType.TEXT_REPLACER && TextStyleTransformer.isStyleCommand(it)
+        })
+    }
+
+    @Test
+    fun findCommand_styleTriggerReturnsLocalStyleCommand() {
+        val result = commandManager.findCommand("hello?bold")
+        assertNotNull(result)
+        assertEquals("?bold", result!!.trigger)
+        assertEquals(CommandType.TEXT_REPLACER, result.type)
+        assertTrue(TextStyleTransformer.isStyleCommand(result))
+    }
+
+    @Test
+    fun saveCustomCommand_rejectsCollisionWithStyleCommand() {
+        assertFalse(commandManager.saveCustomCommand(Command("?bold", "replace with something else")))
+        assertFalse(commandManager.saveCustomCommand(Command("?boldface", "shadow style command")))
+    }
+
+    @Test
     fun getCommands_afterAddingCustom_includesIt() {
         commandManager.saveCustomCommand(Command("?myCmd", "do something"))
         val commands = commandManager.getCommands()
-        assertEquals(16, commands.size)
+        assertEquals(23, commands.size)
         assertTrue(commands.any { it.trigger == "?myCmd" })
     }
 
@@ -136,6 +181,28 @@ class CommandManagerTest {
         val result = commandManager.findCommand("hi?greet")
         assertNotNull(result)
         assertEquals("?greet", result!!.trigger)
+    }
+
+    @Test
+    fun saveCustomCommand_aliasIsPersistedAndFindable() {
+        assertTrue(commandManager.saveCustomCommand(
+            Command("?greet", "Say hello", aliases = listOf("?hello", "?salut"))
+        ))
+        val result = commandManager.findCommand("hi?hello")
+        assertNotNull(result)
+        assertEquals("?greet", result!!.trigger)
+        assertEquals(listOf("?hello", "?salut"), result.aliases)
+    }
+
+    @Test
+    fun findCommandMatch_aliasReportsTheMatchedAlias() {
+        assertTrue(commandManager.saveCustomCommand(
+            Command("?greet", "Say hello", aliases = listOf("?hello"))
+        ))
+        val match = commandManager.findCommandMatch("hi?hello")
+        assertNotNull(match)
+        assertEquals("?greet", match!!.command.trigger)
+        assertEquals("?hello", match.matchedTrigger)
     }
 
     @Test
@@ -197,6 +264,15 @@ class CommandManagerTest {
         val commands = commandManager.getCommands()
         assertTrue(commands.any { it.trigger == "!myCmd" })
         assertFalse(commands.any { it.trigger == "?myCmd" })
+    }
+
+    @Test
+    fun setTriggerPrefix_migratesAliasesToo() {
+        commandManager.saveCustomCommand(Command("?myCmd", "do something", aliases = listOf("?alias")))
+        commandManager.setTriggerPrefix("!")
+        val command = commandManager.getCommands().first { it.trigger == "!myCmd" }
+        assertEquals(listOf("!alias"), command.aliases)
+        assertEquals("!myCmd", commandManager.findCommand("text!alias")!!.trigger)
     }
 
 
@@ -276,7 +352,8 @@ class CommandManagerTest {
     fun importCommands_keepsOnlyUpToTheMaximum() {
         val arr = JSONArray()
         for (i in 0 until (CommandManager.MAX_CUSTOM_COMMANDS + 5)) {
-            arr.put(JSONObject().put("trigger", "?c$i").put("prompt", "p").put("type", "AI"))
+            val name = i.toString().padStart(3, '0')
+            arr.put(JSONObject().put("trigger", "?c$name").put("prompt", "p").put("type", "AI"))
         }
         assertTrue(commandManager.importCommands(arr.toString()))
         val stored = JSONArray(commandManager.exportCommands())
@@ -343,6 +420,32 @@ class CommandManagerTest {
         assertTrue(commandManager.saveCustomCommand(Command("?keep", "original")))
         assertFalse(commandManager.saveCustomCommand(Command("bad", "x"), replacing = "?keep"))
         assertEquals("original", commandManager.findCommand("y ?keep")!!.prompt)
+    }
+
+    @Test
+    fun saveCustomCommand_rejectsCollisionWithBuiltInOrExistingAlias() {
+        assertFalse(commandManager.saveCustomCommand(Command("?copycat", "shadow built-in")))
+        assertTrue(commandManager.saveCustomCommand(Command("?greet", "say hello", aliases = listOf("?hello"))))
+        assertFalse(commandManager.saveCustomCommand(Command("?other", "conflicting", aliases = listOf("?helloworld"))))
+        assertFalse(commandManager.saveCustomCommand(Command("?helloagain", "conflicting")))
+    }
+
+    @Test
+    fun saveCustomCommand_rejectsDynamicTranslateCollision() {
+        assertFalse(commandManager.saveCustomCommand(Command("?translate", "shadow translation")))
+        assertFalse(commandManager.saveCustomCommand(Command("?translate:es", "shadow translation")))
+    }
+
+    @Test
+    fun importCommands_dropsGlobalCollisions() {
+        val json = JSONArray()
+            .put(JSONObject().put("trigger", "?first").put("prompt", "one").put("aliases", JSONArray().put("?shared")))
+            .put(JSONObject().put("trigger", "?shared").put("prompt", "two"))
+            .put(JSONObject().put("trigger", "?copycat").put("prompt", "three"))
+        assertTrue(commandManager.importCommands(json.toString()))
+        val stored = JSONArray(commandManager.exportCommands())
+        assertEquals(1, stored.length())
+        assertEquals("?first", stored.getJSONObject(0).getString("trigger"))
     }
 
     // --- cache invalidation (the prefix is part of the cache key) ---

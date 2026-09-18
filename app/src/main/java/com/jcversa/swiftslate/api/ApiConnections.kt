@@ -11,8 +11,8 @@ import java.net.URL
  * cleartext globally and the http://-only-for-private-LAN rule lives in [EndpointValidator].
  * Every client previously had to remember to call that validator itself; this object makes the
  * check unavoidable by performing it inside the `openConnection()` call every request path
- * already funnels through. The pure `check*` functions hold the policy so it stays
- * JVM-unit-testable without opening sockets.
+ * already funnels through. Automatic redirects are disabled: following a Location response
+ * inside HttpURLConnection could forward a provider key to another host or downgrade HTTPS.
  */
 internal object ApiConnections {
 
@@ -22,7 +22,7 @@ internal object ApiConnections {
      * @throws IllegalArgumentException when [urlString] is not an https URL with a host.
      */
     fun openHttps(urlString: String): HttpURLConnection =
-        URL(checkHttps(urlString)).openConnection() as HttpURLConnection
+        openWithoutRedirects(checkHttps(urlString))
 
     /**
      * Opens [urlString], requiring [EndpointValidator] acceptance (`https://` anywhere,
@@ -30,7 +30,14 @@ internal object ApiConnections {
      * @throws IllegalArgumentException when [urlString] fails validation.
      */
     fun openProviderUrl(urlString: String): HttpURLConnection =
-        URL(checkProviderUrl(urlString)).openConnection() as HttpURLConnection
+        openWithoutRedirects(checkProviderUrl(urlString))
+
+    private fun openWithoutRedirects(urlString: String): HttpURLConnection {
+        val connection = URL(urlString).openConnection()
+        require(connection is HttpURLConnection) { "HTTP connection required" }
+        connection.instanceFollowRedirects = false
+        return connection
+    }
 
     /**
      * Pure policy behind [openHttps]: returns [urlString] with a normalized scheme, or

@@ -18,6 +18,8 @@ class GeminiClient {
         // The listing paginates; pageSize caps at 1000. Three pages is far beyond any
         // realistic catalog — a bound so a hostile/broken nextPageToken loop cannot spin.
         private const val MAX_LIST_PAGES = 3
+        private const val MAX_CATALOG_MODELS = 1_000
+        private const val MAX_MODEL_ID_CHARS = 256
 
         /**
          * Extracts chat-capable model ids from a v1beta/models response page. An entry
@@ -44,7 +46,12 @@ class GeminiClient {
                     }
                     obj.optString("name").trim()
                         .takeIf { it.isNotBlank() }
-                        ?.let { out.add(it.removePrefix("models/")) }
+                        ?.let {
+                            val id = it.removePrefix("models/")
+                            if (id.length <= MAX_MODEL_ID_CHARS && out.size < MAX_CATALOG_MODELS) {
+                                out.add(id)
+                            }
+                        }
                 }
                 out.toList()
             } catch (_: Exception) {
@@ -239,6 +246,7 @@ class GeminiClient {
 
                 put("generationConfig", JSONObject().apply {
                     put("temperature", temperature)
+                    put("maxOutputTokens", ApiClientUtils.suggestedMaxOutputTokens(text))
                     // Spec-driven thinking control (mirrors Groq reasoning params).
                     // "minimal" keeps latency low; null => send no thinkingConfig.
                     if (thinkingLevel != null) {

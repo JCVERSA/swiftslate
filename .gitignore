@@ -25,3 +25,13 @@ local.properties
 app/build
 app/release
 release.keystore
+
+# SwiftSlate Desktop local runtime and user data
+desktop/.lock
+desktop/debug.log
+desktop/config.json
+desktop/runtime/
+desktop/runtime.new/
+desktop/*.tmp
+**/__pycache__/
+*.py[cod]

@@ -1,9 +1,54 @@
+import java.io.File
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
 val baseVersion = "1.0"
+val versionMetadata = Properties().apply {
+    val versionFile = rootProject.file("version.properties")
+    if (versionFile.isFile) {
+        versionFile.inputStream().use { load(it) }
+    }
+}
+
+// Debug and preview builds remain explicitly identifiable. A stable build gets its version from
+// the checked-in metadata (or an explicit -P override in CI), so a release can never accidentally
+// ship the development suffix used by local builds.
+val releaseTaskRequested = gradle.startParameter.taskNames.any { taskName ->
+    taskName.substringAfterLast(':').contains("Release", ignoreCase = true)
+}
+val versionCode = (project.findProperty("versionCode") as? String)?.toIntOrNull()
+    ?: versionMetadata.getProperty("versionCode")?.toIntOrNull()
+    ?: 1
+val releaseVersionName = versionMetadata.getProperty("versionName")?.trim().orEmpty()
+val versionName = (project.findProperty("versionName") as? String)?.trim()
+    ?.takeIf { it.isNotEmpty() }
+    ?: if (releaseTaskRequested) releaseVersionName else "$baseVersion-dev"
+
+require(versionCode > 0) { "versionCode must be a positive integer" }
+if (releaseTaskRequested) {
+    require(Regex("\\d+\\.\\d+(?:\\.\\d+)?").matches(versionName)) {
+        "A stable release requires a semantic versionName such as 1.0.0, got '$versionName'"
+    }
+}
+
+val keystorePath = System.getenv("KEYSTORE_FILE")
+val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
+val keyAlias = System.getenv("KEY_ALIAS")
+val keyPassword = System.getenv("KEY_PASSWORD")
+val releaseSigningConfigured = listOf(keystorePath, keystorePassword, keyAlias, keyPassword)
+    .all { !it.isNullOrBlank() }
+if (releaseTaskRequested) {
+    require(releaseSigningConfigured) {
+        "assembleRelease requires KEYSTORE_FILE, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD"
+    }
+    require(File(keystorePath!!).isFile) {
+        "KEYSTORE_FILE does not point to a readable release keystore"
+    }
+}
 
 android {
     namespace = "com.jcversa.swiftslate"
@@ -13,8 +58,8 @@ android {
         applicationId = "com.jcversa.swiftslate"
         minSdk = 23
         targetSdk = 36
-        versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
-        versionName = (project.findProperty("versionName") as String?) ?: "$baseVersion-dev"
+        this.versionCode = versionCode
+        this.versionName = versionName
 
         // Ship exactly the locales that exist in res/, and nothing else.
         //
@@ -50,16 +95,15 @@ android {
     }
 
     signingConfigs {
-        val ksFile = System.getenv("KEYSTORE_FILE")
-        val ksPassword = System.getenv("KEYSTORE_PASSWORD")
-        val ksAlias = System.getenv("KEY_ALIAS")
-        val ksKeyPassword = System.getenv("KEY_PASSWORD")
-        if (ksFile != null && ksPassword != null && ksAlias != null && ksKeyPassword != null) {
+        // Secrets are supplied by the maintainer's environment or the protected release job,
+        // never committed to the repository. Preview builds deliberately use the debug key and
+        // do not need this configuration.
+        if (releaseSigningConfigured) {
             create("release") {
-                storeFile = file(ksFile)
-                storePassword = ksPassword
-                keyAlias = ksAlias
-                keyPassword = ksKeyPassword
+                this.storeFile = file(keystorePath!!)
+                this.storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
             }
         }
     }
@@ -68,6 +112,8 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            // The configuration check above makes an assembleRelease without the protected
+            // signing inputs fail before this variant can produce an unsigned artifact.
             signingConfig = signingConfigs.findByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
@@ -76,8 +122,7 @@ android {
         // installed stable build, its API keys, its commands or its accessibility setting.
         //
         // Shrunk and non-debuggable like release (a debuggable accessibility service is not
-        // something to hand out), but signed with the local debug key so pull requests from
-        // forks can build it without access to the release signing secrets.
+        // something to hand out), but signed with the local debug key, so no signing setup is needed to build it.
         //
         // The label and icon are overridden in src/preview/res so the two are told apart on
         // the launcher and in Settings > Accessibility.

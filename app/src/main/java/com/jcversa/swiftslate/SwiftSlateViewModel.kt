@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.lifecycle.AndroidViewModel
 import com.jcversa.swiftslate.manager.CommandManager
+import com.jcversa.swiftslate.manager.HistoryManager
 import com.jcversa.swiftslate.manager.StatsManager
 
 class SwiftSlateViewModel(application: Application) : AndroidViewModel(application) {
@@ -12,4 +13,5 @@ class SwiftSlateViewModel(application: Application) : AndroidViewModel(applicati
     val keyManager = (application as SwiftSlateApp).keyManager
     val commandManager = CommandManager(application)
     val statsManager = StatsManager(application)
+    val historyManager = HistoryManager(application)
 }

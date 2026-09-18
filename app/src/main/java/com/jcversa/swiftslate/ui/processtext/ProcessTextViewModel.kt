@@ -9,8 +9,11 @@ import com.jcversa.swiftslate.SwiftSlateApp
 import com.jcversa.swiftslate.api.GeminiClient
 import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.CommandManager
+import com.jcversa.swiftslate.manager.HistoryManager
 import com.jcversa.swiftslate.manager.StatsManager
+import com.jcversa.swiftslate.manager.TextStyleTransformer
 import com.jcversa.swiftslate.model.Command
+import com.jcversa.swiftslate.model.PrefKeys
 import com.jcversa.swiftslate.model.CommandType
 import com.jcversa.swiftslate.service.CommandOutcome
 import com.jcversa.swiftslate.service.runTextCommand
@@ -33,7 +36,11 @@ sealed interface UiState {
     data object Initializing : UiState
     data class CommandList(val commands: List<Command>) : UiState
     data class Loading(val command: Command) : UiState
-    data class Preview(val result: String, val canInsert: Boolean) : UiState
+    data class Preview(
+        val result: String,
+        val canInsert: Boolean,
+        val animateReplacement: Boolean
+    ) : UiState
     /** [retry] is null for failures that re-running cannot fix (e.g. nothing configured). */
     data class Error(val message: String, val retry: Command? = null) : UiState
 }
@@ -60,6 +67,7 @@ class ProcessTextViewModel(
     private val keyManager by lazy { (app as SwiftSlateApp).keyManager }
     private val commandManager by lazy { CommandManager(app) }
     private val statsManager by lazy { StatsManager(app) }
+    private val historyManager by lazy { HistoryManager(app) }
     private val geminiClient by lazy { GeminiClient() }
     private val openAIClient by lazy { OpenAICompatibleClient() }
 
@@ -81,11 +89,14 @@ class ProcessTextViewModel(
             // Dispatchers.Main.immediate — never touch it on the main thread.
             commands = try {
                 withContext(Dispatchers.IO) {
-                    // Built-ins are the clipboard/undo commands, which need the live field the
-                    // accessibility service has and this flow does not. Filtered on isBuiltIn, not
-                    // on trigger text: the prefix is user-configurable, so matching "?copy" would
-                    // silently stop filtering the moment someone changed it.
-                    commandManager.getCommands().filterNot { it.isBuiltIn }
+                    // Clipboard/undo built-ins need the live field the accessibility service has
+                    // and this flow does not. Local text-style built-ins are the exception: they
+                    // transform the selection in this activity without a network request.
+                    // Filter by command metadata, not trigger text, because the prefix is user-
+                    // configurable.
+                    commandManager.getCommands().filterNot {
+                        it.isBuiltIn && !TextStyleTransformer.isStyleCommand(it)
+                    }
                 }
             } catch (e: Exception) {
                 // This activity shares the process with the accessibility service — an
@@ -101,13 +112,31 @@ class ProcessTextViewModel(
     fun run(command: Command) {
         if (!inFlight.compareAndSet(false, true)) return
 
-        // A snippet needs no request at all — resolve it without touching the network.
+        // Local commands need no request at all — resolve them without touching the network.
         if (command.type == CommandType.TEXT_REPLACER) {
+            val result = TextStyleTransformer.styleFor(command)?.let { style ->
+                TextStyleTransformer.transform(style, selection.text)
+            } ?: command.prompt
             inFlight.set(false)
-            _uiState.value = UiState.Preview(command.prompt, canInsert = !selection.readOnly)
+            _uiState.value = UiState.Preview(
+                result = result,
+                canInsert = !selection.readOnly,
+                animateReplacement = false
+            )
             viewModelScope.launch {
-                try { withContext(Dispatchers.IO) { statsManager.recordUsage(command.trigger) } }
-                catch (e: Exception) { Log.w(TAG, "recording usage failed", e) }
+                try {
+                    withContext(Dispatchers.IO) {
+                        statsManager.recordUsage(command.trigger)
+                        historyManager.record(
+                            command.trigger,
+                            selection.text,
+                            result,
+                            currentProviderForHistory()
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "recording usage failed", e)
+                }
             }
             return
         }
@@ -127,9 +156,24 @@ class ProcessTextViewModel(
                 }
                 when (outcome) {
                     is CommandOutcome.Success -> {
-                        try { withContext(Dispatchers.IO) { statsManager.recordUsage(command.trigger) } }
-                        catch (e: Exception) { Log.w(TAG, "recording usage failed", e) }
-                        UiState.Preview(outcome.text, canInsert = !selection.readOnly)
+                        try {
+                            withContext(Dispatchers.IO) {
+                                statsManager.recordUsage(command.trigger)
+                                historyManager.record(
+                                    command.trigger,
+                                    selection.text,
+                                    outcome.text,
+                                    currentProviderForHistory()
+                                )
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "recording usage failed", e)
+                        }
+                        UiState.Preview(
+                            result = outcome.text,
+                            canInsert = !selection.readOnly,
+                            animateReplacement = command.type == CommandType.AI
+                        )
                     }
                     is CommandOutcome.Refusal ->
                         UiState.Error(string(R.string.error_safety_blocked))
@@ -154,6 +198,12 @@ class ProcessTextViewModel(
         if (inFlight.get()) return
         _uiState.value = UiState.CommandList(commands)
     }
+
+    private fun currentProviderForHistory(): String =
+        getApplication<Application>()
+            .getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
+            .getString(PrefKeys.PROVIDER_TYPE, "")
+            .orEmpty()
 
     private fun string(resId: Int) = getApplication<Application>().getString(resId)
 }

@@ -1,0 +1,215 @@
+name: Release stable APK
+
+# A stable release is intentionally separate from the PR preview pipeline. This workflow is
+# tag-driven, uses the protected production signing secrets, and refuses to publish until the
+# release variant, R8/shrinking, unit tests, lint, alignment, version metadata and signature all
+# pass. Do not use the Preview APK as a release artifact.
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+concurrency:
+  group: stable-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx3g -Dfile.encoding=UTF-8 -XX:+UseG1GC"
+
+jobs:
+  release:
+    name: Verify and publish stable APK
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout the tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Verify the tag is on main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::Refusing to release a tag that is not reachable from origin/main."
+            exit 1
+          fi
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-cleanup: on-success
+          cache-read-only: false
+
+      - name: Read and validate release metadata
+        id: metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          VERSION_NAME="$(sed -n 's/^versionName=//p' version.properties | head -1)"
+          VERSION_CODE="$(sed -n 's/^versionCode=//p' version.properties | head -1)"
+
+          test -n "$VERSION_NAME"
+          test -n "$VERSION_CODE"
+
+          [[ "$TAG_VERSION" == "$VERSION_NAME" ]] || {
+            echo "::error::Tag $TAG_VERSION does not match version.properties ($VERSION_NAME)."
+            exit 1
+          }
+
+          [[ "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || {
+            echo "::error::versionName is not a stable semantic version: $VERSION_NAME"
+            exit 1
+          }
+
+          [[ "$VERSION_CODE" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::versionCode must be a positive integer: $VERSION_CODE"
+            exit 1
+          }
+
+          {
+            echo "version_name=$VERSION_NAME"
+            echo "version_code=$VERSION_CODE"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Decode protected release keystore
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SWIFTSLATE_KEYSTORE_BASE64 }}
+          KEYSTORE_FILE: ${{ runner.temp }}/swiftslate-release.keystore
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_BASE64"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
+          chmod 600 "$KEYSTORE_FILE"
+          test -s "$KEYSTORE_FILE"
+
+      - name: Run final verification and build the release variant
+        shell: bash
+        env:
+          VERSION_NAME: ${{ steps.metadata.outputs.version_name }}
+          VERSION_CODE: ${{ steps.metadata.outputs.version_code }}
+          KEYSTORE_FILE: ${{ runner.temp }}/swiftslate-release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.SWIFTSLATE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SWIFTSLATE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.SWIFTSLATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+
+          ./gradlew lintRelease test :app:assembleRelease \
+            --parallel \
+            --build-cache \
+            --no-daemon \
+            --configuration-cache-problems=warn \
+            -PversionName="$VERSION_NAME" \
+            -PversionCode="$VERSION_CODE"
+
+      - name: Verify the final APK is stable, aligned and signed
+        id: verify
+        shell: bash
+        env:
+          VERSION_NAME: ${{ steps.metadata.outputs.version_name }}
+          VERSION_CODE: ${{ steps.metadata.outputs.version_code }}
+        run: |
+          set -euo pipefail
+
+          APK="app/build/outputs/apk/release/app-release.apk"
+
+          test -s "$APK"
+          test -f app/build/outputs/mapping/release/mapping.txt
+
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+
+          test -x "$BUILD_TOOLS/apksigner"
+          test -x "$BUILD_TOOLS/zipalign"
+          test -x "$BUILD_TOOLS/aapt"
+
+          "$BUILD_TOOLS/zipalign" -c -P 4 -v 4 "$APK"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+
+          BADGING="$("$BUILD_TOOLS/aapt" dump badging "$APK")"
+
+          grep -F "package: name='com.jcversa.swiftslate' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'" <<< "$BADGING"
+          ! grep -F "com.jcversa.swiftslate.preview" <<< "$BADGING"
+
+          SIZE="$(stat -c%s "$APK")"
+          test "$SIZE" -gt 100000
+
+          SHA256="$(sha256sum "$APK" | cut -d' ' -f1)"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Stable release verification"
+            echo
+            echo "- Version: $VERSION_NAME (versionCode $VERSION_CODE)"
+            echo "- APK: $SIZE bytes"
+            echo "- SHA-256: $SHA256"
+            echo "- Variant: release (R8 + resource shrinking)"
+            echo "- Signature: apksigner verified"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prepare release assets
+        shell: bash
+        env:
+          VERSION_NAME: ${{ steps.metadata.outputs.version_name }}
+          VERSION_CODE: ${{ steps.metadata.outputs.version_code }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+
+          cp app/build/outputs/apk/release/app-release.apk \
+            "release-assets/SwiftSlate-v${VERSION_NAME}.apk"
+
+          printf '%s\n' "$VERSION_CODE" > release-assets/versionCode.txt
+
+          (
+            cd release-assets
+            sha256sum "SwiftSlate-v${VERSION_NAME}.apk" versionCode.txt > SHA256SUMS.txt
+          )
+
+      - name: Upload verified APK artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: SwiftSlate-${{ github.ref_name }}-stable
+          path: release-assets/
+          retention-days: 90
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: SwiftSlate ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/SwiftSlate-*.apk
+            release-assets/versionCode.txt
+            release-assets/SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove the temporary keystore
+        if: always()
+        shell: bash
+        run: rm -f "${RUNNER_TEMP}/swiftslate-release.keystore"

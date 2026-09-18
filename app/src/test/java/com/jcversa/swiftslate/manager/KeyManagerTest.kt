@@ -8,6 +8,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import com.jcversa.swiftslate.model.ProviderType
 
 /**
  * Reversible stand-in for [AndroidKeystoreCipher]. AndroidKeyStore's AES-GCM provider is
@@ -114,7 +115,7 @@ class KeyManagerTest {
     @Test
     fun keysAreNotStoredInPlaintext() {
         keyManager.addKey("super-secret-key")
-        val stored = prefs().getString("keys_array", null)
+        val stored = prefs().getString("keys_array_gemini", null)
         assertNotNull(stored)
         assertFalse("raw key must not appear in prefs", stored!!.contains("super-secret-key"))
     }
@@ -126,8 +127,47 @@ class KeyManagerTest {
     }
 
     @Test
+    fun keysAreIsolatedPerProvider() {
+        keyManager.addKey("gemini-key", ProviderType.GEMINI)
+        keyManager.addKey("groq-key", ProviderType.GROQ)
+
+        assertEquals(listOf("gemini-key"), keyManager.getKeys(ProviderType.GEMINI))
+        assertEquals(listOf("groq-key"), keyManager.getKeys(ProviderType.GROQ))
+        assertEquals(listOf("gemini-key"), freshManager().getKeys(ProviderType.GEMINI))
+    }
+
+    @Test
+    fun unknownProviderNeverFallsBackToGeminiKeys() {
+        keyManager.addKey("gemini-key", ProviderType.GEMINI)
+
+        assertTrue(keyManager.getKeys("nonsense").isEmpty())
+        assertFalse(keyManager.addKey("should-not-be-stored", "nonsense"))
+        assertNull(keyManager.getNextKey(providerType = "nonsense"))
+        assertEquals(listOf("gemini-key"), keyManager.getKeys(ProviderType.GEMINI))
+    }
+
+    @Test
+    fun marksAreIsolatedPerProvider() {
+        keyManager.addKey("shared-key", ProviderType.GEMINI)
+        keyManager.addKey("shared-key", ProviderType.GROQ)
+        keyManager.markInvalid("shared-key", ProviderType.GEMINI)
+        keyManager.reportRateLimit("shared-key", 60, ProviderType.GEMINI)
+
+        assertNull(keyManager.getNextKey(providerType = ProviderType.GEMINI))
+        assertEquals("shared-key", keyManager.getNextKey(providerType = ProviderType.GROQ))
+    }
+
+    @Test
+    fun corruptedPreferenceType_isIgnoredWithoutCrashing() {
+        prefs().edit().putInt("keys_array_gemini", 123).commit()
+
+        assertTrue(freshManager().getKeys(ProviderType.GEMINI).isEmpty())
+        assertFalse(prefs().contains("keys_array_gemini"))
+    }
+
+    @Test
     fun undecryptableBlob_yieldsEmptyListInsteadOfCrashing() {
-        prefs().edit().putString("keys_array", "garbage]not-ours").commit()
+        prefs().edit().putString("keys_array_gemini", "garbage]not-ours").commit()
         assertTrue(freshManager().getKeys().isEmpty())
     }
 
@@ -162,8 +202,9 @@ class KeyManagerTest {
         prefs().edit().putString("keys_array", JSONArray(listOf("old1", "old2")).toString()).commit()
         val migrated = freshManager()
         assertEquals(listOf("old1", "old2"), migrated.getKeys())
-        val stored = prefs().getString("keys_array", null)!!
+        val stored = prefs().getString("keys_array_gemini", null)!!
         assertFalse("must have been re-encrypted", KeyManager.isLegacyPlaintext(stored))
+        assertNull("the legacy global entry must be removed after migration", prefs().getString("keys_array", null))
         assertFalse(stored.contains("old1"))
         // And still readable afterwards.
         assertEquals(listOf("old1", "old2"), freshManager().getKeys())

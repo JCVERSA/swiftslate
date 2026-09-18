@@ -2,19 +2,31 @@ package com.jcversa.swiftslate.manager
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.jcversa.swiftslate.model.ProviderType
 import org.json.JSONArray
 import java.util.concurrent.atomic.AtomicInteger
 
+/**
+ * Encrypted API-key storage and per-provider key rotation.
+ *
+ * Keys are stored in separate encrypted preference entries for each provider. The old
+ * single `keys_array` entry is migrated lazily to the provider that is active when it is
+ * first read. This keeps existing installs usable while preventing a Gemini key from being
+ * selected for Groq or a custom endpoint after a provider switch.
+ */
 class KeyManager internal constructor(
     context: Context,
     private val cipher: KeyCipher
 ) {
     constructor(context: Context) : this(context, AndroidKeystoreCipher())
 
-    private val prefs: SharedPreferences = context.getSharedPreferences("secure_keys_prefs", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("secure_keys_prefs", Context.MODE_PRIVATE)
 
     companion object {
-        private const val PREF_KEY_ARRAY = "keys_array"
+        private const val LEGACY_PREF_KEY_ARRAY = "keys_array"
+        private const val PREF_KEY_PREFIX = "keys_array_"
+        private const val INVALID_PROVIDER = "__invalid_provider__"
         private const val CACHE_TTL_MS = 5_000L
         private const val MAX_KEY_LENGTH = 256
         // Invalid-key marks expire. A 403 is not always the key's fault (e.g. selecting a
@@ -37,11 +49,15 @@ class KeyManager internal constructor(
     }
 
     private val rateLimitedKeys = java.util.concurrent.ConcurrentHashMap<String, Long>()
-    /** key -> timestamp after which the invalid mark is forgotten. */
+    /** provider + key -> timestamp after which the invalid mark is forgotten. */
     private val invalidKeys = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private val roundRobinIndex = AtomicInteger(0)
     @Volatile
     private var cachedKeys: List<String>? = null
+    @Volatile
+    private var cachedProvider: String? = null
+    @Volatile
+    private var cachedStorageKey: String? = null
     @Volatile
     private var cacheTimestamp = 0L
     /**
@@ -56,87 +72,213 @@ class KeyManager internal constructor(
 
     val keystoreAvailable: Boolean get() = cipher.available
 
+    private fun providerOf(provider: String?): String =
+        if (provider == null) ProviderType.GEMINI
+        else ProviderType.storedOrNull(provider) ?: INVALID_PROVIDER
+
+    private fun isInvalidProvider(provider: String): Boolean = provider == INVALID_PROVIDER
+
+    private fun storageKey(provider: String): String = PREF_KEY_PREFIX + provider
+
+    /**
+     * SharedPreferences throws ClassCastException when a value was corrupted or written with a
+     * different type. Treat that value as invalid and remove only the affected entry rather than
+     * allowing a UI/service read to crash the process.
+     */
+    private fun readStringSafely(key: String): String? = try {
+        prefs.getString(key, null)
+    } catch (_: ClassCastException) {
+        try { prefs.edit().remove(key).apply() } catch (_: Exception) { }
+        null
+    }
+
+    private fun writeString(key: String, value: String): Boolean = try {
+        // This method is called from the IO dispatcher by UI/service code. commit gives migration
+        // a durable success signal so the legacy value is not removed before the scoped copy exists.
+        prefs.edit().putString(key, value).commit()
+    } catch (_: Exception) {
+        false
+    }
+
+    private fun removeEntry(key: String) {
+        try { prefs.edit().remove(key).apply() } catch (_: Exception) { }
+    }
+
+    private fun namespaced(provider: String, key: String): String = "$provider\u0000$key"
+
     private fun JSONArray.toStringList(): List<String> =
         (0 until length()).map { getString(it) }
 
+    private fun parseKeys(json: String): List<String> = try {
+        JSONArray(json).toStringList()
+    } catch (_: Exception) {
+        emptyList()
+    }
+
     @Synchronized
-    fun getKeys(): List<String> {
+    fun getKeys(providerType: String = ProviderType.GEMINI): List<String> {
+        val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return emptyList()
         val now = System.currentTimeMillis()
         val cached = cachedKeys
-        if (cached != null && now - cacheTimestamp < CACHE_TTL_MS) return cached
-        val stored = prefs.getString(PREF_KEY_ARRAY, null) ?: return emptyList()
+        if (cached != null && cachedProvider == provider && now - cacheTimestamp < CACHE_TTL_MS) {
+            return cached
+        }
+
+        val scopedKey = storageKey(provider)
+        val scopedStored = readStringSafely(scopedKey)
+        val sourceKey: String
+        val stored: String?
+        if (scopedStored != null) {
+            stored = scopedStored
+            sourceKey = scopedKey
+        } else {
+            // One-time compatibility path for installs written before provider-scoped storage.
+            stored = readStringSafely(LEGACY_PREF_KEY_ARRAY)
+            sourceKey = LEGACY_PREF_KEY_ARRAY
+        }
+        if (stored == null) {
+            cacheKeys(emptyList(), null, provider, scopedKey)
+            return emptyList()
+        }
+
         // TTL expired but the stored ciphertext is byte-identical, so the plaintext cannot have
-        // changed: revalidate the cache rather than paying for another KeyStore decrypt. Without
-        // this, every 5s of active typing re-ran AES-GCM on the accessibility service's path.
-        if (cached != null && stored == cachedCipherText) {
+        // changed: revalidate the cache rather than paying for another KeyStore decrypt.
+        if (cached != null && cachedProvider == provider &&
+            cachedStorageKey == sourceKey && stored == cachedCipherText
+        ) {
             cacheTimestamp = now
             return cached
         }
+
         // Legacy plaintext migration — can be removed once all users are on an encrypted build.
         if (isLegacyPlaintext(stored)) {
+            val list = try { JSONArray(stored).toStringList() } catch (_: Exception) { emptyList() }
             return try {
                 val encrypted = cipher.encrypt(stored)
-                prefs.edit().putString(PREF_KEY_ARRAY, encrypted).commit()
-                val list = JSONArray(stored).toStringList()
-                cacheKeys(list, encrypted)
+                if (writeString(scopedKey, encrypted)) {
+                    if (sourceKey != scopedKey) removeEntry(sourceKey)
+                    cacheKeys(list, encrypted, provider, scopedKey)
+                }
+                // If encryption fails, keep the old value and return it without caching. This
+                // preserves access to a legacy install while the Keystore is unavailable.
                 list
             } catch (_: Exception) {
-                // Encryption failed (e.g. keystore invalidated) — return the plaintext keys so
-                // the user does not lose access, without caching or rewriting anything.
-                try { JSONArray(stored).toStringList() } catch (_: Exception) { emptyList() }
+                list
             }
         }
+
         val jsonStr = cipher.decrypt(stored) ?: run {
-            cacheKeys(emptyList(), stored)
+            cacheKeys(emptyList(), stored, provider, sourceKey)
             return emptyList()
         }
-        val list = try { JSONArray(jsonStr).toStringList() } catch (_: Exception) { emptyList() }
-        cacheKeys(list, stored)
+        val list = parseKeys(jsonStr)
+        if (sourceKey != scopedKey && writeString(scopedKey, stored)) {
+            removeEntry(sourceKey)
+            cacheKeys(list, stored, provider, scopedKey)
+        } else {
+            cacheKeys(list, stored, provider, sourceKey)
+        }
         return list
     }
 
-    private fun cacheKeys(keys: List<String>, cipherText: String?) {
+    private fun cacheKeys(keys: List<String>, cipherText: String?, provider: String, storageKey: String) {
         cachedKeys = keys
         cachedCipherText = cipherText
+        cachedProvider = provider
+        cachedStorageKey = storageKey
         cacheTimestamp = System.currentTimeMillis()
     }
 
+    private fun invalidateCache() {
+        cachedKeys = null
+        cachedCipherText = null
+        cachedProvider = null
+        cachedStorageKey = null
+        cacheTimestamp = 0L
+    }
+
     @Synchronized
-    private fun saveKeys(keys: List<String>): Boolean {
+    private fun saveKeys(providerType: String, keys: List<String>): Boolean {
+        val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return false
         val arr = JSONArray(keys)
         return try {
             val cipherText = cipher.encrypt(arr.toString())
-            prefs.edit().putString(PREF_KEY_ARRAY, cipherText).apply()
-            cacheKeys(keys, cipherText)
-            true
+            val key = storageKey(provider)
+            if (!writeString(key, cipherText)) {
+                invalidateCache()
+                false
+            } else {
+                cacheKeys(keys, cipherText, provider, key)
+                true
+            }
         } catch (_: Exception) {
             // Invalidate: the stored value and the in-memory list may now disagree.
-            cachedKeys = null
-            cachedCipherText = null
-            cacheTimestamp = 0L
+            invalidateCache()
+            false
+        }
+    }
+
+    /**
+     * Replaces every provider namespace in one durable edit. Secure imports prepare and encrypt
+     * every provider before this method is called, so a failed Keystore operation cannot leave a
+     * half-imported set of keys.
+     */
+    @Synchronized
+    fun replaceAllKeys(keysByProvider: Map<String, List<String>>): Boolean {
+        if (keysByProvider.keys.any { it !in ProviderType.ALL }) return false
+        if (keysByProvider.keys != ProviderType.ALL.toSet()) return false
+        if (keysByProvider.values.any { values ->
+                values.size > 100 || values.distinct().size != values.size ||
+                    values.any { it.isBlank() || it.length > MAX_KEY_LENGTH }
+            }) return false
+
+        return try {
+            val encrypted = keysByProvider.mapValues { (_, keys) ->
+                cipher.encrypt(JSONArray(keys).toString())
+            }
+            val editor = prefs.edit()
+            encrypted.forEach { (provider, value) ->
+                editor.putString(storageKey(provider), value)
+            }
+            editor.remove(LEGACY_PREF_KEY_ARRAY)
+            if (!editor.commit()) {
+                invalidateCache()
+                false
+            } else {
+                invalidateCache()
+                true
+            }
+        } catch (_: Exception) {
+            invalidateCache()
             false
         }
     }
 
     @Synchronized
-    fun addKey(key: String): Boolean {
+    fun addKey(key: String, providerType: String = ProviderType.GEMINI): Boolean {
         if (key.isBlank() || key.length > MAX_KEY_LENGTH) return false
-        val keys = getKeys().toMutableList()
+        val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return false
+        val keys = getKeys(provider).toMutableList()
         if (!keys.contains(key)) {
             keys.add(key)
-            if (!saveKeys(keys)) return false
+            if (!saveKeys(provider, keys)) return false
         }
-        invalidKeys.remove(key)
+        clearMarks(key, provider)
         return true
     }
 
     @Synchronized
-    fun removeKey(key: String): Boolean {
-        val keys = getKeys().toMutableList()
+    fun removeKey(key: String, providerType: String = ProviderType.GEMINI): Boolean {
+        val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return false
+        val keys = getKeys(provider).toMutableList()
         keys.remove(key)
-        val saved = saveKeys(keys)
-        rateLimitedKeys.remove(key)
-        invalidKeys.remove(key)
+        val saved = saveKeys(provider, keys)
+        rateLimitedKeys.remove(namespaced(provider, key))
+        invalidKeys.remove(namespaced(provider, key))
         return saved
     }
 
@@ -151,15 +293,21 @@ class KeyManager internal constructor(
      * at all, so the command could fail with a healthy key sitting idle.
      */
     @Synchronized
-    fun getNextKey(alreadyTried: Set<String> = emptySet()): String? {
-        val keys = getKeys()
+    fun getNextKey(
+        alreadyTried: Set<String> = emptySet(),
+        providerType: String = ProviderType.GEMINI
+    ): String? {
+        val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return null
+        val keys = getKeys(provider)
         if (keys.isEmpty()) return null
 
         val now = System.currentTimeMillis()
         val validKeys = keys.filter { key ->
             if (key in alreadyTried) return@filter false
-            if (isInvalid(key)) return@filter false
-            val limitTime = rateLimitedKeys[key] ?: 0L
+            val scoped = namespaced(provider, key)
+            if (isInvalid(scoped)) return@filter false
+            val limitTime = rateLimitedKeys[scoped] ?: 0L
             now > limitTime
         }
 
@@ -169,13 +317,23 @@ class KeyManager internal constructor(
         return validKeys[idx]
     }
 
-    fun reportRateLimit(key: String, retryAfterSeconds: Long = 60) {
+    fun reportRateLimit(
+        key: String,
+        retryAfterSeconds: Long = 60,
+        providerType: String = ProviderType.GEMINI
+    ) {
+        val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return
         val cooldown = retryAfterSeconds.coerceIn(1, 600)
-        rateLimitedKeys[key] = System.currentTimeMillis() + cooldown * 1_000
+        rateLimitedKeys[namespaced(provider, key)] =
+            System.currentTimeMillis() + cooldown * 1_000
     }
 
-    fun markInvalid(key: String) {
-        invalidKeys[key] = System.currentTimeMillis() + INVALID_KEY_TTL_MS
+    fun markInvalid(key: String, providerType: String = ProviderType.GEMINI) {
+        val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return
+        invalidKeys[namespaced(provider, key)] =
+            System.currentTimeMillis() + INVALID_KEY_TTL_MS
     }
 
     /**
@@ -185,9 +343,12 @@ class KeyManager internal constructor(
      * the key for the full 15-minute TTL even after the user fixed it.
      */
     @Synchronized
-    fun clearMarks(key: String) {
-        invalidKeys.remove(key)
-        rateLimitedKeys.remove(key)
+    fun clearMarks(key: String, providerType: String = ProviderType.GEMINI) {
+        val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return
+        val scoped = namespaced(provider, key)
+        invalidKeys.remove(scoped)
+        rateLimitedKeys.remove(scoped)
     }
 
     /**
@@ -195,22 +356,24 @@ class KeyManager internal constructor(
      * Self-healing: without expiry a transient 403 killed the key until the process
      * restarted (see [INVALID_KEY_TTL_MS]).
      */
-    private fun isInvalid(key: String): Boolean {
-        val until = invalidKeys[key] ?: return false
+    private fun isInvalid(scopedKey: String): Boolean {
+        val until = invalidKeys[scopedKey] ?: return false
         if (System.currentTimeMillis() >= until) {
-            invalidKeys.remove(key)
+            invalidKeys.remove(scopedKey)
             return false
         }
         return true
     }
 
-    fun getShortestWaitTimeMs(): Long? {
-        val keys = getKeys()
+    fun getShortestWaitTimeMs(providerType: String = ProviderType.GEMINI): Long? {
+        val provider = providerOf(providerType)
+        if (isInvalidProvider(provider)) return null
+        val keys = getKeys(provider)
         if (keys.isEmpty()) return null
         val now = System.currentTimeMillis()
-        val waits = keys.filter { !isInvalid(it) }
+        val waits = keys.filter { !isInvalid(namespaced(provider, it)) }
             .mapNotNull { key ->
-                val limitTime = rateLimitedKeys[key] ?: return@mapNotNull null
+                val limitTime = rateLimitedKeys[namespaced(provider, key)] ?: return@mapNotNull null
                 val remaining = limitTime - now
                 if (remaining > 0) remaining else null
             }

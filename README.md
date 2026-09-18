@@ -44,7 +44,7 @@ Type a trigger like **`?fix`** at the end of any text, in any app, and watch it 
 > **SwiftSlate works in most apps** — WhatsApp, Gmail, Twitter/X, Messages, Notes, and more. No copy-pasting. No app switching. Just type and go. Some apps with custom input fields may not be supported ([see limitations](#%EF%B8%8F-known-limitations)).
 
 > [!TIP]
-> **Looking for the Windows version?** Check out [**SwiftSlate Desktop**](https://github.com/Musheer360/SwiftSlate-Desktop) — same concept, works system-wide on Windows 10/11.
+> **Looking for the Windows version?** Check out the repository's [**SwiftSlate Desktop port**](desktop/README.md) — same concept, works system-wide on Windows 10/11 x64.
 
 <br>
 
@@ -54,6 +54,7 @@ Type a trigger like **`?fix`** at the end of any text, in any app, and watch it 
 - [Features](#-features)
 - [Built-in Commands](#-built-in-commands)
 - [Text Replacer Commands](#-text-replacer-commands)
+- [Text Styles](#-text-styles)
 - [Supported AI Providers](#-supported-ai-providers)
 - [Getting Started](#-getting-started)
 - [How It Works](#%EF%B8%8F-how-it-works)
@@ -68,6 +69,7 @@ Type a trigger like **`?fix`** at the end of any text, in any app, and watch it 
 - [Tech Stack](#%EF%B8%8F-tech-stack)
 - [Architecture](#-architecture)
 - [Building from Source](#-building-from-source)
+- [Release Runbook](#-release-runbook)
 - [Trying a Pull Request](#-trying-a-pull-request-without-touching-your-install)
 - [Contributing](#-contributing)
 - [Sponsors](#-sponsors)
@@ -78,3 +80,729 @@ Type a trigger like **`?fix`** at the end of any text, in any app, and watch it 
 <br>
 
 ## ⚡ Quick Demo
+
+```
+📝  You type       →  "i dont no whats hapening ?fix"
+⏳  You see        →  "i dont no whats hapening ◐"  (spinner animates)
+✅  Result         →  "I don't know what's happening."
+```
+
+```
+📝  You type       →  "hey can u send me that file ?formal"
+⏳  You see        →  "hey can u send me that file ◐"  (spinner animates)
+✅  Result         →  "Could you please share the file at your earliest convenience?"
+```
+
+```
+📝  You type       →  "Hello, how are you? ?translate:es"
+⏳  You see        →  "Hello, how are you? ◐"  (spinner animates)
+✅  Result         →  "Hola, ¿cómo estás?"
+```
+
+<br>
+
+## ✨ Features
+
+<table>
+<tr>
+<td width="50%">
+
+### 🌐 Works Almost Everywhere
+Integrates at the system level via Android's Accessibility Service. Works in **most apps** — messaging, email, social media, notes, browsers, and more. Some apps with custom input fields may not be supported ([see limitations](#%EF%B8%8F-known-limitations)).
+
+### ✂️ Text-Selection Menu
+Select any text, tap **SwiftSlate** in the Copy/Share popup, and pick a command — no accessibility permission required. Works in any app that offers Android's text-selection menu, including apps the accessibility flow can't reach.
+
+### ⚡ Instant Inline Replacement
+Type, trigger, done. The AI response replaces your text directly in the same field — no copy-pasting, no app switching. While processing, an animated spinner appends to your text (e.g., `how r u ◐`) so you always see progress. Text replacer commands execute instantly.
+
+### 🔑 Multi-Key Rotation
+Add multiple API keys for automatic round-robin rotation. If one key hits a rate limit, SwiftSlate seamlessly switches to the next.
+
+### 🌙 AMOLED Dark Theme
+Pure black (`#000000`) Material 3 interface designed for OLED screens — saves battery and looks stunning. Light theme also included.
+
+</td>
+<td width="50%">
+
+### 🤖 Multi-Provider AI
+Ships with Google Gemini, Groq, or connect **any OpenAI-compatible endpoint** — cloud providers, or **local LLMs** like [Ollama](https://ollama.com), [LM Studio](https://lmstudio.ai), and others running on your network.
+
+### 🛠️ Two Command Types
+**AI commands** send text to your provider for intelligent transformation. **Text replacer commands** run entirely offline for instant local text manipulation — no API key needed.
+
+### 🔒 Encrypted Key Storage
+API keys are encrypted with **AES-256-GCM** using the Android Keystore before being written to disk — they never leave your device unencrypted. Keys are kept separately for each configured provider.
+
+### 🌍 Localized in 40 Languages
+The UI ships in 40 languages and automatically follows your device's language, falling back to English when a translation isn't available.
+
+### 🚫 Zero Analytics
+No telemetry, no tracking, no crash reporting — text is sent only to your configured AI provider, never anywhere else.
+
+</td>
+</tr>
+</table>
+
+<br>
+
+## 🧩 Built-in Commands
+
+SwiftSlate ships with **9 AI-powered commands**, dynamic translation, **7 local text styles**, and clipboard helpers — ready to use out of the box. The AI commands are seeded as editable entries, so you can reword or delete any of them:
+
+| Trigger | Action | Example |
+|:--------|:-------|:--------|
+| **`?fix`** | Fix grammar, spelling & punctuation | `i dont no whats hapening` → `I don't know what's happening.` |
+| **`?improve`** | Improve clarity and readability | `The thing is not working good` → `The feature isn't functioning properly.` |
+| **`?shorten`** | Shorten while keeping meaning | `I wanted to let you know that I will not be able to attend the meeting tomorrow` → `I can't attend tomorrow's meeting.` |
+| **`?expand`** | Expand with more detail | `Meeting postponed` → `The meeting has been postponed to a later date. We will share the updated schedule soon.` |
+| **`?formal`** | Rewrite in professional tone | `hey can u send me that file` → `Could you please share the file at your earliest convenience?` |
+| **`?casual`** | Rewrite in friendly tone | `Please confirm your attendance at the event` → `Hey, you coming to the event? Let me know!` |
+| **`?emoji`** | Add relevant emojis | `I love this new feature` → `I love this new feature! 🎉❤️✨` |
+| **`?human`** | Humanize AI-generated text | `I hope this email finds you well. I wanted to delve into...` → `Hope you're doing well. I wanted to dig into...` |
+| **`?reply`** | Generate a contextual reply | `Do you want to grab lunch tomorrow?` → `Sure, I'd love to! What time works for you?` |
+| **`?undo`** | Restore text from before the last replacement | Reverts to your original text before AI modified it |
+| **`?translate:XX`** | Translate to any language | `Hello, how are you?` **`?translate:es`** → `Hola, ¿cómo estás?` |
+| **`?bold`** | Apply bold Unicode characters locally | `Hello ?bold` → `𝗛𝗲𝗹𝗹𝗼` |
+| **`?italic`** | Apply italic Unicode characters locally | `Hello ?italic` → `𝘏𝘦𝘭𝘭𝘰` |
+| **`?mono`** | Apply monospace Unicode characters locally | `Hello ?mono` → `𝙷𝚎𝚕𝚕𝚘` |
+| **`?bubble`** | Apply circled characters locally | `Hello ?bubble` → `Ⓗⓔⓛⓛⓞ` |
+| **`?gothic`** | Apply Fraktur characters locally | `Hello ?gothic` → `ℌ𝔢𝔩𝔩𝔬` |
+| **`?smallcaps`** | Apply small-cap characters locally | `Hello ?smallcaps` → `ʜᴇʟʟᴏ` |
+| **`?normal`** | Convert supported styles back to normal text | `𝗛𝗲𝗹𝗹𝗼 ?normal` → `Hello` |
+
+<details>
+<summary>🌍 <strong>Supported language codes for translation</strong></summary>
+
+<br>
+
+Use any standard language code with `?translate:XX`:
+
+| Code | Language | Code | Language | Code | Language |
+|:-----|:---------|:-----|:---------|:-----|:---------|
+| `es` | Spanish | `fr` | French | `de` | German |
+| `ja` | Japanese | `ko` | Korean | `zh` | Chinese |
+| `hi` | Hindi | `ar` | Arabic | `pt` | Portuguese |
+| `it` | Italian | `ru` | Russian | `nl` | Dutch |
+| `tr` | Turkish | `pl` | Polish | `sv` | Swedish |
+
+…and many more. Any ISO 639 language code works — the AI model handles it.
+
+</details>
+
+### 🎨 Text Styles
+
+SwiftSlate includes local Unicode text styles that work instantly without an API key or network request. Type the command at the end of text, or select text and choose the style from SwiftSlate in Android's text-selection menu:
+
+| Trigger | Style | Example |
+|:--------|:------|:--------|
+| **`?bold`** | Bold | `Hello ?bold` → `𝗛𝗲𝗹𝗹𝗼` |
+| **`?italic`** | Italic | `Hello ?italic` → `𝘏𝘦𝘭𝘭𝘰` |
+| **`?mono`** | Monospace | `Hello ?mono` → `𝙷𝚎𝚕𝚕𝚘` |
+| **`?bubble`** | Circled | `Hello ?bubble` → `Ⓗⓔⓛⓛⓞ` |
+| **`?gothic`** | Fraktur | `Hello ?gothic` → `ℌ𝔢𝔩𝔩𝔬` |
+| **`?smallcaps`** | Small capitals | `Hello ?smallcaps` → `ʜᴇʟʟᴏ` |
+| **`?normal`** | Restore supported styles | `𝗛𝗲𝗹𝗹𝗼 ?normal` → `Hello` |
+
+These are Unicode characters that imitate font styles, not actual font changes. Unsupported characters, accents, emoji, and non-Latin scripts are preserved instead of being removed. Some apps may render Unicode styles differently.
+
+<br>
+
+### 📋 Clipboard Commands
+
+SwiftSlate also includes **4 clipboard commands** that work entirely offline, using the real Android system clipboard:
+
+| Trigger | Action | Example |
+|:--------|:-------|:--------|
+| **`?copy`** | Copy preceding text to the clipboard | `Hello world?copy` → copies "Hello world" |
+| **`?cut`** | Cut preceding text (copy + delete) | `Hello world?cut` → cuts "Hello world" |
+| **`?paste`** | Paste after existing text | Type `?paste` → appends the clipboard contents |
+| **`?replace`** | Replace all text with clipboard content | Type `?replace` → replaces field content with the clipboard contents |
+
+> [!NOTE]
+> `?paste` and `?replace` work with anything you've copied, in any app. Since Android 10, an accessibility service can't *read* the clipboard (only the focused app and the active keyboard can), so SwiftSlate doesn't try — it asks the text field itself to paste, which the app performs under its own focus. If a field ignores that request, SwiftSlate falls back to the last text you copied with `?copy` or `?cut`.
+
+<br>
+
+## 🛠️ Text Replacer Commands
+
+Beyond AI, you can create **text replacer commands** that run **entirely offline** — no API key, no network, instant execution:
+
+| Use Case | Trigger | Replacement | Result |
+|:---------|:--------|:------------|:-------|
+| **Signatures** | `?sig` | `— John Doe, CEO` | Appends your signature |
+| **Canned responses** | `?ty` | `Thank you for reaching out! I'll get back to you shortly.` | Instant reply template |
+| **Snippets** | `?addr` | `123 Main St, Springfield, IL 62701` | Quick address insertion |
+| **Shortcuts** | `?email` | `contact@example.com` | Fast email insertion |
+
+> [!TIP]
+> Text replacer commands execute instantly with zero latency — no spinner, no network call. Create them in the **Commands** tab by selecting the **"Text Replacer"** type.
+
+<br>
+
+## 🤖 Supported AI Providers
+
+| Provider | Models | Notes |
+|:---------|:-------|:------|
+| **Google Gemini** (default) | `gemini-3.5-flash-lite` (default), `gemini-3.6-flash` | Free tier available at [aistudio.google.com](https://aistudio.google.com) |
+| **Groq** | `openai/gpt-oss-120b` (default), `qwen/qwen3.6-27b` | Free tier at [console.groq.com](https://console.groq.com/keys) |
+| **NVIDIA NIM** | `nvidia/nemotron-3-super-120b-a12b` (default), plus the live NIM catalog | User supplies a key from [build.nvidia.com](https://build.nvidia.com/settings/api-keys); OpenAI-compatible |
+| **OpenRouter** | `openrouter/free` (default), plus the live model catalog | User supplies a key from [openrouter.ai](https://openrouter.ai/settings/keys); free availability can change |
+| **DeepSeek** | `deepseek-flash` (default), plus the live DeepSeek catalog | User supplies a key from [platform.deepseek.com](https://platform.deepseek.com/api_keys); OpenAI-compatible |
+| **Custom (OpenAI-compatible)** | Any model your endpoint supports | Works with Ollama, LM Studio, vLLM, any `/v1/chat/completions` endpoint |
+
+> [!TIP]
+> For local LLMs, use an address reachable from the Android device. On the Android emulator, the host machine is typically `http://10.0.2.2:11434/v1`; on a physical device, use the machine's private-LAN IP. `localhost` and `127.0.0.1` refer to the Android device itself. HTTP is restricted to private-LAN endpoints.
+
+<br>
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+| Requirement | Details |
+|:------------|:--------|
+| **Android Device** | Android 6.0+ (API 23 or higher) |
+| **API Key** | Free Gemini key at [aistudio.google.com](https://aistudio.google.com), or a key from Groq / any OpenAI-compatible provider. *Not required for text replacer commands.* |
+
+### Installation
+
+> [!TIP]
+> The APK is only ~1.4 MB — lightweight with zero external dependencies for networking or JSON.
+
+**Install from GitHub Releases:**
+
+**1.** Download the latest APK from the [**Releases**](https://github.com/JCVERSA/swiftslate/releases/latest) page
+
+**2.** Install the APK on your device (allow installation from unknown sources if prompted)
+
+**3.** Open SwiftSlate and follow the setup below
+
+### Setup in 3 Steps
+
+<table>
+<tr>
+<td width="33%" align="center">
+
+**Step 1**
+
+🔑 **Add API Key**
+
+Open the **Keys** tab, enter your API key. It's validated before saving. Add multiple keys for rotation.
+
+</td>
+<td width="33%" align="center">
+
+**Step 2**
+
+♿ **Enable Service**
+
+On the **Dashboard**, tap **"Enable"** → find **"SwiftSlate Assistant"** in Accessibility Settings → toggle it on.
+
+</td>
+<td width="33%" align="center">
+
+**Step 3**
+
+✍️ **Start Typing!**
+
+Open any app, type your text, add a trigger like `?fix` at the end, and watch the magic happen.
+
+</td>
+</tr>
+</table>
+
+<br>
+
+## ⚙️ How It Works
+
+```mermaid
+flowchart TD
+    A["📝 You type: 'Hello wrld, how r u ?fix'"] --> B{"🔍 Accessibility Service\ndetects trigger"}
+    B -- "Text Replacer" --> C["⚡ Instant local replacement\n(no network call)"]
+    B -- "AI Command" --> D["🔑 Selects next API key\n(round-robin)"]
+    D --> E["🤖 Sends text + prompt\nto AI provider"]
+    E --> F["⏳ Spinner appended to text\nhow r u ◐ ◓ ◑ ◒"]
+    F --> G["✅ Replaces text in-place"]
+    C --> G
+
+    style A fill:#1a1a2e,stroke:#e94560,color:#fff
+    style B fill:#1a1a2e,stroke:#0f3460,color:#fff
+    style C fill:#1a1a2e,stroke:#00b894,color:#fff
+    style D fill:#1a1a2e,stroke:#0f3460,color:#fff
+    style E fill:#1a1a2e,stroke:#0f3460,color:#fff
+    style F fill:#1a1a2e,stroke:#e94560,color:#fff
+    style G fill:#16213e,stroke:#00b894,color:#fff
+```
+
+<details>
+<summary>🔧 <strong>Technical deep-dive</strong></summary>
+
+<br>
+
+1. **Event Listening** — SwiftSlate registers an Accessibility Service that listens for `TYPE_VIEW_TEXT_CHANGED` events across all apps (ignoring its own UI and password fields)
+2. **Fast Exit Optimization** — For performance, it first checks if the last character of typed text matches any known trigger's last character before doing a full scan
+3. **Longest Match** — When a potential match is found, it searches for the longest matching trigger at the end of the text
+4. **Command Routing** — Text replacer commands execute immediately on-device. AI commands proceed to the API call path
+5. **API Call** — The text + prompt is sent to the configured AI provider using the next available key in the round-robin rotation
+6. **Inline Spinner** — While waiting for the AI response, the trigger is replaced with an animated spinner appended to your original text (e.g., `how r u ◐`) to show progress
+7. **Watchdog Timer** — A 120-second safety timer auto-cancels stuck processing jobs to prevent the service from becoming unresponsive
+8. **Text Replacement** — The response replaces the original text using `ACTION_SET_TEXT`
+9. **Fallback Strategy** — If `ACTION_SET_TEXT` fails (some apps don't support it), SwiftSlate falls back to a clipboard-based select-all + paste approach
+10. **Post-Replace Verification** — A delayed check ensures the IME didn't clobber the replacement, re-applying if needed
+11. **Bounded Responses** — API responses are capped at 1 MB to prevent memory issues from malformed responses
+
+</details>
+
+<br>
+
+## ✂️ Text-Selection Menu
+
+Every app that offers Android's text-selection popup (the one with Copy, Cut, Share) can show **SwiftSlate** as an option, whether or not the accessibility service is enabled:
+
+1. Select text in any app
+2. Tap **SwiftSlate** in the popup
+3. Pick a command
+4. Get the result back with **Insert** (replaces the selection in-place, when the field allows it) or **Copy**
+
+It runs the same commands, requests, and errors as typing a trigger — just through a one-shot dialog that closes as soon as it's done, with no new permissions. Built-in clipboard commands (`?copy`, `?cut`, `?paste`, `?replace`, `?undo`) aren't available here since they need the live text field the accessibility flow has access to.
+
+<br>
+
+## 🎨 Custom Commands
+
+Create, edit, and manage your own commands in the **Commands** tab.
+
+### Two Types of Custom Commands
+
+| Type | How It Works | Needs API Key? | Latency |
+|:-----|:-------------|:---------------|:--------|
+| **AI** | Sends text to your AI provider with your custom prompt | Yes | ~1–3 seconds |
+| **Text Replacer** | Replaces the trigger with a fixed string, entirely offline | No | Instant |
+
+### Example AI Command Ideas
+
+| Trigger | Prompt | Use Case |
+|:--------|:-------|:---------|
+| `?eli5` | `Explain this like I'm five years old.` | Simplify complex topics |
+| `?bullet` | `Convert this text into bullet points.` | Quick formatting |
+| `?headline` | `Rewrite this as a catchy headline.` | Social media posts |
+| `?code` | `Convert this description into pseudocode.` | Developer shorthand |
+| `?tldr` | `Summarize this text in one sentence.` | Quick summaries |
+
+> [!TIP]
+> Just describe the transformation you want — SwiftSlate's system instruction automatically ensures the AI returns only the transformed text without extra commentary.
+
+<br>
+
+## 🔑 API Key Management
+
+SwiftSlate supports multiple API keys with intelligent rotation:
+
+| Feature | Details |
+|:--------|:--------|
+| **Round-Robin Rotation** | Keys are used in turn to spread usage evenly across all configured keys |
+| **Rate-Limit Handling** | If a key gets rate-limited (HTTP 429), SwiftSlate tracks the cooldown and skips it automatically |
+| **Invalid Key Detection** | Keys returning 401/403 errors are marked invalid and excluded from rotation |
+| **Encrypted Storage** | All keys encrypted with AES-256-GCM via Android Keystore before being saved locally; storage is isolated per provider |
+| **Provider Isolation** | A corrupted or unknown provider value never falls back to Gemini; the app stops and asks for an explicit provider selection |
+| **Live Validation** | Keys are validated against the selected provider's API before being saved |
+
+> [!TIP]
+> Adding **2–3 API keys from different accounts** helps avoid rate limits during heavy use. Keys are managed separately for Gemini, Groq, and Custom providers. On the free tier, all keys under the same account share a single quota — so rotation only helps with keys from separate accounts.
+
+<br>
+
+## 💾 Backup & Restore
+
+SwiftSlate provides two deliberately separate backup paths:
+
+- **Safe Backup & Restore** — Saves custom commands, selected models, the trigger prefix, temperature, privacy mode, and typing-animation preference via Android's file picker
+- **Encrypted API Key Export** — An explicit, manual export of all configured provider keys, the selected model per provider, and the custom endpoint. The payload is encrypted with AES-256-GCM using a passphrase-derived key (PBKDF2), and the passphrase is never stored or sent anywhere
+- **Encrypted Import** — Decrypts the file locally, displays a summary, then asks for confirmation before replacing the provider key namespaces and selected models. It never runs a network validation automatically
+- **Safe Backup never contains** — API keys, the custom endpoint, and optional local history. Keys remain in Android Keystore storage and must be configured again on a new device unless the user explicitly uses the encrypted export
+
+Find both paths in the **Settings** tab under **Backup & Migration Vault**. The **Encrypted API backup** Android Quick Settings tile opens the same explicit export/import chooser; tapping it never exports a key by itself. SwiftSlate's Android backup rules also exclude app data from standard cloud/device-transfer backups.
+
+> [!NOTE]
+> Local command history is opt-in and stays on the device. Disabling it clears saved inputs and results.
+
+<br>
+
+## 🖥️ App Screens
+
+SwiftSlate has **four screens** accessible via the bottom navigation bar:
+
+<table>
+<tr>
+<td width="25%" valign="top">
+
+#### 📊 Dashboard
+- Service status indicator (green/red)
+- Enable/disable toggle
+- API key count
+- Quick-start guide
+- Version info & update check
+
+</td>
+<td width="25%" valign="top">
+
+#### 🔑 Keys
+- Add new keys (validated live)
+- Delete existing keys
+- AES-256-GCM encryption
+- Multi-key management
+- Direct link to get API keys
+
+</td>
+<td width="25%" valign="top">
+
+#### 📝 Commands
+- 5 built-in commands (read-only)
+- 9 AI commands, editable like your own
+- Add custom commands (AI or Text Replacer)
+- Edit existing custom commands
+- Delete custom commands
+
+</td>
+<td width="25%" valign="top">
+
+#### ⚙️ Settings
+- **Provider selection** (Gemini, Groq, Custom)
+- **Model picker** per provider
+- Custom endpoint URL & model
+- Trigger prefix customization
+- Safe backup and encrypted API-key export/import
+
+</td>
+</tr>
+</table>
+
+<br>
+
+## 📸 Screenshots
+
+<div align="center">
+
+**Dark Mode**
+
+<table>
+<tr>
+<td><img src="screenshots/dashboard.png" width="280" alt="Dashboard — Dark" /></td>
+<td><img src="screenshots/keys.png" width="280" alt="API Keys — Dark" /></td>
+</tr>
+<tr>
+<td><img src="screenshots/commands.png" width="280" alt="Commands — Dark" /></td>
+<td><img src="screenshots/settings.png" width="280" alt="Settings — Dark" /></td>
+</tr>
+</table>
+
+**Light Mode**
+
+<table>
+<tr>
+<td><img src="screenshots/dashboard_light.png" width="280" alt="Dashboard — Light" /></td>
+<td><img src="screenshots/keys_light.png" width="280" alt="API Keys — Light" /></td>
+</tr>
+<tr>
+<td><img src="screenshots/commands_light.png" width="280" alt="Commands — Light" /></td>
+<td><img src="screenshots/settings_light.png" width="280" alt="Settings — Light" /></td>
+</tr>
+</table>
+
+</div>
+
+<br>
+
+## 🌍 Localization
+
+SwiftSlate's UI is available in **40 languages**:
+
+| | | | |
+|:--|:--|:--|:--|
+| 🇺🇸 English `en` | 🇸🇦 Arabic `ar` | 🇧🇬 Bulgarian `bg` | 🇪🇸 Catalan `ca` |
+| 🇨🇿 Czech `cs` | 🇩🇰 Danish `da` | 🇩🇪 German `de` | 🇬🇷 Greek `el` |
+| 🇪🇸 Spanish `es` | 🇪🇪 Estonian `et` | 🇮🇷 Persian `fa` | 🇫🇮 Finnish `fi` |
+| 🇫🇷 French `fr` | 🇮🇳 Hindi `hi` | 🇭🇷 Croatian `hr` | 🇭🇺 Hungarian `hu` |
+| 🇮🇩 Indonesian `in` | 🇮🇹 Italian `it` | 🇮🇱 Hebrew `iw` | 🇯🇵 Japanese `ja` |
+| 🇰🇷 Korean `ko` | 🇱🇹 Lithuanian `lt` | 🇱🇻 Latvian `lv` | 🇲🇾 Malay `ms` |
+| 🇳🇴 Norwegian `nb` | 🇳🇱 Dutch `nl` | 🇵🇱 Polish `pl` | 🇵🇹 Portuguese `pt` |
+| 🇧🇷 Portuguese (BR) `pt-rBR` | 🇷🇴 Romanian `ro` | 🇷🇺 Russian `ru` | 🇸🇰 Slovak `sk` |
+| 🇸🇮 Slovenian `sl` | 🇷🇸 Serbian `sr` | 🇹🇭 Thai `th` | 🇹🇷 Turkish `tr` |
+| 🇺🇦 Ukrainian `uk` | 🇻🇳 Vietnamese `vi` | 🇨🇳 Chinese `zh` | 🇨🇳 Chinese (Simplified) `zh-rCN` |
+
+The app automatically uses your device's language, and falls back to English otherwise. Some recently added redesign labels are currently English-only and intentionally use that fallback until their translations land.
+
+Adding a translation is a single directory: drop `values-<locale>/strings.xml` into `app/src/main/res/` and it ships automatically — the build derives the shipped locale list from that folder, so nothing else needs editing. Contributions welcome.
+
+<br>
+
+## 🔒 Privacy & Security
+
+> [!NOTE]
+> SwiftSlate is built with privacy as a **core architectural principle**, not an afterthought.
+
+| | Concern | How SwiftSlate Handles It |
+|:--|:--------|:------------------------|
+| 👁️ | **Text Monitoring** | Only processes text when a trigger command is detected at the end. All other typing is completely ignored. Password fields are always skipped. |
+| 📡 | **Data Transmission** | Text is sent **only** to the configured AI provider (Google Gemini, Groq, NVIDIA NIM, OpenRouter, DeepSeek, or your custom endpoint). The only other network contact is a daily GitHub Releases check for update notifications — your text is never part of it. Text replacer commands never leave your device. |
+| 🧭 | **Network Requests** | Model catalogs are fetched only after the user presses the catalog action, never automatically on app return. Privacy mode blocks catalog and AI requests. Automatic HTTP redirects are disabled so provider keys cannot be forwarded to another host or downgraded. |
+| 🌐 | **Local HTTP** | HTTPS is preferred. HTTP is accepted only for private-LAN endpoints and the app warns that this traffic is unencrypted. |
+| 🔐 | **Key Storage** | API keys are encrypted with AES-256-GCM using the Android Keystore system and isolated per provider. Encryption failures throw rather than falling back to plaintext. |
+| 📊 | **Analytics** | **None.** Zero telemetry, zero tracking, zero crash reporting. |
+| 📖 | **Open Source** | The entire codebase is open for inspection under the MIT License. |
+| 🔑 | **Permissions** | Requires Internet (provider API calls + update check), Accessibility Service, notification, and vibration (haptics) permissions. |
+| 💾 | **Backups** | Android cloud/device-transfer backups are disabled. The recommended manual safe backup contains commands and non-sensitive preferences/models only; API keys, custom endpoints, and optional local history are excluded. A separate user-initiated encrypted API-key export uses a passphrase and requires confirmation on import. |
+| 📖 | **Local History** | Successful command inputs and results are stored only when the user explicitly enables optional local history. It is disabled by default and can be cleared from Settings or the Commands history view. |
+
+<br>
+
+## 🏗️ Tech Stack
+
+<table>
+<tr><td><strong>Language</strong></td><td>Kotlin 2.4</td></tr>
+<tr><td><strong>UI</strong></td><td>Jetpack Compose · Material 3</td></tr>
+<tr><td><strong>Async</strong></td><td>Kotlin Coroutines</td></tr>
+<tr><td><strong>HTTP</strong></td><td><code>HttpURLConnection</code> (zero external dependencies)</td></tr>
+<tr><td><strong>JSON</strong></td><td><code>org.json</code> (Android built-in)</td></tr>
+<tr><td><strong>Storage</strong></td><td>SharedPreferences (encrypted via Android Keystore)</td></tr>
+<tr><td><strong>Background Work</strong></td><td>WorkManager (daily update checks)</td></tr>
+<tr><td><strong>Core Service</strong></td><td>Android Accessibility Service</td></tr>
+<tr><td><strong>Build System</strong></td><td>Gradle with Kotlin DSL</td></tr>
+<tr><td><strong>Java Target</strong></td><td>JDK 17</td></tr>
+<tr><td><strong>Min SDK</strong></td><td>API 23 (Android 6.0)</td></tr>
+<tr><td><strong>Target SDK</strong></td><td>API 36</td></tr>
+</table>
+
+> **Zero third-party dependencies** for networking or JSON parsing — SwiftSlate uses only Android's built-in APIs.
+
+<br>
+
+## 🏛️ Architecture
+
+```
+com.jcversa.swiftslate/
+├── service/
+│   ├── AssistantService.kt      # Core accessibility service — event listening, trigger
+│   │                            # detection, text replacement, undo, inline spinner
+│   ├── CommandRunner.kt         # Shared request policy (key rotation, rate-limit backoff,
+│   │                            # error mapping) used by both the accessibility service and
+│   │                            # the text-selection popup
+│   ├── ErrorMessages.kt         # Maps raw provider/network errors to localized strings
+│   └── OverlayToast.kt          # TYPE_ACCESSIBILITY_OVERLAY toast with enter/exit animation
+├── api/
+│   ├── GeminiClient.kt          # Google Gemini API client
+│   ├── OpenAICompatibleClient.kt # Unified client for Groq + any OpenAI-compatible endpoint
+│   └── ApiClientUtils.kt        # Shared utilities — response parsing, error classification,
+│                                # refusal detection, secret redaction, system prompt
+├── manager/
+│   ├── KeyManager.kt            # Key storage, round-robin rotation, rate-limit tracking,
+│   │                            # invalid-key benching with expiry
+│   ├── KeyCipher.kt             # AES-256-GCM via AndroidKeyStore, behind an interface so
+│   │                            # KeyManager is testable without the keystore
+│   ├── CommandManager.kt        # Command CRUD, trigger matching (longest-match),
+│   │                            # prefix migration, import/export
+│   ├── TextStyleTransformer.kt  # Offline Unicode styles for bold, italic, mono, bubble,
+│   │                            # gothic, small caps and normalizing supported glyphs
+│   └── StatsManager.kt          # Usage counters — monthly total, per-command, last 7 days
+├── provider/
+│   └── ProviderConfig.kt        # Per-provider config (transport, endpoint, model key,
+│                                # reasoning/thinking params) + registry
+├── model/
+│   ├── Command.kt               # Command data class (AI or Text Replacer)
+│   ├── GeminiModels.kt          # Gemini model catalog + per-model thinking level
+│   ├── GroqModels.kt            # Groq model catalog + per-model reasoning params
+│   ├── PrefKeys.kt              # SharedPreferences key constants
+│   └── ProviderType.kt          # Provider constants (gemini, groq, nvidia, openrouter, deepseek, custom)
+├── ui/
+│   ├── DashboardScreen.kt       # Service status, key count, usage stats, 7-day chart
+│   ├── KeysScreen.kt            # API key management with live validation
+│   ├── CommandsScreen.kt        # Command list, add/edit/delete with collapsible form
+│   ├── SettingsScreen.kt        # Provider, model, temperature, prefix, backup/restore
+│   ├── processtext/             # ACTION_PROCESS_TEXT entry point (the text-selection menu)
+│   │   ├── ProcessTextActivity.kt      # One-shot dialog activity, owns the bottom sheet
+│   │   ├── ProcessTextViewModel.kt     # Picker -> loading -> result state machine
+│   │   ├── ProcessTextInput.kt         # Parses/validates the system-provided selection
+│   │   └── ProcessTextReplacement.kt   # Correlates a finished popup result with the next
+│   │                                    # accessibility event to auto-replace in-place
+│   ├── components/              # Reusable UI components (cards, text fields, dividers,
+│   │                            # the app's own bottom sheet and toast)
+│   └── theme/Theme.kt           # AMOLED dark + light Material 3 color schemes
+├── MainActivity.kt              # AnimatedContent tab navigation (4 tabs)
+├── SwiftSlateViewModel.kt       # Shared ViewModel exposing managers + prefs
+├── SwiftSlateApp.kt             # Application class — SharedPreferences pre-warming,
+│                                # WorkManager update check scheduling
+└── worker/
+    └── UpdateCheckWorker.kt     # Daily background check for new GitHub releases
+```
+
+<br>
+
+## 🔨 Building from Source
+
+### Prerequisites
+
+- [**Android Studio**](https://developer.android.com/studio) (latest stable)
+- **JDK 17+**
+- **Android SDK** with API level 36
+
+### Build
+
+```bash
+# Clone the repository
+git clone https://github.com/JCVERSA/swiftslate.git
+cd SwiftSlate
+
+# Build debug APK
+./gradlew assembleDebug
+
+# Output: app/build/outputs/apk/debug/app-debug.apk
+```
+
+### Install on device
+
+```bash
+adb install app/build/outputs/apk/debug/app-debug.apk
+```
+
+> [!NOTE]
+> Every push to `main` and every pull request also produces an **installable preview APK** (separate app, debug-signed) — grab it from the run's **Artifacts** section, no signing setup needed. Preview APKs are not stable releases.
+
+### Stable release builds
+
+Stable distribution uses the `release` variant, the production signing key, and R8/resource
+shrinking. The tag-driven `Release stable APK` workflow verifies the exact `versionName`,
+`versionCode`, package ID, alignment, shrink output, and signature before publishing. See the
+[release runbook](RELEASE.md) for signing setup, device acceptance checks, and rollback. Never
+rename or distribute a Preview APK as a stable release.
+
+<br>
+
+## 📦 Release Runbook
+
+See [`RELEASE.md`](RELEASE.md) for the complete release and rollback procedure.
+
+<br>
+
+## 🧪 Trying a Pull Request Without Touching Your Install
+
+Every pull request builds a **preview APK** you can install side by side with a stable release.
+
+It ships as a separate app — applicationId `com.jcversa.swiftslate.preview`, shown on your launcher as **SwiftSlate Preview** — so installing it never replaces your stable build and never touches its API keys, commands, stats or accessibility setting. Both appear as separate entries under Settings → Accessibility, and you can enable whichever you want to test.
+
+1. Open the pull request's **Checks** tab and pick the latest **Build APK** run
+2. Download the `SwiftSlate-preview-prNNN` artifact from the **Artifacts** section
+3. Unzip and install the APK, then enable **SwiftSlate Preview** in accessibility settings
+4. Uninstall it when you're done — your stable install is untouched throughout
+
+Preview builds are shrunk and non-debuggable like release builds, but signed with a debug key, so they'll never silently update your stable app. To build one locally:
+
+```bash
+./gradlew assemblePreview
+# app/build/outputs/apk/preview/app-preview.apk
+```
+
+<br>
+
+## ⚠️ Known Limitations
+
+- **Some apps use custom input fields** that don't support Android's standard text replacement APIs. SwiftSlate includes a clipboard-based fallback and a focused-node fallback, but note-taking apps built on WebView or custom editors (Google Keep, Samsung Notes, some Zoho fields) can still ignore replacements — text replacement works most reliably in apps with standard text fields (WhatsApp, Telegram, Gmail, etc.). The [text-selection menu](#%EF%B8%8F-text-selection-menu) works in all of them, since it doesn't rely on the accessibility service.
+- **WeChat deliberately degrades third-party accessibility services.** Since WeChat 8.0.52+, non-whitelisted services (everything except system apps) receive wiped or faked node trees and incomplete text-change events — this is enforced by WeChat itself and cannot be fixed from any accessibility app. SwiftSlate cannot reliably detect triggers inside WeChat chat input; use the [text-selection menu](#%EF%B8%8F-text-selection-menu) there instead.
+- **Some OEMs restrict accessibility services.** Certain manufacturers (e.g., OnePlus, Xiaomi) may hide or block third-party accessibility services in their settings UI. If SwiftSlate doesn't appear in your accessibility settings, check for a "Downloaded apps" or "Installed services" section, or try searching for it. On Android 13+, sideloaded apps must also be allowed via **App info → ⋮ → Allow restricted settings** before the accessibility toggle unlocks.
+- **Aggressive battery optimization can silently disable the service.** Some OEM skins (Xiaomi/MIUI, OnePlus/OxygenOS, Infinix/XOS, Samsung One UI, and others) kill background accessibility services after a period of inactivity to save battery, and Android itself does not let an accessibility service run as a foreground/persistent service to defend against this. If SwiftSlate stops responding and shows as inactive on the Dashboard after running for a while, this is the most common cause — re-enable it in Accessibility Settings and, per OEM: **Xiaomi/HyperOS** — enable *Autostart*, set Battery saver to *No restrictions*, lock SwiftSlate in Recents, and avoid Ultra Battery Saver (its force-stop also strips the permission, which flips the toggle itself OFF); **Infinix/XOS and OnePlus/OxygenOS** — set battery to *No restrictions* / *Don't optimize* and lock the app in Recents; **Samsung One UI** — set battery to *Unrestricted*, disable *Remove permissions if app is unused*, and remove the app from Sleeping/Deep-sleeping lists. If the service actually crashed, the Dashboard now shows a "SwiftSlate was interrupted" banner with a one-tap re-enable.
+- **Some banking apps refuse to open while any accessibility service is enabled**, including SwiftSlate. This is a security measure the bank's app controls entirely — it checks the OS's list of enabled accessibility services and blocks itself if that list isn't empty, regardless of which app is on it or what that app actually does. There's no manifest flag or API that lets a legitimate accessibility tool opt out of another app's own check, so this can't be fixed on SwiftSlate's end. Disable SwiftSlate's accessibility permission before opening the affected banking app, then re-enable it afterward. The [text-selection menu](#%EF%B8%8F-text-selection-menu) still works with accessibility disabled, since it doesn't use the service at all.
+
+<br>
+
+## 🤝 Contributing
+
+Contributions are welcome! Here's how to get involved:
+
+```bash
+# 1. Fork the repository, then:
+git clone https://github.com/YOUR_USERNAME/SwiftSlate.git
+cd SwiftSlate
+
+# 2. Create a feature branch
+git checkout -b feature/amazing-feature
+
+# 3. Make your changes and commit
+git commit -m "Add amazing feature"
+
+# 4. Push and open a Pull Request
+git push origin feature/amazing-feature
+```
+
+### Ideas for Contributions
+
+- 🧩 New built-in commands
+- 🤖 Additional AI provider integrations
+- 🎨 UI improvements and new themes
+- 🌍 Translations for more languages
+- 📖 Documentation improvements
+
+<br>
+
+## 💜 Sponsors
+
+SwiftSlate is made possible by the generous support of its sponsors. Thank you!
+
+<table>
+<tr>
+<td align="center">
+<a href="https://github.com/lifearien">
+<img src="https://github.com/lifearien.png" width="80" alt="lifearien" /><br>
+<strong>@lifearien</strong>
+</a>
+</td>
+</tr>
+</table>
+
+Want to see your name here? [**Become a sponsor →**](https://github.com/sponsors/JCVERSA)
+
+<br>
+
+## ❤️ Support the Project
+
+SwiftSlate is free, open source, and built in my spare time. If it's useful to you, consider supporting its development:
+
+- ⭐ **Star this repo** — it helps others discover SwiftSlate
+- 💖 [**Sponsor on GitHub**](https://github.com/sponsors/JCVERSA) — even a small contribution keeps the project going
+
+<br>
+
+## 📄 License
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+
+<br>
+
+## 📈 Star History
+
+<div align="center">
+
+<a href="https://star-history.dera.page/#JCVERSA/swiftslate&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=JCVERSA/swiftslate&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=JCVERSA/swiftslate&type=Date" />
+    <img alt="Star History Chart" src="https://star-history.dera.page/svg?repos=JCVERSA/swiftslate&type=Date" width="600" />
+  </picture>
+</a>
+
+</div>
+
+<br>
+
+---
+
+<div align="center">
+
+<br>
+
+Made with ❤️ by [**JCVERSA**](https://github.com/JCVERSA) — based on [SwiftSlate by Musheer Alam](https://github.com/Musheer360/SwiftSlate)
+
+If SwiftSlate makes your typing life easier, consider giving it a ⭐
+
+<br>
+
+</div>

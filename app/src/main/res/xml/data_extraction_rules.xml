@@ -5,11 +5,15 @@
         <exclude domain="sharedpref" path="settings.xml" />
         <exclude domain="sharedpref" path="commands.xml" />
         <exclude domain="sharedpref" path="stats.xml" />
+        <!-- Optional local history contains user-selected text; never back it up. -->
+        <exclude domain="sharedpref" path="history.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="secure_keys_prefs.xml" />
         <exclude domain="sharedpref" path="settings.xml" />
         <exclude domain="sharedpref" path="commands.xml" />
         <exclude domain="sharedpref" path="stats.xml" />
+        <!-- Optional local history contains user-selected text; never transfer it. -->
+        <exclude domain="sharedpref" path="history.xml" />
     </device-transfer>
 </data-extraction-rules>

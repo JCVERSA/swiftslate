@@ -2,7 +2,23 @@ name: Verify
 
 on:
   push:
-    branches: [arena/01a092c0-swiftslate]
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - '.github/workflows/**'
   workflow_dispatch:
 
 concurrency:
@@ -22,6 +38,7 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 15
+
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -35,8 +52,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
-          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
-          gradle-home-cache-cleanup: true
+          cache-cleanup: on-success
           cache-read-only: true
 
       - name: Run lint
@@ -44,7 +60,14 @@ jobs:
         run: |
           result=1
           for i in 1 2 3; do
-            ./gradlew lint --parallel --build-cache --no-daemon --configuration-cache-problems=warn && { result=0; break; }
+            ./gradlew lint \
+              --parallel \
+              --build-cache \
+              --no-daemon \
+              --configuration-cache-problems=warn && {
+                result=0
+                break
+              }
             echo "::warning::Lint attempt $i failed, retrying..."
             sleep 10
           done
@@ -64,6 +87,7 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 15
+
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -77,8 +101,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
         with:
-          cache-encryption-key: ${{ secrets.GRADLE_CACHE_ENCRYPTION_KEY }}
-          gradle-home-cache-cleanup: true
+          cache-cleanup: on-success
           cache-read-only: true
 
       - name: Run unit tests
@@ -86,7 +109,14 @@ jobs:
         run: |
           result=1
           for i in 1 2 3; do
-            ./gradlew test --parallel --build-cache --no-daemon --configuration-cache-problems=warn && { result=0; break; }
+            ./gradlew test \
+              --parallel \
+              --build-cache \
+              --no-daemon \
+              --configuration-cache-problems=warn && {
+                result=0
+                break
+              }
             echo "::warning::Test attempt $i failed, retrying..."
             sleep 10
           done

@@ -20,7 +20,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalContext
@@ -40,7 +39,10 @@ import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.KeyManager
 import com.jcversa.swiftslate.model.PrefKeys
 import com.jcversa.swiftslate.model.ProviderType
+import com.jcversa.swiftslate.provider.DeepSeekConfig
 import com.jcversa.swiftslate.provider.GroqConfig
+import com.jcversa.swiftslate.provider.NvidiaConfig
+import com.jcversa.swiftslate.provider.OpenRouterConfig
 import com.jcversa.swiftslate.ui.components.LocalSlateRhythm
 import com.jcversa.swiftslate.ui.components.SlateCard
 import com.jcversa.swiftslate.ui.components.SlateItemCard
@@ -70,8 +72,19 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
     val geminiClient = remember { GeminiClient() }
     val openAIClient = remember { OpenAICompatibleClient() }
 
-    LaunchedEffect(Unit) {
-        keys = withContext(Dispatchers.IO) { keyManager.getKeys() }
+    // Read on every recomposition: the Settings tab can change the active provider while this
+    // movable screen is kept alive by MainActivity's tab container.
+    val storedProviderType = prefs.getString(PrefKeys.PROVIDER_TYPE, null)
+    val providerConfigurationInvalid =
+        storedProviderType != null && !ProviderType.isValid(storedProviderType)
+    val providerType = ProviderType.storedOrNull(storedProviderType) ?: ProviderType.GEMINI
+
+    LaunchedEffect(providerType, providerConfigurationInvalid) {
+        keys = if (providerConfigurationInvalid) {
+            emptyList()
+        } else {
+            withContext(Dispatchers.IO) { keyManager.getKeys(providerType) }
+        }
     }
 
     val validAddedMsg = stringResource(R.string.keys_valid_added)
@@ -83,21 +96,31 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
     val endpointNeedsV1Msg = stringResource(R.string.keys_endpoint_needs_v1)
     val rhythm = LocalSlateRhythm.current
 
-    val providerType = remember(prefs) {
-        ProviderType.sanitize(prefs.getString(PrefKeys.PROVIDER_TYPE, ProviderType.GEMINI))
-    }
-
     // Provider display names stay literals: proper nouns, like the pre-redesign "Groq"/"Gemini".
-    val providerName = when (providerType) {
-        ProviderType.GROQ -> "Groq AI"
-        ProviderType.CUSTOM -> "Custom OpenAI Provider"
-        else -> "Google Gemini AI"
+    val providerName = if (providerConfigurationInvalid) {
+        stringResource(R.string.error_provider_selection_invalid)
+    } else {
+        when (providerType) {
+            ProviderType.GROQ -> "Groq AI"
+            ProviderType.NVIDIA -> "NVIDIA NIM"
+            ProviderType.OPENROUTER -> "OpenRouter"
+            ProviderType.DEEPSEEK -> "DeepSeek"
+            ProviderType.CUSTOM -> "Custom OpenAI Provider"
+            else -> "Google Gemini AI"
+        }
     }
 
-    val apiKeyUrl = when (providerType) {
-        ProviderType.GROQ -> "https://console.groq.com/keys"
-        ProviderType.CUSTOM -> null
-        else -> "https://aistudio.google.com/api-keys"
+    val apiKeyUrl = if (providerConfigurationInvalid) {
+        null
+    } else {
+        when (providerType) {
+            ProviderType.GROQ -> "https://console.groq.com/keys"
+            ProviderType.NVIDIA -> "https://build.nvidia.com/settings/api-keys"
+            ProviderType.OPENROUTER -> "https://openrouter.ai/settings/keys"
+            ProviderType.DEEPSEEK -> "https://platform.deepseek.com/api_keys"
+            ProviderType.CUSTOM -> null
+            else -> "https://aistudio.google.com/api-keys"
+        }
     }
 
     Column(
@@ -117,8 +140,7 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                 Column {
                     Text(
                         text = stringResource(R.string.keys_title),
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
@@ -128,6 +150,30 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                     )
                 }
             }
+        }
+
+        if (providerConfigurationInvalid) {
+            SlateCard {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(2.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ErrorOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = stringResource(R.string.error_provider_selection_invalid),
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(rhythm.cardGap))
         }
 
         if (!keyManager.keystoreAvailable) {
@@ -214,12 +260,12 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                             testResult = null
                             scope.launch {
                                 val trimmedKey = newKey.trim()
-                                if (withContext(Dispatchers.IO) { keyManager.getKeys() }.contains(trimmedKey)) {
+                                if (withContext(Dispatchers.IO) { keyManager.getKeys(providerType) }.contains(trimmedKey)) {
                                     isTesting = false
                                     // Re-adding an existing key means the user is retrying it after a
                                     // failure — clear any invalid/rate-limit bench so the service can
                                     // use it again immediately instead of waiting out the 15-min TTL.
-                                    withContext(Dispatchers.IO) { keyManager.clearMarks(trimmedKey) }
+                                    withContext(Dispatchers.IO) { keyManager.clearMarks(trimmedKey, providerType) }
                                     testResult = alreadyAddedMsg
                                     testSuccess = false
                                     return@launch
@@ -235,6 +281,12 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                                         }
                                         providerType == ProviderType.GROQ ->
                                             openAIClient.validateKey(trimmedKey, GroqConfig.ENDPOINT)
+                                        providerType == ProviderType.NVIDIA ->
+                                            openAIClient.validateKey(trimmedKey, NvidiaConfig.ENDPOINT)
+                                        providerType == ProviderType.OPENROUTER ->
+                                            openAIClient.validateKey(trimmedKey, OpenRouterConfig.ENDPOINT)
+                                        providerType == ProviderType.DEEPSEEK ->
+                                            openAIClient.validateKey(trimmedKey, DeepSeekConfig.ENDPOINT)
                                         providerType == ProviderType.CUSTOM ->
                                             openAIClient.validateKey(trimmedKey, customEndpoint)
                                         else ->
@@ -243,12 +295,12 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                                 }
                                 isTesting = false
                                 if (result.isSuccess) {
-                                    if (!withContext(Dispatchers.IO) { keyManager.addKey(trimmedKey) }) {
+                                    if (!withContext(Dispatchers.IO) { keyManager.addKey(trimmedKey, providerType) }) {
                                         testResult = keystoreErrorMsg
                                         testSuccess = false
                                         return@launch
                                     }
-                                    keys = withContext(Dispatchers.IO) { keyManager.getKeys() }
+                                    keys = withContext(Dispatchers.IO) { keyManager.getKeys(providerType) }
                                     newKey = ""
                                     testResult = validAddedMsg
                                     testSuccess = true
@@ -269,7 +321,8 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                             }
                         }
                     },
-                    enabled = newKey.isNotBlank() && !isTesting && keyManager.keystoreAvailable,
+                    enabled = newKey.isNotBlank() && !isTesting && keyManager.keystoreAvailable &&
+                        !providerConfigurationInvalid,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 ) {
@@ -424,7 +477,7 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                                     Box(
                                         modifier = Modifier
                                             .size(6.dp)
-                                            .background(Color(0xFF10B981), CircleShape)
+                                            .background(MaterialTheme.colorScheme.tertiary, CircleShape)
                                             .align(Alignment.TopEnd)
                                     )
                                 }
@@ -450,7 +503,7 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     keyToDelete = key
                                 },
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.DeleteOutline,
@@ -505,9 +558,9 @@ fun KeysScreen(keyManager: KeyManager, prefs: SharedPreferences) {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     keyToDelete = null
                     scope.launch {
-                        val removed = withContext(Dispatchers.IO) { keyManager.removeKey(keyValue) }
+                        val removed = withContext(Dispatchers.IO) { keyManager.removeKey(keyValue, providerType) }
                         if (removed) {
-                            keys = withContext(Dispatchers.IO) { keyManager.getKeys() }
+                            keys = withContext(Dispatchers.IO) { keyManager.getKeys(providerType) }
                         } else {
                             testResult = keystoreErrorMsg
                             testSuccess = false

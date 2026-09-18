@@ -20,9 +20,13 @@ import com.jcversa.swiftslate.api.GeminiClient
 import com.jcversa.swiftslate.api.OpenAICompatibleClient
 import com.jcversa.swiftslate.manager.CommandManager
 import com.jcversa.swiftslate.manager.KeyManager
+import com.jcversa.swiftslate.manager.HistoryManager
 import com.jcversa.swiftslate.manager.StatsManager
+import com.jcversa.swiftslate.manager.TextStyleTransformer
 import com.jcversa.swiftslate.model.Command
 import com.jcversa.swiftslate.model.CommandType
+import com.jcversa.swiftslate.model.PrefKeys
+import com.jcversa.swiftslate.provider.Providers
 import com.jcversa.swiftslate.ui.processtext.ProcessTextEdit
 import com.jcversa.swiftslate.ui.processtext.ProcessTextReplacementBridge
 import com.jcversa.swiftslate.ui.processtext.resolveProcessTextEdit
@@ -50,6 +54,7 @@ class AssistantService : AccessibilityService() {
     private lateinit var keyManager: KeyManager
     private lateinit var commandManager: CommandManager
     private lateinit var statsManager: StatsManager
+    private lateinit var historyManager: HistoryManager
     private val client = GeminiClient()
     private val openAIClient = OpenAICompatibleClient()
     private val serviceJob = SupervisorJob()
@@ -113,6 +118,9 @@ class AssistantService : AccessibilityService() {
         const val TRIGGER_REFRESH_INTERVAL_MS = 5_000L
         const val PROCESSING_WATCHDOG_MS = 120_000L
         const val FOCUS_FALLBACK_MIN_INTERVAL_MS = 300L
+        const val TYPING_ANIMATION_MAX_STEPS = 72
+        const val TYPING_ANIMATION_MIN_DELAY_MS = 16L
+        const val TYPING_ANIMATION_MAX_DELAY_MS = 40L
         val SPINNER_FRAMES = arrayOf("◐", "◓", "◑", "◒")
     }
 
@@ -122,7 +130,9 @@ class AssistantService : AccessibilityService() {
             keyManager = (applicationContext as SwiftSlateApp).keyManager
             commandManager = CommandManager(applicationContext)
             statsManager = StatsManager(applicationContext)
+            historyManager = HistoryManager(applicationContext)
             updateTriggers()
+            BackgroundReliability.refreshRecoveryNotification(applicationContext)
         } catch (e: Exception) {
             // This callback runs on the binder thread with no framework guard: an exception
             // here propagates to AccessibilityManagerService, which drops the service into the
@@ -136,7 +146,9 @@ class AssistantService : AccessibilityService() {
         cachedPrefix = commandManager.getTriggerPrefix()
         cachedTranslatePrefix = "${cachedPrefix}translate:"
         val cmds = commandManager.getCommands()
-        triggerLastChars = cmds.mapNotNull { it.trigger.lastOrNull() }.toSet()
+        triggerLastChars = cmds.flatMap { command ->
+            listOf(command.trigger) + command.aliases
+        }.mapNotNull { it.lastOrNull() }.toSet()
         lastTriggerRefresh = System.currentTimeMillis()
     }
 
@@ -250,14 +262,15 @@ class AssistantService : AccessibilityService() {
             }
         }
 
-        val command = commandManager.findCommand(text) ?: run {
+        val match = commandManager.findCommandMatch(text) ?: run {
             source.safeRecycle()
             return
         }
+        val command = match.command
 
         performHapticFeedback(HapticFeedbackConstants.GESTURE_START)
 
-        val precedingText = text.substring(0, text.length - command.trigger.length)
+        val precedingText = text.substring(0, text.length - match.matchedTrigger.length)
         val cleanText = precedingText.trim()
 
         if (command.trigger.endsWith("undo") && command.isBuiltIn) {
@@ -287,6 +300,12 @@ class AssistantService : AccessibilityService() {
 
         when (command.type) {
             CommandType.TEXT_REPLACER -> {
+                // Style commands are built-in local transformations. Unlike a user snippet,
+                // their output depends on the text before the trigger and must never append the
+                // command's descriptive prompt into the user's field.
+                val replacement = TextStyleTransformer.styleFor(command)?.let { style ->
+                    TextStyleTransformer.transform(style, precedingText)
+                } ?: (precedingText + command.prompt)
                 if (!isProcessing.compareAndSet(false, true)) {
                     source.safeRecycle()
                     return
@@ -298,7 +317,7 @@ class AssistantService : AccessibilityService() {
                     val thisJob = coroutineContext[Job]
                     try {
                         withContext(Dispatchers.Main) {
-                            val replacerOk = replaceText(source, precedingText + command.prompt)
+                            val replacerOk = replaceText(source, replacement)
                             if (!replacerOk) {
                                 // Don't record an undo point, a CONFIRM haptic or a usage stat
                                 // for a replacement the field silently refused.
@@ -309,6 +328,7 @@ class AssistantService : AccessibilityService() {
                                 lastUndoSourceId = sourceId(source)
                                 performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                                 statsManager.recordUsage(command.trigger)
+                                recordHistory(command.trigger, precedingText, replacement)
                             }
                         }
                     } catch (e: CancellationException) {
@@ -393,27 +413,29 @@ class AssistantService : AccessibilityService() {
         source: AccessibilityNodeInfo,
         afterText: String
     ): Boolean {
-        val request = ProcessTextReplacementBridge.current(SystemClock.elapsedRealtime())
-            ?: return false
-        // The request's package is optional, but an event without a package can never be
-        // verified against it — previously a pending request with a null sourcePackage was
-        // matched against (and consumed by) an edit in ANY app, or one with no package at all.
+        // A process can host several Process Text activities at once. Pick a pending request
+        // by package and exact edit shape instead of using one global slot, so a late event for
+        // request A cannot consume request B.
         val eventPackage = event.packageName?.toString() ?: return false
-        if (request.sourcePackage != null && eventPackage != request.sourcePackage) {
-            return false
-        }
         val beforeText = event.beforeText?.toString() ?: return false
-        val edit = resolveProcessTextEdit(
-            beforeText = beforeText,
-            afterText = afterText,
-            fromIndex = event.fromIndex,
-            removedCount = event.removedCount,
-            addedCount = event.addedCount,
-            request = request
-        )
-        if (edit == ProcessTextEdit.Unrelated) {
-            return false
+        var request: com.jcversa.swiftslate.ui.processtext.PendingProcessTextReplacement? = null
+        var edit: ProcessTextEdit = ProcessTextEdit.Unrelated
+        for (candidate in ProcessTextReplacementBridge.candidates(SystemClock.elapsedRealtime(), eventPackage)) {
+            val candidateEdit = resolveProcessTextEdit(
+                beforeText = beforeText,
+                afterText = afterText,
+                fromIndex = event.fromIndex,
+                removedCount = event.removedCount,
+                addedCount = event.addedCount,
+                request = candidate
+            )
+            if (candidateEdit != ProcessTextEdit.Unrelated) {
+                request = candidate
+                edit = candidateEdit
+                break
+            }
         }
+        val matchedRequest = request ?: return false
         if (edit is ProcessTextEdit.Appended && isProcessing.get()) {
             // A command is already running. Leave the request pending and the field untouched
             // instead of consuming the request and swallowing the user's keystroke — a later
@@ -421,11 +443,15 @@ class AssistantService : AccessibilityService() {
             source.safeRecycle()
             return false
         }
-        if (!ProcessTextReplacementBridge.consume(request)) {
+        if (!ProcessTextReplacementBridge.consume(matchedRequest)) {
             return false
         }
         if (edit == ProcessTextEdit.Replaced) {
-            source.safeRecycle()
+            if (matchedRequest.animateReplacement && typingAnimationEnabled()) {
+                startProcessTextAnimation(source, beforeText, matchedRequest.replacement)
+            } else {
+                source.safeRecycle()
+            }
             return true
         }
 
@@ -441,7 +467,16 @@ class AssistantService : AccessibilityService() {
         currentJob = serviceScope.launch {
             val thisJob = coroutineContext[Job]
             try {
-                val replaced = replaceText(source, edit.correctedText)
+                val replaced = if (matchedRequest.animateReplacement && typingAnimationEnabled()) {
+                    replaceTextWithTypingAnimation(
+                        source,
+                        beforeText,
+                        edit.correctedText,
+                        restoreOriginalFirst = true
+                    )
+                } else {
+                    replaceText(source, edit.correctedText)
+                }
                 if (replaced) {
                     lastOriginalText = beforeText
                     lastUndoSourceId = sourceId(source)
@@ -467,6 +502,53 @@ class AssistantService : AccessibilityService() {
             }
         }
         return true
+    }
+
+    private fun startProcessTextAnimation(
+        source: AccessibilityNodeInfo,
+        originalText: String,
+        replacement: String
+    ) {
+        if (!isProcessing.compareAndSet(false, true)) {
+            source.safeRecycle()
+            return
+        }
+        startWatchdog()
+        cancelPendingProcessingReset()
+        currentJob?.cancel()
+        currentJob = serviceScope.launch {
+            val thisJob = coroutineContext[Job]
+            try {
+                if (replaceTextWithTypingAnimation(
+                        source,
+                        originalText,
+                        replacement,
+                        restoreOriginalFirst = true
+                    )
+                ) {
+                    lastOriginalText = originalText
+                    lastUndoSourceId = sourceId(source)
+                } else {
+                    withContext(Dispatchers.Main) {
+                        showToast(getString(R.string.toast_replace_failed))
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                withContext(Dispatchers.Main) {
+                    showToast(getString(R.string.toast_replace_failed))
+                }
+            } finally {
+                withContext(NonCancellable + Dispatchers.Main) {
+                    if (currentJob === thisJob) {
+                        cancelWatchdog()
+                        scheduleProcessingReset()
+                    }
+                    recycleIfUnowned(source)
+                }
+            }
+        }
     }
 
     private fun processCommand(source: AccessibilityNodeInfo, text: String, command: Command) {
@@ -503,7 +585,7 @@ class AssistantService : AccessibilityService() {
 
                 when (outcome) {
                     is CommandOutcome.Success -> {
-                        if (!replaceText(source, outcome.text)) {
+                        if (!replaceTextWithTypingAnimation(source, originalText, outcome.text)) {
                             // The field rejected the write. Restore the user's text, and don't
                             // record an undo point or a CONFIRM haptic for text that never landed.
                             replaceText(source, originalText)
@@ -514,6 +596,7 @@ class AssistantService : AccessibilityService() {
                             lastUndoSourceId = sourceId(source)
                             performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                             statsManager.recordUsage(command.trigger)
+                            recordHistory(command.trigger, originalText, outcome.text)
                         }
                     }
                     is CommandOutcome.Refusal -> {
@@ -788,6 +871,73 @@ class AssistantService : AccessibilityService() {
         after
     }
 
+    private fun typingAnimationEnabled(): Boolean =
+        getSharedPreferences("settings", Context.MODE_PRIVATE)
+            .getBoolean(PrefKeys.TYPING_ANIMATION_ENABLED, true)
+
+    /**
+     * Writes AI output progressively while keeping the existing ACTION_SET_TEXT and clipboard
+     * fallback path as the final safety net. The focused field is always restored first for
+     * PROCESS_TEXT hosts, because those hosts have already inserted the complete result before
+     * the accessibility service sees the event.
+     */
+    private suspend fun replaceTextWithTypingAnimation(
+        source: AccessibilityNodeInfo,
+        originalText: String,
+        newText: String,
+        restoreOriginalFirst: Boolean = false
+    ): Boolean {
+        if (!typingAnimationEnabled() || newText.length < 2 || newText == originalText) {
+            return replaceText(source, newText)
+        }
+
+        return withContext(Dispatchers.Main) {
+            fun setTextDirect(text: String): Boolean {
+                if (!source.refresh()) return false
+                val bundle = Bundle().apply {
+                    putCharSequence(
+                        AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                        text
+                    )
+                }
+                return source.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)
+            }
+
+            if (restoreOriginalFirst && !setTextDirect(originalText)) {
+                return@withContext replaceText(source, newText)
+            }
+
+            val steps = minOf(TYPING_ANIMATION_MAX_STEPS, newText.length)
+            val chunkSize = (newText.length + steps - 1) / steps
+            val pauseMs = (1_100L / steps).coerceIn(
+                TYPING_ANIMATION_MIN_DELAY_MS,
+                TYPING_ANIMATION_MAX_DELAY_MS
+            )
+            var end = 0
+            while (end < newText.length) {
+                var next = minOf(newText.length, end + chunkSize)
+                // Never expose half of a UTF-16 surrogate pair during an intermediate frame.
+                if (next < newText.length &&
+                    newText[next - 1].isHighSurrogate() && newText[next].isLowSurrogate()
+                ) {
+                    next++
+                }
+                if (!setTextDirect(newText.substring(0, next))) {
+                    return@withContext replaceText(source, newText)
+                }
+                end = next
+                if (end < newText.length) delay(pauseMs)
+            }
+
+            delay(80)
+            if (!source.refresh() || source.text?.toString() != newText) {
+                return@withContext replaceText(source, newText)
+            }
+            scheduleTextVerification(source, newText)
+            true
+        }
+    }
+
     /**
      * Writes [newText] into [source]. Returns false when the field could not be updated.
      * It previously returned Unit and signalled failure by returning early, which made every
@@ -1000,6 +1150,17 @@ class AssistantService : AccessibilityService() {
         val pending = pendingClipRestore ?: return
         pendingClipRestore = null
         restoreClipboard(pending.first, pending.second, pending.third)
+    }
+
+    private fun recordHistory(command: String, input: String, output: String) {
+        if (!::historyManager.isInitialized) return
+        try {
+            val prefs = getSharedPreferences("settings", Context.MODE_PRIVATE)
+            val provider = Providers.forStoredType(prefs.getString(PrefKeys.PROVIDER_TYPE, null))?.type.orEmpty()
+            historyManager.record(command, input, output, provider)
+        } catch (_: Exception) {
+            // History is optional and must never make a successful replacement fail.
+        }
     }
 
     private fun mapErrorMessage(raw: String): String = getString(ErrorMessages.map(raw))

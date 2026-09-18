@@ -68,6 +68,16 @@ class CatalogTest {
         assertTrue(GroqModels.isChatCandidate("allam-2-7b"))
     }
 
+    @Test
+    fun openai_compatible_filter_excludes_non_chat_models() {
+        assertTrue(OpenAIModels.isChatCandidate("meta/llama-3.1-8b-instruct"))
+        assertTrue(OpenAIModels.isChatCandidate("deepseek-flash"))
+        assertFalse(OpenAIModels.isChatCandidate("text-embedding-3-small"))
+        assertFalse(OpenAIModels.isChatCandidate("whisper-1"))
+        assertFalse(OpenAIModels.isChatCandidate("some-reranker"))
+        assertFalse(OpenAIModels.isChatCandidate("moderation-latest"))
+    }
+
     // ---------- GeminiModels ----------
 
     @Test
@@ -87,8 +97,8 @@ class CatalogTest {
 
     @Test
     fun gemini_thinkingLevel_for_catalog_null_for_unknown() {
-        // flash-lite uses "low", flash uses "minimal"
-        assertEquals("low", GeminiModels.thinkingLevel("gemini-3.5-flash-lite"))
+        // Both curated models use the latency-first setting for inline transformations.
+        assertEquals("minimal", GeminiModels.thinkingLevel("gemini-3.5-flash-lite"))
         assertEquals("minimal", GeminiModels.thinkingLevel("gemini-3.6-flash"))
         assertNull(GeminiModels.thinkingLevel("gemini-9-ultra"))
     }

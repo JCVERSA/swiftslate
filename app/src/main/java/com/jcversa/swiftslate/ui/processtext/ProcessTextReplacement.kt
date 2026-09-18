@@ -1,12 +1,13 @@
 package com.jcversa.swiftslate.ui.processtext
 
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.ConcurrentLinkedQueue
 
 internal data class PendingProcessTextReplacement(
     val original: String,
     val replacement: String,
     val sourcePackage: String?,
-    val createdAt: Long
+    val createdAt: Long,
+    val animateReplacement: Boolean = false
 )
 
 internal sealed interface ProcessTextEdit {
@@ -15,24 +16,57 @@ internal sealed interface ProcessTextEdit {
     data class Appended(val correctedText: String) : ProcessTextEdit
 }
 
-/** One result awaiting application by the app that launched ACTION_PROCESS_TEXT. */
+/**
+ * Results awaiting application by apps that launched ACTION_PROCESS_TEXT.
+ *
+ * More than one Process Text activity can be alive in the same process (for example when a user
+ * launches SwiftSlate from two split-screen windows). A single AtomicReference let the newest
+ * result overwrite the older one. The bounded, expiring queue keeps those requests isolated; the
+ * service selects a request by source package and the exact before/after edit before consuming it.
+ */
 internal object ProcessTextReplacementBridge {
     private const val MAX_AGE_MS = 3_000L
-    private val pending = AtomicReference<PendingProcessTextReplacement?>()
+    private const val MAX_PENDING = 16
+    private val pending = ConcurrentLinkedQueue<PendingProcessTextReplacement>()
 
-    fun prepare(original: String, replacement: String, sourcePackage: String?, now: Long) {
-        pending.set(PendingProcessTextReplacement(original, replacement, sourcePackage, now))
+    fun prepare(
+        original: String,
+        replacement: String,
+        sourcePackage: String?,
+        animateReplacement: Boolean,
+        now: Long
+    ) {
+        purgeExpired(now)
+        while (pending.size >= MAX_PENDING) pending.poll()
+        pending.offer(
+            PendingProcessTextReplacement(
+                original = original,
+                replacement = replacement,
+                sourcePackage = sourcePackage,
+                createdAt = now,
+                animateReplacement = animateReplacement
+            )
+        )
     }
 
-    fun current(now: Long): PendingProcessTextReplacement? {
-        val request = pending.get() ?: return null
-        if (now - request.createdAt in 0..MAX_AGE_MS) return request
-        pending.compareAndSet(request, null)
-        return null
+    /** Returns live requests that may belong to [sourcePackage], without removing any. */
+    fun candidates(now: Long, sourcePackage: String): List<PendingProcessTextReplacement> {
+        purgeExpired(now)
+        return pending.filter { request ->
+            request.sourcePackage == null || request.sourcePackage == sourcePackage
+        }
     }
 
-    fun consume(request: PendingProcessTextReplacement): Boolean =
-        pending.compareAndSet(request, null)
+    fun consume(request: PendingProcessTextReplacement): Boolean = pending.remove(request)
+
+    private fun purgeExpired(now: Long) {
+        // Use an explicit snapshot rather than Queue.removeIf: SwiftSlate supports API 23,
+        // where the Java 8 default method is not available without core-library desugaring.
+        pending.toList().forEach { request ->
+            val age = now - request.createdAt
+            if (age !in 0..MAX_AGE_MS) pending.remove(request)
+        }
+    }
 }
 
 /**

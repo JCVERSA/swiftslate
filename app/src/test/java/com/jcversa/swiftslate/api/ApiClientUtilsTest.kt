@@ -295,6 +295,26 @@ class ApiClientUtilsTest {
     }
 
     @Test
+    fun parseModelIds_appliesCatalogCountAndIdLengthBounds() {
+        val body = buildString {
+            append("{\"data\":[")
+            repeat(1_005) { index ->
+                if (index > 0) append(',')
+                append("{\"id\":\"model-$index\"}")
+            }
+            append(", {\"id\":\"")
+            append("x".repeat(257))
+            append("\"}]}")
+        }
+
+        val models = ApiClientUtils.parseModelIds(body)
+
+        assertEquals(1_000, models.size)
+        assertEquals("model-0", models.first())
+        assertEquals("model-999", models.last())
+    }
+
+    @Test
     fun parseModelIds_nonJsonHtmlAndBlankReturnEmpty() {
         assertEquals(emptyList<String>(), ApiClientUtils.parseModelIds(""))
         assertEquals(emptyList<String>(), ApiClientUtils.parseModelIds("not json"))
