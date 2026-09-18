@@ -239,7 +239,7 @@ config = {}
 commands = {}
 api_keys = []
 model = ""
-prefix = "?"
+prefix = "."
 processing = False
 abort_event = threading.Event()  # Set when user types during processing — aborts spinner
 last_original_text = None
@@ -529,7 +529,7 @@ def load_config():
     if not isinstance(model, str) or not model.strip():
         log(f"WARNING: Invalid model value, defaulting to {default_model}")
         model = default_model
-    prefix = config.get("prefix", "?")
+    prefix = config.get("prefix", ".")
     temperature = config.get("temperature", 0.5)
     custom_endpoint = config.get("endpoint", "")
     if not isinstance(custom_endpoint, str):
@@ -539,8 +539,8 @@ def load_config():
 
     # Validate prefix (must happen before translate_prefix is computed)
     if not isinstance(prefix, str) or not prefix:
-        log("WARNING: Invalid prefix, defaulting to '?'")
-        prefix = "?"
+        log("WARNING: Invalid prefix, defaulting to '.'")
+        prefix = "."
     translate_prefix = prefix + "translate:"
 
     # Validate temperature. json.load accepts Infinity/NaN and huge int literals, and

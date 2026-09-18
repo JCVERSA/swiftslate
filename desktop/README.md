@@ -34,18 +34,18 @@ Type one of these commands at the end of text in a supported field:
 
 | Command | Result |
 | --- | --- |
-| `?bold` | Unicode bold characters |
-| `?italic` | Unicode italic characters |
-| `?mono` | Unicode monospace characters |
-| `?bubble` | Circled or bubble characters |
-| `?gothic` | Fraktur characters |
-| `?smallcaps` | Small-cap characters |
-| `?normal` | Convert the supported style characters back to ordinary text |
+| `.bold` | Unicode bold characters |
+| `.italic` | Unicode italic characters |
+| `.mono` | Unicode monospace characters |
+| `.bubble` | Circled or bubble characters |
+| `.gothic` | Fraktur characters |
+| `.smallcaps` | Small-cap characters |
+| `.normal` | Convert the supported style characters back to ordinary text |
 
 Example:
 
 ```text
-Hello SwiftSlate 2026 ?bold
+Hello SwiftSlate 2026 .bold
 ```
 
 becomes:
@@ -68,7 +68,7 @@ SwiftSlate returns focus to the target window, copies only the selection, applie
 
 ## Configuration
 
-The installer creates `%USERPROFILE%\.swiftslate\config.json`. Ordinary settings remain JSON, while API keys are stored as `api_keys_protected` DPAPI values. A protected value can only be decrypted by the same Windows user profile on the same machine.
+The installer creates `%USERPROFILE%\.swiftslate\config.json`. The Windows default trigger prefix is a period (`.`). You can change it in `config.json`. Ordinary settings remain JSON, while API keys are stored as `api_keys_protected` DPAPI values. A protected value can only be decrypted by the same Windows user profile on the same machine.
 
 To add, replace, or remove keys without editing them in plaintext, run the bundled PowerShell helper:
 
@@ -83,6 +83,7 @@ Example configuration without API access:
 ```json
 {
   "provider": "gemini",
+  "prefix": ".",
   "model": "gemini-3.5-flash-lite",
   "api_keys_protected": [],
   "spinner": "animated",
@@ -96,16 +97,16 @@ With no key, AI commands show a clear error only when invoked. Local styles and 
 
 The desktop baseline includes:
 
-- `?fix`
-- `?improve`
-- `?shorten`
-- `?expand`
-- `?formal`
-- `?casual`
-- `?emoji`
-- `?human`
-- `?reply`
-- `?translate:XX`
+- `.fix`
+- `.improve`
+- `.shorten`
+- `.expand`
+- `.formal`
+- `.casual`
+- `.emoji`
+- `.human`
+- `.reply`
+- `.translate:XX`
 
 AI commands are opt-in network operations. SwiftSlate does not silently change the selected provider or send text to an unconfigured provider. The current provider and model remain in `config.json`.
 

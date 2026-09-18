@@ -24,7 +24,7 @@ $pyTag = (($pythonVersion -split '\.')[0] + ($pythonVersion -split '\.')[1])
 # verified at install time and by CI (URL reachability); bump it whenever $pythonVersion
 # changes. Recompute with: sha256sum <file>  (or `Get-FileHash -Algorithm SHA256` on Windows)
 $hashes = @{
-    "SwiftSlate.pyw"   = "4011DC77627B5C2253B2A7AA200DD9AA7D9BFE9EDC14C0F9A8B1C4DAD564356C"
+    "SwiftSlate.pyw"   = "F5C196477B8830CAEC74BCF40B3C7C12F88E691282FF0A57124F31E6831580DE"
     "commands.json"    = "6DBEFF58B9C270A350E53E4604146AD41E04B874F49ECF42AF34861C4E631D6B"
     "text_styles.py"   = "487C1BEEC7CECEA838612DB76117FE9CA57DC5B6888187645D654FD6A3F705A8"
     "secure_config.py" = "A22BE931E0A01F013F91765D875DC4C30719C90AA31F0AA05CF373292486EB12"
@@ -313,7 +313,7 @@ try {
         Write-Host ""
         $prov = Read-Host "  Choice [default: 1]"
 
-        $cfg = @{ provider = "gemini" }
+        $cfg = @{ provider = "gemini"; prefix = "." }
         if ($prov -eq "2") {
             $cfg.provider = "groq"
             Write-Host ""

@@ -23,6 +23,14 @@ class DesktopPackagingTest(unittest.TestCase):
         self.assertIn("raw.githubusercontent.com/JCVERSA/swiftslate/main/desktop", installer)
         self.assertNotIn("Musheer360/SwiftSlate-Desktop/master", installer)
 
+    def test_windows_default_prefix_is_a_period(self):
+        root = Path(__file__).parents[1]
+        source = (root / "SwiftSlate.pyw").read_text(encoding="utf-8")
+        installer = (root / "install.ps1").read_text(encoding="utf-8")
+        self.assertIn('prefix = "."', source)
+        self.assertIn('config.get("prefix", ".")', source)
+        self.assertIn('prefix = "."', installer)
+
 
 if __name__ == "__main__":
     unittest.main()
