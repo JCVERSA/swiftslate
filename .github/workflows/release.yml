@@ -66,20 +66,25 @@ jobs:
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           VERSION_NAME="$(sed -n 's/^versionName=//p' version.properties | head -1)"
           VERSION_CODE="$(sed -n 's/^versionCode=//p' version.properties | head -1)"
+
           test -n "$VERSION_NAME"
           test -n "$VERSION_CODE"
+
           [[ "$TAG_VERSION" == "$VERSION_NAME" ]] || {
             echo "::error::Tag $TAG_VERSION does not match version.properties ($VERSION_NAME)."
             exit 1
           }
+
           [[ "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || {
             echo "::error::versionName is not a stable semantic version: $VERSION_NAME"
             exit 1
           }
+
           [[ "$VERSION_CODE" =~ ^[1-9][0-9]*$ ]] || {
             echo "::error::versionCode must be a positive integer: $VERSION_CODE"
             exit 1
           }
+
           {
             echo "version_name=$VERSION_NAME"
             echo "version_code=$VERSION_CODE"
@@ -111,6 +116,7 @@ jobs:
           test -n "$KEYSTORE_PASSWORD"
           test -n "$KEY_ALIAS"
           test -n "$KEY_PASSWORD"
+
           ./gradlew lintRelease test :app:assembleRelease \
             --parallel \
             --build-cache \
@@ -127,22 +133,32 @@ jobs:
           VERSION_CODE: ${{ steps.metadata.outputs.version_code }}
         run: |
           set -euo pipefail
+
           APK="app/build/outputs/apk/release/app-release.apk"
+
           test -s "$APK"
           test -f app/build/outputs/mapping/release/mapping.txt
+
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+
           test -x "$BUILD_TOOLS/apksigner"
           test -x "$BUILD_TOOLS/zipalign"
           test -x "$BUILD_TOOLS/aapt"
+
           "$BUILD_TOOLS/zipalign" -c -P 4 -v 4 "$APK"
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+
           BADGING="$("$BUILD_TOOLS/aapt" dump badging "$APK")"
+
           grep -F "package: name='com.jcversa.swiftslate' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'" <<< "$BADGING"
           ! grep -F "com.jcversa.swiftslate.preview" <<< "$BADGING"
+
           SIZE="$(stat -c%s "$APK")"
           test "$SIZE" -gt 100000
+
           SHA256="$(sha256sum "$APK" | cut -d' ' -f1)"
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
           {
             echo "## Stable release verification"
             echo
@@ -161,9 +177,16 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-assets
-          cp app/build/outputs/apk/release/app-release.apk "release-assets/SwiftSlate-v${VERSION_NAME}.apk"
+
+          cp app/build/outputs/apk/release/app-release.apk \
+            "release-assets/SwiftSlate-v${VERSION_NAME}.apk"
+
           printf '%s\n' "$VERSION_CODE" > release-assets/versionCode.txt
-          (cd release-assets && sha256sum "SwiftSlate-v${VERSION_NAME}.apk" versionCode.txt > SHA256SUMS.txt)
+
+          (
+            cd release-assets
+            sha256sum "SwiftSlate-v${VERSION_NAME}.apk" versionCode.txt > SHA256SUMS.txt
+          )
 
       - name: Upload verified APK artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
