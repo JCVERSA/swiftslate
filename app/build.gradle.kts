@@ -98,7 +98,7 @@ android {
     // never committed to the repository. Preview builds deliberately use the debug key and
     // do not need this configuration.
     val releaseSigningConfig = if (releaseSigningConfigured) {
-        signingConfigs.create("release") {
+        signingConfigs.create("stableRelease") {
             this.storeFile = File(keystorePath!!)
             this.storePassword = keystorePassword
             this.keyAlias = keyAlias
