@@ -92,8 +92,7 @@ jobs:
 
           ./gradlew lintRelease test :app:assembleRelease \
             --parallel \
-            --no-build-cache \
-            --no-configuration-cache \
+            --build-cache \
             --no-daemon \
             --configuration-cache-problems=warn \
             -PversionName="$VERSION_NAME" \
