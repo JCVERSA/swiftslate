@@ -1,0 +1,22 @@
+[
+  { "trigger": "fix", "type": "ai", "prompt": "Fix grammar, spelling, and punctuation errors." },
+  { "trigger": "improve", "type": "ai", "prompt": "Rewrite to improve clarity, flow, and coherence." },
+  { "trigger": "shorten", "type": "ai", "prompt": "Rewrite to be more concise while preserving the core meaning." },
+  { "trigger": "expand", "type": "ai", "prompt": "Rewrite with more detail. Elaborate only on what is stated or widely known — do not fabricate information." },
+  { "trigger": "formal", "type": "ai", "prompt": "Rewrite in a formal, professional tone." },
+  { "trigger": "casual", "type": "ai", "prompt": "Rewrite in a casual, friendly tone." },
+  { "trigger": "emoji", "type": "ai", "prompt": "Add relevant emojis throughout." },
+  { "trigger": "human", "type": "ai", "prompt": "Rewrite to sound naturally human, not AI-generated. Never use emdashes or semicolons, use commas or periods instead. Drop AI clichés and filler phrases. Use contractions, everyday words, and varied sentence lengths. Keep all facts, names, and numbers intact." },
+  { "trigger": "reply", "type": "ai", "prompt": "Generate a contextual reply to this message." },
+
+  { "trigger": "bold", "type": "style", "value": "bold", "prompt": "Apply bold Unicode characters locally." },
+  { "trigger": "italic", "type": "style", "value": "italic", "prompt": "Apply italic Unicode characters locally." },
+  { "trigger": "mono", "type": "style", "value": "mono", "prompt": "Apply monospace Unicode characters locally." },
+  { "trigger": "bubble", "type": "style", "value": "bubble", "prompt": "Apply circled Unicode characters locally." },
+  { "trigger": "gothic", "type": "style", "value": "gothic", "prompt": "Apply Fraktur Unicode characters locally." },
+  { "trigger": "smallcaps", "type": "style", "value": "smallcaps", "prompt": "Apply small-cap Unicode characters locally." },
+  { "trigger": "normal", "type": "style", "value": "normal", "prompt": "Convert supported Unicode styles back to normal text." },
+
+  { "trigger": "date", "type": "replacer-shell", "value": "powershell -NoProfile -Command \"Get-Date -Format 'dddd, MMMM dd, yyyy'\"" },
+  { "trigger": "time", "type": "replacer-shell", "value": "powershell -NoProfile -Command \"Get-Date -Format 'hh:mm tt'\"" }
+]

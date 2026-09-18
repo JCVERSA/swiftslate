@@ -44,7 +44,7 @@ Type a trigger like **`?fix`** at the end of any text, in any app, and watch it 
 > **SwiftSlate works in most apps** — WhatsApp, Gmail, Twitter/X, Messages, Notes, and more. No copy-pasting. No app switching. Just type and go. Some apps with custom input fields may not be supported ([see limitations](#%EF%B8%8F-known-limitations)).
 
 > [!TIP]
-> **Looking for the Windows version?** Check out [**SwiftSlate Desktop**](https://github.com/Musheer360/SwiftSlate-Desktop) — same concept, works system-wide on Windows 10/11.
+> **Looking for the Windows version?** Check out the repository's [**SwiftSlate Desktop port**](desktop/README.md) — same concept, works system-wide on Windows 10/11 x64.
 
 <br>
 
