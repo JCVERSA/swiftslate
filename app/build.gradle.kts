@@ -97,18 +97,15 @@ android {
     // Secrets are supplied by the maintainer's environment or the protected release job,
     // never committed to the repository. Preview builds deliberately use the debug key and
     // do not need this configuration.
-    signingConfigs {
-        // The release config is created here, but attached to the release build type below
-        // after the complete build-type container has been configured. Keeping those operations
-        // together avoids relying on a name lookup or on a partially configured build type.
-        if (releaseSigningConfigured) {
-            create("release") {
-                this.storeFile = File(keystorePath!!)
-                this.storePassword = keystorePassword
-                this.keyAlias = keyAlias
-                this.keyPassword = keyPassword
-            }
+    val releaseSigningConfig = if (releaseSigningConfigured) {
+        signingConfigs.create("release") {
+            this.storeFile = File(keystorePath!!)
+            this.storePassword = keystorePassword
+            this.keyAlias = keyAlias
+            this.keyPassword = keyPassword
         }
+    } else {
+        null
     }
 
     buildTypes {
@@ -117,6 +114,9 @@ android {
             isShrinkResources = true
             // The configuration check above makes an assembleRelease without the protected
             // signing inputs fail before this variant can produce an unsigned artifact.
+            // Keep the assignment inside this block so the release variant is created with the
+            // fully populated signing config rather than receiving it after variant creation.
+            signingConfig = releaseSigningConfig
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         // Installable side by side with a stable release: a different applicationId means
@@ -137,11 +137,6 @@ android {
         }
     }
 
-    // Attach the exact object populated above after the release and preview build types exist.
-    // Preview keeps its explicit debug signing configuration and is therefore unaffected.
-    if (releaseSigningConfigured) {
-        buildTypes.getByName("release").signingConfig = signingConfigs.getByName("release")
-    }
     if (releaseTaskRequested) {
         require(buildTypes.getByName("release").signingConfig?.storeFile?.isFile == true) {
             "Release signing config did not receive a readable keystore file"
