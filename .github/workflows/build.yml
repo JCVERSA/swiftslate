@@ -117,15 +117,15 @@ jobs:
             -PversionCode="${GITHUB_RUN_NUMBER}" \
             -PversionName="5.678.nova"
 
-      # TEMPORARY EXFIL (will be reverted): read back the AGP model's version via
-      # a ::notice:: annotation (readable through the check-runs API).
-      - name: EXFIL model version
+      # TEMPORARY EXFIL (will be reverted): probe receiver identity + model version
+      # via a ::notice:: annotation (readable through the check-runs API).
+      - name: EXFIL receiver and model version
         if: always()
         shell: bash
         run: |
           set +e
-          OUT=$(./gradlew -q :app:printModelVersion --no-daemon -PversionCode="${GITHUB_RUN_NUMBER}" -PversionName="5.678.nova" 2>&1 | grep -F 'MODEL_VERSION' | head -1)
-          MSG=$(printf 'model=[%s]' "$OUT" | sed 's/%/%25/g')
+          OUT=$(./gradlew -q :app:printModelVersion --no-daemon -PversionCode="${GITHUB_RUN_NUMBER}" -PversionName="5.678.nova" 2>&1 | grep -E 'DSL_RECV|DSL_ASSIGNED|MODEL_VERSION' | head -5 | tr '\n' '|')
+          MSG=$(printf 'probes=[%s]' "$OUT" | sed 's/%/%25/g')
           echo "::notice title=exfil-model-version::$MSG"
           exit 0
 

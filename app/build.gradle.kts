@@ -58,8 +58,8 @@ android {
         applicationId = "com.jcversa.swiftslate"
         minSdk = 23
         targetSdk = 36
-        this.versionCode = versionCode
-        this.versionName = versionName
+        // TEMP EXPERIMENT (will be reverted): probe the defaultConfig receiver.
+        println("DSL_RECV class=${this::class.qualifiedName} idHash=${System.identityHashCode(this)}")
 
         // Ship exactly the locales that exist in res/, and nothing else.
         //
@@ -85,6 +85,11 @@ android {
             .map { it.name.removePrefix("values-") }
         androidResources.localeFilters += (listOf("en") + locales)
     }
+
+    // TEMP EXPERIMENT (will be reverted): assign version directly on the model object.
+    defaultConfig.versionCode = versionCode
+    defaultConfig.versionName = versionName
+    println("DSL_ASSIGNED modelIdHash=${System.identityHashCode(defaultConfig)} versionCodeNow=${defaultConfig.versionCode} versionNameNow=${defaultConfig.versionName}")
 
     androidResources {
         // Generates <locale-config> from the locales in res/ and references it from the
@@ -194,6 +199,6 @@ dependencies {
 // TEMPORARY (will be reverted): read back the AGP model's version values.
 tasks.register("printModelVersion") {
     doLast {
-        println("MODEL_VERSION versionCode=[${android.defaultConfig.versionCode}] versionName=[${android.defaultConfig.versionName}]")
+        println("MODEL_VERSION versionCode=[${android.defaultConfig.versionCode}] versionName=[${android.defaultConfig.versionName}] idHash=${System.identityHashCode(android.defaultConfig)}")
     }
 }
