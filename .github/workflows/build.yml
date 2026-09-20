@@ -42,10 +42,6 @@ jobs:
     name: Build installable APK
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # TEMPORARY (PR branch only, will be reverted): allow committing the built
-    # debug APK back to the PR branch.
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout code
@@ -101,91 +97,6 @@ jobs:
           name: SwiftSlate-${{ env.APK_LABEL }}
           path: app/build/outputs/apk/preview/SwiftSlate-*.apk
           retention-days: 14
-
-      # TEMPORARY (PR branch only, will be reverted): also assemble the requested
-      # debug APK so the PR check produces it without merging or workflow_dispatch.
-      # Strict checks: any failure fails the run and skips shipping.
-      - name: Build debug APK
-        shell: bash
-        run: |
-          ./gradlew :app:assembleDebug \
-            --parallel \
-            --build-cache \
-            --no-daemon \
-            --configuration-cache-problems=warn \
-            -PversionCode="${GITHUB_RUN_NUMBER}" \
-            -PversionName="5.678.nova"
-
-      - name: Check debug APK alignment
-        shell: bash
-        run: |
-          set -euo pipefail
-          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
-          "$BUILD_TOOLS/zipalign" -c 4 app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Check debug APK signature
-        shell: bash
-        run: |
-          set -euo pipefail
-          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
-          "$BUILD_TOOLS/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Check debug APK identity
-        shell: bash
-        run: |
-          set -euo pipefail
-          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
-          "$BUILD_TOOLS/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep -F "package: name='com.jcversa.swiftslate' versionCode='${GITHUB_RUN_NUMBER}' versionName='5.678.nova'"
-
-      - name: Check debug APK size
-        shell: bash
-        run: |
-          set -euo pipefail
-          APK="app/build/outputs/apk/debug/app-debug.apk"
-          test -s "$APK"
-          SIZE="$(stat -c%s "$APK")"
-          test "$SIZE" -gt 100000
-          sha256sum "$APK"
-
-      - name: Rename debug APK
-        shell: bash
-        run: |
-          mv app/build/outputs/apk/debug/app-debug.apk \
-            "app/build/outputs/apk/debug/SwiftSlate-debug-5.678.nova-${GITHUB_SHA:0:7}.apk"
-
-      - name: Upload debug APK artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: SwiftSlate-debug-5.678.nova
-          path: app/build/outputs/apk/debug/SwiftSlate-debug-*.apk
-          retention-days: 30
-
-      # TEMPORARY (PR branch only, will be reverted): commit the verified debug
-      # APK to dist/ on the PR branch so it lands in the repo without merging.
-      - name: Commit debug APK to the PR branch
-        if: github.event_name == 'pull_request'
-        shell: bash
-        env:
-          BRANCH: ${{ github.head_ref }}
-        run: |
-          set -euo pipefail
-          test -n "$BRANCH"
-          APK="app/build/outputs/apk/debug/SwiftSlate-debug-5.678.nova-${GITHUB_SHA:0:7}.apk"
-          test -s "$APK"
-          git fetch origin "$BRANCH"
-          git checkout "$BRANCH"
-          mkdir -p dist
-          cp "$APK" dist/SwiftSlate-debug-5.678.nova.apk
-          test -s dist/SwiftSlate-debug-5.678.nova.apk
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add dist/SwiftSlate-debug-5.678.nova.apk
-          if git diff --cached --quiet; then
-            echo "APK unchanged, nothing to commit."
-            exit 0
-          fi
-          git commit -m "Add debug APK 5.678.nova built by CI (run $GITHUB_RUN_NUMBER) [skip ci]"
-          git push origin "$BRANCH"
 
       - name: Explain how to use it
         shell: bash
