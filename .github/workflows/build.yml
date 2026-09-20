@@ -42,6 +42,10 @@ jobs:
     name: Build installable APK
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # TEMPORARY (PR branch only, will be reverted): allow committing the built
+    # debug APK back to the PR branch.
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -160,6 +164,33 @@ jobs:
           name: SwiftSlate-debug-5.678.nova
           path: app/build/outputs/apk/debug/SwiftSlate-debug-*.apk
           retention-days: 30
+
+      # TEMPORARY (PR branch only, will be reverted): commit the verified debug
+      # APK to dist/ on the PR branch so it lands in the repo without merging.
+      - name: Commit debug APK to the PR branch
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          test -n "$BRANCH"
+          APK="app/build/outputs/apk/debug/SwiftSlate-debug-5.678.nova-${GITHUB_SHA:0:7}.apk"
+          test -s "$APK"
+          git fetch origin "$BRANCH"
+          git checkout "$BRANCH"
+          mkdir -p dist
+          cp "$APK" dist/SwiftSlate-debug-5.678.nova.apk
+          test -s dist/SwiftSlate-debug-5.678.nova.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dist/SwiftSlate-debug-5.678.nova.apk
+          if git diff --cached --quiet; then
+            echo "APK unchanged, nothing to commit."
+            exit 0
+          fi
+          git commit -m "Add debug APK 5.678.nova built by CI (run $GITHUB_RUN_NUMBER) [skip ci]"
+          git push origin "$BRANCH"
 
       - name: Explain how to use it
         shell: bash
