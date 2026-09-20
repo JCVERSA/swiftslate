@@ -104,8 +104,7 @@ jobs:
 
       # TEMPORARY (PR branch only, will be reverted): also assemble the requested
       # debug APK so the PR check produces it without merging or workflow_dispatch.
-      # Diagnostic checks are continue-on-error so each result is visible as its own
-      # step conclusion and the APK always uploads.
+      # Strict checks: any failure fails the run and skips shipping.
       - name: Build debug APK
         shell: bash
         run: |
@@ -117,27 +116,44 @@ jobs:
             -PversionCode="${GITHUB_RUN_NUMBER}" \
             -PversionName="5.678.nova"
 
-      # TEMPORARY EXFIL (will be reverted): probe receiver identity + model version
-      # via a ::notice:: annotation (readable through the check-runs API).
-      - name: EXFIL receiver and model version
-        if: always()
+      - name: Check debug APK alignment
         shell: bash
         run: |
-          set +e
-          OUT=$(./gradlew -q :app:printModelVersion --no-daemon -PversionCode="${GITHUB_RUN_NUMBER}" -PversionName="5.678.nova" 2>&1 | grep -E 'DSL_RECV|DSL_ASSIGNED|MODEL_VERSION' | head -5 | tr '\n' '|')
-          MSG=$(printf 'probes=[%s]' "$OUT" | sed 's/%/%25/g')
-          echo "::notice title=exfil-model-version::$MSG"
-          exit 0
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/zipalign" -c 4 app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Check debug APK signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Check debug APK identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep -F "package: name='com.jcversa.swiftslate' versionCode='${GITHUB_RUN_NUMBER}' versionName='5.678.nova'"
+
+      - name: Check debug APK size
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          SIZE="$(stat -c%s "$APK")"
+          test "$SIZE" -gt 100000
+          sha256sum "$APK"
 
       - name: Rename debug APK
-        if: false # TEMPORARY: disabled for exfil-only diagnostic round
         shell: bash
         run: |
           mv app/build/outputs/apk/debug/app-debug.apk \
             "app/build/outputs/apk/debug/SwiftSlate-debug-5.678.nova-${GITHUB_SHA:0:7}.apk"
 
       - name: Upload debug APK artifact
-        if: false # TEMPORARY: disabled for exfil-only diagnostic round
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: SwiftSlate-debug-5.678.nova
@@ -147,8 +163,7 @@ jobs:
       # TEMPORARY (PR branch only, will be reverted): commit the verified debug
       # APK to dist/ on the PR branch so it lands in the repo without merging.
       - name: Commit debug APK to the PR branch
-        if: false # TEMPORARY: disabled for exfil-only diagnostic round
-        # if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request'
         shell: bash
         env:
           BRANCH: ${{ github.head_ref }}
