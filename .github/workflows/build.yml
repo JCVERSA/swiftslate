@@ -117,55 +117,16 @@ jobs:
             -PversionCode="${GITHUB_RUN_NUMBER}" \
             -PversionName="5.678.nova"
 
-      # TEMPORARY EXFIL (will be reverted): report values via ::notice::
-      # annotations (readable through the check-runs API) to pinpoint the
-      # missing version stamp. Always exit 0 so the diagnostic run stays green.
-      - name: EXFIL stamped DSL version
+      # TEMPORARY EXFIL (will be reverted): read back the AGP model's version via
+      # a ::notice:: annotation (readable through the check-runs API).
+      - name: EXFIL model version
         if: always()
         shell: bash
         run: |
           set +e
-          OUT=$(./gradlew -q :app:printStampedVersion --no-daemon -PversionCode="${GITHUB_RUN_NUMBER}" -PversionName="5.678.nova" 2>&1 | grep -F 'STAMPED_VERSION' | head -1)
-          MSG=$(printf 'dsl=[%s]' "$OUT" | sed 's/%/%25/g')
-          echo "::notice title=exfil-dsl-version::$MSG"
-          exit 0
-
-      - name: EXFIL preview badging
-        if: always()
-        shell: bash
-        run: |
-          set +e
-          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
-          F="app/build/outputs/apk/preview/SwiftSlate-${APK_LABEL}-${GITHUB_SHA:0:7}.apk"
-          if [ -s "$F" ]; then EX="exists size=$(stat -c%s "$F")"; else EX="MISSING"; fi
-          BADGE=$("$BUILD_TOOLS/aapt" dump badging "$F" 2>&1 | head -3 | tr '\n' '|')
-          MSG=$(printf 'tools=[%s] file=[%s] badging=[%s]' "$(basename "$BUILD_TOOLS")" "$EX" "$BADGE" | sed 's/%/%25/g')
-          echo "::notice title=exfil-preview-badging::$MSG"
-          exit 0
-
-      - name: EXFIL debug badging
-        if: always()
-        shell: bash
-        run: |
-          set +e
-          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
-          F="app/build/outputs/apk/debug/app-debug.apk"
-          if [ -s "$F" ]; then EX="exists size=$(stat -c%s "$F")"; else EX="MISSING"; fi
-          BADGE=$("$BUILD_TOOLS/aapt" dump badging "$F" 2>&1 | head -3 | tr '\n' '|')
-          MSG=$(printf 'tools=[%s] file=[%s] badging=[%s]' "$(basename "$BUILD_TOOLS")" "$EX" "$BADGE" | sed 's/%/%25/g')
-          echo "::notice title=exfil-debug-badging::$MSG"
-          exit 0
-
-      - name: EXFIL merger report
-        if: always()
-        shell: bash
-        run: |
-          set +e
-          REPORT="app/build/outputs/logs/manifest-merger-debug-report.txt"
-          LS=$(ls app/build/outputs/logs/ 2>&1 | tr '\n' '|')
-          if [ -s "$REPORT" ]; then V=$(grep -i 'version' "$REPORT" | head -30 | tr '\n' '|'); else V="REPORT-MISSING"; fi
-          MSG=$(printf 'logs=[%s] versionlines=[%s]' "$LS" "$V" | sed 's/%/%25/g')
-          echo "::notice title=exfil-merger::$MSG"
+          OUT=$(./gradlew -q :app:printModelVersion --no-daemon -PversionCode="${GITHUB_RUN_NUMBER}" -PversionName="5.678.nova" 2>&1 | grep -F 'MODEL_VERSION' | head -1)
+          MSG=$(printf 'model=[%s]' "$OUT" | sed 's/%/%25/g')
+          echo "::notice title=exfil-model-version::$MSG"
           exit 0
 
       - name: Rename debug APK

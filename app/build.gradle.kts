@@ -191,9 +191,9 @@ dependencies {
     testImplementation("androidx.test:core-ktx:1.7.0")
 }
 
-// TEMPORARY (will be reverted): expose DSL version values to CI diagnostics.
-tasks.register("printStampedVersion") {
+// TEMPORARY (will be reverted): read back the AGP model's version values.
+tasks.register("printModelVersion") {
     doLast {
-        println("STAMPED_VERSION versionCode=${versionCode} versionName=${versionName}")
+        println("MODEL_VERSION versionCode=[${android.defaultConfig.versionCode}] versionName=[${android.defaultConfig.versionName}]")
     }
 }
