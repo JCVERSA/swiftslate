@@ -58,8 +58,6 @@ android {
         applicationId = "com.jcversa.swiftslate"
         minSdk = 23
         targetSdk = 36
-        // TEMP EXPERIMENT (will be reverted): probe the defaultConfig receiver.
-        println("DSL_RECV class=${this::class.qualifiedName} idHash=${System.identityHashCode(this)}")
 
         // Ship exactly the locales that exist in res/, and nothing else.
         //
@@ -86,10 +84,13 @@ android {
         androidResources.localeFilters += (listOf("en") + locales)
     }
 
-    // TEMP EXPERIMENT (will be reverted): assign version directly on the model object.
+    // Assign the version directly on the android.defaultConfig model object.
+    // Do NOT move these back into the defaultConfig block as `this.versionCode = ...`:
+    // verified by CI probe (run 35520413620) that the in-block `this.`-qualified form
+    // silently leaves android.defaultConfig.versionCode/versionName null, producing APKs
+    // with empty versionCode/versionName, while direct assignment sticks.
     defaultConfig.versionCode = versionCode
     defaultConfig.versionName = versionName
-    println("DSL_ASSIGNED modelIdHash=${System.identityHashCode(defaultConfig)} versionCodeNow=${defaultConfig.versionCode} versionNameNow=${defaultConfig.versionName}")
 
     androidResources {
         // Generates <locale-config> from the locales in res/ and references it from the
@@ -194,11 +195,4 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation("androidx.test:core-ktx:1.7.0")
-}
-
-// TEMPORARY (will be reverted): read back the AGP model's version values.
-tasks.register("printModelVersion") {
-    doLast {
-        println("MODEL_VERSION versionCode=[${android.defaultConfig.versionCode}] versionName=[${android.defaultConfig.versionName}] idHash=${System.identityHashCode(android.defaultConfig)}")
-    }
 }
