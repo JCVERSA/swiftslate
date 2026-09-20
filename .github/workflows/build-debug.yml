@@ -1,0 +1,163 @@
+name: Build Debug APK
+
+# On-demand debuggable APK for local testing and distribution of development builds.
+# Trigger manually from the Actions tab (or via `gh workflow run`) and download the
+# artifact when the run finishes. The debug APK shares the production applicationId
+# (com.jcversa.swiftslate) and is signed with the runner's temporary debug key, so it
+# cannot be installed over — or upgraded to — a stable release build (signature mismatch).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'versionName stamped into the APK (debug only, no release check)'
+        required: true
+        default: '5.678.nova'
+      version_code:
+        description: 'versionCode stamped into the APK (empty = GitHub run number)'
+        required: false
+        default: ''
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx3g -Dfile.encoding=UTF-8 -XX:+UseG1GC"
+
+jobs:
+  debug:
+    name: Lint, test and build debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-cleanup: on-success
+          cache-read-only: false
+
+      - name: Resolve version metadata
+        id: metadata
+        shell: bash
+        env:
+          INPUT_VERSION_NAME: ${{ inputs.version_name }}
+          INPUT_VERSION_CODE: ${{ inputs.version_code }}
+        run: |
+          set -euo pipefail
+          VERSION_NAME="${INPUT_VERSION_NAME:-5.678.nova}"
+          VERSION_CODE="${INPUT_VERSION_CODE:-$GITHUB_RUN_NUMBER}"
+          [[ "$VERSION_CODE" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::versionCode must be a positive integer: $VERSION_CODE"
+            exit 1
+          }
+          {
+            echo "version_name=$VERSION_NAME"
+            echo "version_code=$VERSION_CODE"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run lint, unit tests and assemble the debug APK
+        shell: bash
+        env:
+          VERSION_NAME: ${{ steps.metadata.outputs.version_name }}
+          VERSION_CODE: ${{ steps.metadata.outputs.version_code }}
+        run: |
+          set -euo pipefail
+          ./gradlew lintDebug testDebugUnitTest :app:assembleDebug \
+            --parallel \
+            --build-cache \
+            --no-daemon \
+            --configuration-cache-problems=warn \
+            -PversionName="$VERSION_NAME" \
+            -PversionCode="$VERSION_CODE"
+
+      - name: Check debug APK alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/zipalign" -c 4 app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Check debug APK signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Check debug APK identity
+        shell: bash
+        env:
+          VERSION_NAME: ${{ steps.metadata.outputs.version_name }}
+          VERSION_CODE: ${{ steps.metadata.outputs.version_code }}
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep -F "package: name='com.jcversa.swiftslate' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'"
+
+      - name: Check debug APK size
+        shell: bash
+        env:
+          VERSION_NAME: ${{ steps.metadata.outputs.version_name }}
+          VERSION_CODE: ${{ steps.metadata.outputs.version_code }}
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          SIZE="$(stat -c%s "$APK")"
+          test "$SIZE" -gt 100000
+          SHA256="$(sha256sum "$APK" | cut -d' ' -f1)"
+          {
+            echo "## Debug APK verification"
+            echo
+            echo "- Version: $VERSION_NAME (versionCode $VERSION_CODE)"
+            echo "- APK: $SIZE bytes"
+            echo "- SHA-256: $SHA256"
+            echo "- Variant: debug (debuggable, debug-signed)"
+            echo "- Signature: apksigner verified"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Rename APK
+        shell: bash
+        env:
+          VERSION_NAME: ${{ steps.metadata.outputs.version_name }}
+        run: |
+          set -euo pipefail
+          mv app/build/outputs/apk/debug/app-debug.apk \
+            "app/build/outputs/apk/debug/SwiftSlate-debug-${VERSION_NAME}-${GITHUB_SHA:0:7}.apk"
+
+      - name: Upload debug APK artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: SwiftSlate-debug-${{ steps.metadata.outputs.version_name }}
+          path: app/build/outputs/apk/debug/SwiftSlate-debug-*.apk
+          retention-days: 30
+
+      - name: Upload lint results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: debug-lint-results
+          path: app/build/reports/lint-results-*.html
+          retention-days: 14
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: debug-test-results
+          path: app/build/reports/tests/
+          retention-days: 14

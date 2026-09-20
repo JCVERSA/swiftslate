@@ -58,8 +58,6 @@ android {
         applicationId = "com.jcversa.swiftslate"
         minSdk = 23
         targetSdk = 36
-        this.versionCode = versionCode
-        this.versionName = versionName
 
         // Ship exactly the locales that exist in res/, and nothing else.
         //
@@ -85,6 +83,14 @@ android {
             .map { it.name.removePrefix("values-") }
         androidResources.localeFilters += (listOf("en") + locales)
     }
+
+    // Assign the version directly on the android.defaultConfig model object.
+    // Do NOT move these back into the defaultConfig block as `this.versionCode = ...`:
+    // verified by CI probe (run 35520413620) that the in-block `this.`-qualified form
+    // silently leaves android.defaultConfig.versionCode/versionName null, producing APKs
+    // with empty versionCode/versionName, while direct assignment sticks.
+    defaultConfig.versionCode = versionCode
+    defaultConfig.versionName = versionName
 
     androidResources {
         // Generates <locale-config> from the locales in res/ and references it from the
