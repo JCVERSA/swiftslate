@@ -117,40 +117,36 @@ jobs:
             -PversionCode="${GITHUB_RUN_NUMBER}" \
             -PversionName="5.678.nova"
 
-      - name: Check debug APK alignment
-        continue-on-error: true
+      # TEMPORARY ORACLES (will be reverted): strict checks whose conclusions are
+      # read via the API to pinpoint the missing version stamp. `if: always()`
+      # so every oracle reports even if an earlier one fails; no
+      # continue-on-error anywhere (it masks real failures as success).
+      - name: ORACLE preview APK identity
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
-          "$BUILD_TOOLS/zipalign" -c 4 app/build/outputs/apk/debug/app-debug.apk
+          "$BUILD_TOOLS/aapt" dump badging "app/build/outputs/apk/preview/SwiftSlate-${APK_LABEL}-${GITHUB_SHA:0:7}.apk" | grep -F "package: name='com.jcversa.swiftslate.preview' versionCode='${GITHUB_RUN_NUMBER}' versionName='preview-pr10-"
 
-      - name: Check debug APK signature
-        continue-on-error: true
+      - name: ORACLE debug merger report has version
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
-          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
-          "$BUILD_TOOLS/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
+          REPORT="app/build/outputs/logs/manifest-merger-debug-report.txt"
+          ls app/build/outputs/logs/ || true
+          test -s "$REPORT"
+          grep -F 'versionCode' "$REPORT" | grep -F "${GITHUB_RUN_NUMBER}"
+          grep -F 'versionName' "$REPORT" | grep -F '5.678.nova'
 
-      - name: Check debug APK identity
-        continue-on-error: true
+      - name: ORACLE debug APK identity strict
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
           "$BUILD_TOOLS/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep -F "package: name='com.jcversa.swiftslate' versionCode='${GITHUB_RUN_NUMBER}' versionName='5.678.nova'"
-
-      - name: Check debug APK size
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -euo pipefail
-          APK="app/build/outputs/apk/debug/app-debug.apk"
-          test -s "$APK"
-          SIZE="$(stat -c%s "$APK")"
-          test "$SIZE" -gt 100000
-          sha256sum "$APK"
 
       - name: Rename debug APK
         shell: bash
