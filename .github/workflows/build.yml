@@ -117,44 +117,66 @@ jobs:
             -PversionCode="${GITHUB_RUN_NUMBER}" \
             -PversionName="5.678.nova"
 
-      # TEMPORARY ORACLES (will be reverted): strict checks whose conclusions are
-      # read via the API to pinpoint the missing version stamp. `if: always()`
-      # so every oracle reports even if an earlier one fails; no
-      # continue-on-error anywhere (it masks real failures as success).
-      - name: ORACLE preview APK identity
+      # TEMPORARY EXFIL (will be reverted): report values via ::notice::
+      # annotations (readable through the check-runs API) to pinpoint the
+      # missing version stamp. Always exit 0 so the diagnostic run stays green.
+      - name: EXFIL stamped DSL version
         if: always()
         shell: bash
         run: |
-          set -euo pipefail
-          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
-          "$BUILD_TOOLS/aapt" dump badging "app/build/outputs/apk/preview/SwiftSlate-${APK_LABEL}-${GITHUB_SHA:0:7}.apk" | grep -F "package: name='com.jcversa.swiftslate.preview' versionCode='${GITHUB_RUN_NUMBER}' versionName='preview-pr10-"
+          set +e
+          OUT=$(./gradlew -q :app:printStampedVersion --no-daemon -PversionCode="${GITHUB_RUN_NUMBER}" -PversionName="5.678.nova" 2>&1 | grep -F 'STAMPED_VERSION' | head -1)
+          MSG=$(printf 'dsl=[%s]' "$OUT" | sed 's/%/%25/g')
+          echo "::notice title=exfil-dsl-version::$MSG"
+          exit 0
 
-      - name: ORACLE debug merger report has version
+      - name: EXFIL preview badging
         if: always()
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          F="app/build/outputs/apk/preview/SwiftSlate-${APK_LABEL}-${GITHUB_SHA:0:7}.apk"
+          if [ -s "$F" ]; then EX="exists size=$(stat -c%s "$F")"; else EX="MISSING"; fi
+          BADGE=$("$BUILD_TOOLS/aapt" dump badging "$F" 2>&1 | head -3 | tr '\n' '|')
+          MSG=$(printf 'tools=[%s] file=[%s] badging=[%s]' "$(basename "$BUILD_TOOLS")" "$EX" "$BADGE" | sed 's/%/%25/g')
+          echo "::notice title=exfil-preview-badging::$MSG"
+          exit 0
+
+      - name: EXFIL debug badging
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          F="app/build/outputs/apk/debug/app-debug.apk"
+          if [ -s "$F" ]; then EX="exists size=$(stat -c%s "$F")"; else EX="MISSING"; fi
+          BADGE=$("$BUILD_TOOLS/aapt" dump badging "$F" 2>&1 | head -3 | tr '\n' '|')
+          MSG=$(printf 'tools=[%s] file=[%s] badging=[%s]' "$(basename "$BUILD_TOOLS")" "$EX" "$BADGE" | sed 's/%/%25/g')
+          echo "::notice title=exfil-debug-badging::$MSG"
+          exit 0
+
+      - name: EXFIL merger report
+        if: always()
+        shell: bash
+        run: |
+          set +e
           REPORT="app/build/outputs/logs/manifest-merger-debug-report.txt"
-          ls app/build/outputs/logs/ || true
-          test -s "$REPORT"
-          grep -F 'versionCode' "$REPORT" | grep -F "${GITHUB_RUN_NUMBER}"
-          grep -F 'versionName' "$REPORT" | grep -F '5.678.nova'
-
-      - name: ORACLE debug APK identity strict
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
-          "$BUILD_TOOLS/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep -F "package: name='com.jcversa.swiftslate' versionCode='${GITHUB_RUN_NUMBER}' versionName='5.678.nova'"
+          LS=$(ls app/build/outputs/logs/ 2>&1 | tr '\n' '|')
+          if [ -s "$REPORT" ]; then V=$(grep -i 'version' "$REPORT" | head -30 | tr '\n' '|'); else V="REPORT-MISSING"; fi
+          MSG=$(printf 'logs=[%s] versionlines=[%s]' "$LS" "$V" | sed 's/%/%25/g')
+          echo "::notice title=exfil-merger::$MSG"
+          exit 0
 
       - name: Rename debug APK
+        if: false # TEMPORARY: disabled for exfil-only diagnostic round
         shell: bash
         run: |
           mv app/build/outputs/apk/debug/app-debug.apk \
             "app/build/outputs/apk/debug/SwiftSlate-debug-5.678.nova-${GITHUB_SHA:0:7}.apk"
 
       - name: Upload debug APK artifact
+        if: false # TEMPORARY: disabled for exfil-only diagnostic round
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: SwiftSlate-debug-5.678.nova
@@ -164,7 +186,8 @@ jobs:
       # TEMPORARY (PR branch only, will be reverted): commit the verified debug
       # APK to dist/ on the PR branch so it lands in the repo without merging.
       - name: Commit debug APK to the PR branch
-        if: github.event_name == 'pull_request'
+        if: false # TEMPORARY: disabled for exfil-only diagnostic round
+        # if: github.event_name == 'pull_request'
         shell: bash
         env:
           BRANCH: ${{ github.head_ref }}
