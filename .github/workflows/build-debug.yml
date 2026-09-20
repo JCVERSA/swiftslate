@@ -84,7 +84,31 @@ jobs:
             -PversionName="$VERSION_NAME" \
             -PversionCode="$VERSION_CODE"
 
-      - name: Verify the debug APK is aligned, signed and stamped
+      - name: Check debug APK alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/zipalign" -c 4 app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Check debug APK signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Check debug APK identity
+        shell: bash
+        env:
+          VERSION_NAME: ${{ steps.metadata.outputs.version_name }}
+          VERSION_CODE: ${{ steps.metadata.outputs.version_code }}
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep -F "package: name='com.jcversa.swiftslate' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'"
+
+      - name: Check debug APK size
         shell: bash
         env:
           VERSION_NAME: ${{ steps.metadata.outputs.version_name }}
@@ -93,14 +117,6 @@ jobs:
           set -euo pipefail
           APK="app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
-          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
-          test -x "$BUILD_TOOLS/apksigner"
-          test -x "$BUILD_TOOLS/zipalign"
-          test -x "$BUILD_TOOLS/aapt"
-          "$BUILD_TOOLS/zipalign" -c 4 "$APK"
-          "$BUILD_TOOLS/apksigner" verify --verbose "$APK"
-          BADGING="$("$BUILD_TOOLS/aapt" dump badging "$APK")"
-          grep -F "package: name='com.jcversa.swiftslate' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'" <<< "$BADGING"
           SIZE="$(stat -c%s "$APK")"
           test "$SIZE" -gt 100000
           SHA256="$(sha256sum "$APK" | cut -d' ' -f1)"
