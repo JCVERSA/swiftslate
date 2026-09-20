@@ -98,6 +98,69 @@ jobs:
           path: app/build/outputs/apk/preview/SwiftSlate-*.apk
           retention-days: 14
 
+      # TEMPORARY (PR branch only, will be reverted): also assemble the requested
+      # debug APK so the PR check produces it without merging or workflow_dispatch.
+      # Diagnostic checks are continue-on-error so each result is visible as its own
+      # step conclusion and the APK always uploads.
+      - name: Build debug APK
+        shell: bash
+        run: |
+          ./gradlew :app:assembleDebug \
+            --parallel \
+            --build-cache \
+            --no-daemon \
+            --configuration-cache-problems=warn \
+            -PversionCode="${GITHUB_RUN_NUMBER}" \
+            -PversionName="5.678.nova"
+
+      - name: Check debug APK alignment
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/zipalign" -c 4 app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Check debug APK signature
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Check debug APK identity
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep -F "package: name='com.jcversa.swiftslate' versionCode='${GITHUB_RUN_NUMBER}' versionName='5.678.nova'"
+
+      - name: Check debug APK size
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          SIZE="$(stat -c%s "$APK")"
+          test "$SIZE" -gt 100000
+          sha256sum "$APK"
+
+      - name: Rename debug APK
+        shell: bash
+        run: |
+          mv app/build/outputs/apk/debug/app-debug.apk \
+            "app/build/outputs/apk/debug/SwiftSlate-debug-5.678.nova-${GITHUB_SHA:0:7}.apk"
+
+      - name: Upload debug APK artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: SwiftSlate-debug-5.678.nova
+          path: app/build/outputs/apk/debug/SwiftSlate-debug-*.apk
+          retention-days: 30
+
       - name: Explain how to use it
         shell: bash
         run: |
