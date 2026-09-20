@@ -98,6 +98,56 @@ jobs:
           path: app/build/outputs/apk/preview/SwiftSlate-*.apk
           retention-days: 14
 
+      # TEMPORARY (PR branch only, will be reverted): also assemble the requested
+      # debug APK so the PR check produces it without merging or workflow_dispatch.
+      - name: Build debug APK
+        shell: bash
+        run: |
+          ./gradlew :app:assembleDebug \
+            --parallel \
+            --build-cache \
+            --no-daemon \
+            --configuration-cache-problems=warn \
+            -PversionCode="${GITHUB_RUN_NUMBER}" \
+            -PversionName="5.678.nova"
+
+      - name: Verify the debug APK is aligned, signed and stamped
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          test -x "$BUILD_TOOLS/apksigner"
+          test -x "$BUILD_TOOLS/zipalign"
+          test -x "$BUILD_TOOLS/aapt"
+          "$BUILD_TOOLS/zipalign" -c 4 "$APK"
+          "$BUILD_TOOLS/apksigner" verify --verbose "$APK"
+          "$BUILD_TOOLS/aapt" dump badging "$APK" | grep -F "package: name='com.jcversa.swiftslate' versionCode='${GITHUB_RUN_NUMBER}' versionName='5.678.nova'"
+          SIZE="$(stat -c%s "$APK")"
+          test "$SIZE" -gt 100000
+          SHA256="$(sha256sum "$APK" | cut -d' ' -f1)"
+          {
+            echo "## Debug APK verification"
+            echo
+            echo "- Version: 5.678.nova (versionCode $GITHUB_RUN_NUMBER)"
+            echo "- APK: $SIZE bytes"
+            echo "- SHA-256: $SHA256"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Rename debug APK
+        shell: bash
+        run: |
+          mv app/build/outputs/apk/debug/app-debug.apk \
+            "app/build/outputs/apk/debug/SwiftSlate-debug-5.678.nova-${GITHUB_SHA:0:7}.apk"
+
+      - name: Upload debug APK artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: SwiftSlate-debug-5.678.nova
+          path: app/build/outputs/apk/debug/SwiftSlate-debug-*.apk
+          retention-days: 30
+
       - name: Explain how to use it
         shell: bash
         run: |
